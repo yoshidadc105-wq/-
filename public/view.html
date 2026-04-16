@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マニュアル閲覧 - 社内マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .manual-content { line-height: 1.8; font-size: 15px; }
+    .manual-content h1, .manual-content h2, .manual-content h3 { margin: 20px 0 10px; font-weight: 700; }
+    .manual-content h1 { font-size: 22px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+    .manual-content h2 { font-size: 18px; }
+    .manual-content h3 { font-size: 16px; }
+    .manual-content p { margin-bottom: 12px; }
+    .manual-content ul, .manual-content ol { padding-left: 24px; margin-bottom: 12px; }
+    .manual-content li { margin-bottom: 4px; }
+    .manual-content strong { font-weight: 700; }
+    .manual-content em { font-style: italic; }
+    .manual-content blockquote { border-left: 4px solid var(--primary); padding-left: 16px; color: var(--text-muted); margin: 12px 0; }
+    .manual-content table { border-collapse: collapse; margin-bottom: 12px; }
+    .manual-content th, .manual-content td { border: 1px solid var(--border); padding: 8px 12px; }
+    .manual-content th { background: var(--bg); }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+  <div class="navbar-right">
+    <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
+    <a href="/admin.html" id="navAdminLink" class="btn btn-secondary btn-sm hidden">管理者設定</a>
+    <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div id="breadcrumb" class="text-sm text-muted mb-2">
+    <a href="/" style="color: var(--primary);">← マニュアル一覧</a>
+  </div>
+
+  <div id="content"><div class="loading">読み込み中</div></div>
+</div>
+
+<!-- 削除確認モーダル -->
+<div class="modal-overlay hidden" id="deleteModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">マニュアルの削除</span>
+      <button class="modal-close" onclick="closeModal('deleteModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p>このマニュアルを削除しますか？この操作は取り消せません。</p>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeModal('deleteModal')" class="btn btn-secondary">キャンセル</button>
+      <button onclick="deleteManual()" class="btn btn-danger">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+let manualId = null;
+let currentUser = null;
+let manualData = null;
+
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  manualId = params.get('id');
+
+  if (!manualId) { window.location.href = '/'; return; }
+
+  currentUser = await loadCurrentUser();
+  if (!currentUser) return;
+  initNavbar(currentUser);
+
+  await loadManual();
+}
+
+async function loadManual() {
+  const res = await fetch(`/api/manuals/${manualId}`);
+
+  if (!res.ok) {
+    document.getElementById('content').innerHTML = `
+      <div class="empty"><div class="empty-icon">❌</div>マニュアルが見つかりません<br>
+      <a href="/" class="btn btn-primary mt-2">一覧に戻る</a></div>
+    `;
+    return;
+  }
+
+  manualData = await res.json();
+  document.title = `${manualData.title} - マニュアルシステム`;
+
+  const canEdit = currentUser.role === 'admin' || manualData.created_by === currentUser.id;
+
+  let bodyHtml = '';
+
+  if (manualData.type === 'pdf') {
+    bodyHtml = `
+      <div class="mb-2 flex gap-2">
+        <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+        ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+        ${canEdit ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+      </div>
+      <iframe src="/uploads/${manualData.file_path}" class="pdf-viewer"></iframe>
+    `;
+  } else {
+    bodyHtml = `
+      <div class="card">
+        <div class="card-body">
+          <div class="manual-content">${manualData.content || ''}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('content').innerHTML = `
+    <div class="card mb-2">
+      <div class="card-header">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge ${manualData.type === 'pdf' ? 'badge-pdf' : 'badge-text'}">${manualData.type === 'pdf' ? 'PDF' : 'テキスト'}</span>
+            ${manualData.category_name ? `<span class="badge" style="background:#f1f5f9;color:var(--text-muted);">${manualData.category_name}</span>` : ''}
+          </div>
+          <h1 style="font-size: 22px; font-weight: 700;">${manualData.title}</h1>
+          ${manualData.description ? `<p class="text-muted text-sm mt-1">${manualData.description}</p>` : ''}
+          <div class="text-sm text-muted mt-1">
+            作成者: ${manualData.created_by_name} ·
+            作成日: ${formatDate(manualData.created_at)} ·
+            更新日: ${formatDate(manualData.updated_at)}
+          </div>
+        </div>
+        ${manualData.type !== 'pdf' ? `
+        <div class="flex gap-2">
+          ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+          ${canEdit ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+        </div>
+        ` : ''}
+      </div>
+    </div>
+    ${bodyHtml}
+  `;
+}
+
+async function deleteManual() {
+  const res = await fetch(`/api/manuals/${manualId}`, { method: 'DELETE' });
+  if (res.ok) {
+    window.location.href = '/';
+  } else {
+    const data = await res.json();
+    alert(data.error || '削除に失敗しました');
+    closeModal('deleteModal');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

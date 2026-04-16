@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マニュアル一覧 - 社内マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- ナビバー -->
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+  <div class="navbar-right">
+    <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
+    <a href="/admin.html" id="navAdminLink" class="btn btn-secondary btn-sm hidden">管理者設定</a>
+    <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="layout">
+
+    <!-- サイドバー（カテゴリ） -->
+    <aside class="sidebar">
+      <div class="card">
+        <div class="card-body" style="padding: 12px 0;">
+          <div class="sidebar-section-title">カテゴリ</div>
+          <ul class="sidebar-nav" id="categoryNav">
+            <li><a href="#" class="active" data-category="">すべて</a></li>
+          </ul>
+          <div class="sidebar-section-title" style="margin-top: 16px;">最近見たもの</div>
+          <ul class="sidebar-nav" id="recentNav"></ul>
+        </div>
+      </div>
+
+      <div class="mt-2">
+        <a href="/create.html" class="btn btn-primary w-full">+ 新規マニュアル作成</a>
+      </div>
+    </aside>
+
+    <!-- メインコンテンツ -->
+    <main class="main-content">
+      <div class="flex items-center justify-between mb-2">
+        <h1 style="font-size: 20px; font-weight: 700;" id="pageTitle">すべてのマニュアル</h1>
+        <div class="flex gap-2">
+          <button onclick="setViewMode('grid')" id="btnGrid" class="btn btn-secondary btn-sm">▦ グリッド</button>
+          <button onclick="setViewMode('list')" id="btnList" class="btn btn-secondary btn-sm">☰ リスト</button>
+        </div>
+      </div>
+
+      <!-- 検索バー -->
+      <div class="search-bar">
+        <input type="text" id="searchInput" class="form-control" placeholder="タイトル・説明で検索...">
+        <select id="typeFilter" class="form-control" style="width: auto;">
+          <option value="">種別：すべて</option>
+          <option value="pdf">PDF</option>
+          <option value="rich_text">テキスト</option>
+        </select>
+        <button onclick="loadManuals(1)" class="btn btn-primary">検索</button>
+      </div>
+
+      <div id="alert" class="hidden"></div>
+      <div id="manualList"><div class="loading">読み込み中</div></div>
+      <div id="pagination" class="pagination"></div>
+    </main>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+let currentPage = 1;
+let currentCategory = '';
+let viewMode = localStorage.getItem('viewMode') || 'grid';
+let currentUser = null;
+
+async function init() {
+  currentUser = await loadCurrentUser();
+  if (!currentUser) return;
+  initNavbar(currentUser);
+  await loadCategories();
+  await loadRecent();
+  await loadManuals(1);
+  setViewMode(viewMode);
+
+  document.getElementById('searchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadManuals(1);
+  });
+}
+
+async function loadCategories() {
+  const res = await fetch('/api/categories');
+  const cats = await res.json();
+  const nav = document.getElementById('categoryNav');
+  nav.innerHTML = `<li><a href="#" class="${currentCategory === '' ? 'active' : ''}" data-category="" onclick="filterByCategory('', 'すべて', this)">すべて</a></li>`;
+  cats.forEach(c => {
+    nav.innerHTML += `<li><a href="#" data-category="${c.id}" onclick="filterByCategory(${c.id}, '${c.name}', this)">${c.name} <span class="text-muted text-sm">(${c.manual_count})</span></a></li>`;
+  });
+}
+
+async function loadRecent() {
+  const res = await fetch('/api/manuals/history/recent');
+  const list = await res.json();
+  const nav = document.getElementById('recentNav');
+  if (list.length === 0) {
+    nav.innerHTML = '<li style="padding: 4px 12px; font-size: 12px; color: var(--text-muted);">まだ閲覧履歴がありません</li>';
+    return;
+  }
+  nav.innerHTML = list.slice(0, 5).map(m => `
+    <li><a href="/view.html?id=${m.id}" style="font-size: 13px;">
+      ${m.type === 'pdf' ? '📄' : '📝'} ${m.title.length > 20 ? m.title.slice(0, 20) + '…' : m.title}
+    </a></li>
+  `).join('');
+}
+
+function filterByCategory(id, name, el) {
+  currentCategory = id;
+  document.querySelectorAll('#categoryNav a').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('pageTitle').textContent = name;
+  loadManuals(1);
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  localStorage.setItem('viewMode', mode);
+  document.getElementById('btnGrid').className = `btn btn-sm ${mode === 'grid' ? 'btn-primary' : 'btn-secondary'}`;
+  document.getElementById('btnList').className = `btn btn-sm ${mode === 'list' ? 'btn-primary' : 'btn-secondary'}`;
+  if (document.getElementById('manualList').children.length > 0) renderManuals(window._lastManuals || []);
+}
+
+async function loadManuals(page = 1) {
+  currentPage = page;
+  const search = document.getElementById('searchInput').value;
+  const type = document.getElementById('typeFilter').value;
+
+  const params = new URLSearchParams({ page, limit: 20 });
+  if (search) params.set('search', search);
+  if (currentCategory) params.set('category_id', currentCategory);
+  if (type) params.set('type', type);
+
+  const res = await fetch(`/api/manuals?${params}`);
+  const data = await res.json();
+
+  window._lastManuals = data.manuals;
+  renderManuals(data.manuals);
+  renderPagination(data.total, data.page, data.limit);
+}
+
+function renderManuals(manuals) {
+  const container = document.getElementById('manualList');
+
+  if (manuals.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📂</div>マニュアルが見つかりません</div>`;
+    return;
+  }
+
+  if (viewMode === 'grid') {
+    container.className = 'manual-grid';
+    container.innerHTML = manuals.map(m => `
+      <a href="/view.html?id=${m.id}" class="manual-card">
+        <div class="flex items-center gap-2">
+          <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : 'テキスト'}</span>
+          ${m.category_name ? `<span class="text-sm text-muted">${m.category_name}</span>` : ''}
+        </div>
+        <div class="manual-card-title">${m.title}</div>
+        ${m.description ? `<div class="manual-card-desc">${m.description}</div>` : ''}
+        <div class="manual-card-meta">
+          <span>${m.created_by_name}</span>
+          <span>·</span>
+          <span>${formatDate(m.updated_at)}</span>
+          ${m.file_size ? `<span>· ${formatFileSize(m.file_size)}</span>` : ''}
+        </div>
+      </a>
+    `).join('');
+  } else {
+    container.className = '';
+    container.innerHTML = `
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>種別</th>
+                <th>タイトル</th>
+                <th>カテゴリ</th>
+                <th>作成者</th>
+                <th>更新日時</th>
+                <th>サイズ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${manuals.map(m => `
+                <tr onclick="location.href='/view.html?id=${m.id}'" style="cursor:pointer;">
+                  <td><span class="badge ${m.type === 'pdf' ? 'badge-pdf' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : 'テキスト'}</span></td>
+                  <td style="font-weight: 500;">${m.title}</td>
+                  <td>${m.category_name || '<span class="text-muted">-</span>'}</td>
+                  <td>${m.created_by_name}</td>
+                  <td>${formatDate(m.updated_at)}</td>
+                  <td>${formatFileSize(m.file_size) || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function renderPagination(total, page, limit) {
+  const totalPages = Math.ceil(total / limit);
+  const container = document.getElementById('pagination');
+
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" onclick="loadManuals(${page - 1})" ${page <= 1 ? 'disabled' : ''}>‹</button>`;
+
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - page) <= 2) {
+      html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="loadManuals(${i})">${i}</button>`;
+    } else if (Math.abs(i - page) === 3) {
+      html += `<span class="page-btn" style="cursor:default;">…</span>`;
+    }
+  }
+
+  html += `<button class="page-btn" onclick="loadManuals(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>›</button>`;
+  container.innerHTML = html;
+}
+
+init();
+</script>
+</body>
+</html>

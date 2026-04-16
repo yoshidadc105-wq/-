@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マニュアル作成 - 社内マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <!-- Quill.js リッチテキストエディタ -->
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+  <style>
+    .ql-container { font-size: 15px; min-height: 400px; }
+    .ql-editor { min-height: 400px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+  <div class="navbar-right">
+    <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
+    <a href="/admin.html" id="navAdminLink" class="btn btn-secondary btn-sm hidden">管理者設定</a>
+    <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 900px;">
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <a href="/" class="text-sm" style="color: var(--primary);">← 一覧に戻る</a>
+      <h1 style="font-size: 22px; font-weight: 700; margin-top: 4px;" id="pageTitle">新規マニュアル作成</h1>
+    </div>
+  </div>
+
+  <div id="alert" class="hidden"></div>
+
+  <!-- 種別タブ（新規作成時のみ表示） -->
+  <div id="typeTabs" class="tabs">
+    <div class="tab active" onclick="switchType('rich_text', this)">📝 テキストで作成</div>
+    <div class="tab" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
+  </div>
+
+  <form id="manualForm">
+    <!-- 共通フィールド -->
+    <div class="card mb-2">
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">タイトル <span class="required">*</span></label>
+          <input type="text" id="title" class="form-control" placeholder="マニュアルのタイトルを入力" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">説明（任意）</label>
+          <input type="text" id="description" class="form-control" placeholder="このマニュアルの概要を入力">
+        </div>
+        <div class="form-group">
+          <label class="form-label">カテゴリ</label>
+          <select id="categorySelect" class="form-control">
+            <option value="">カテゴリなし</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- テキストエディタ -->
+    <div id="textSection" class="card mb-2">
+      <div class="card-header"><span class="card-title">本文</span></div>
+      <div class="card-body" style="padding: 0;">
+        <div id="editor"></div>
+      </div>
+    </div>
+
+    <!-- PDFアップロード -->
+    <div id="pdfSection" class="card mb-2 hidden">
+      <div class="card-header"><span class="card-title">PDFファイル</span></div>
+      <div class="card-body">
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdfFile').click()">
+          <div class="upload-area-icon">📄</div>
+          <div class="upload-area-text">クリックしてPDFを選択</div>
+          <div class="upload-area-hint">またはここにファイルをドラッグ＆ドロップ</div>
+          <div id="fileNameDisplay" class="mt-1" style="font-weight: 500; color: var(--success);"></div>
+        </div>
+        <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
+        <p class="text-sm text-muted mt-1">最大100MBのPDFファイル</p>
+
+        <!-- 編集時：PDFの差し替えオプション -->
+        <div id="replacePdfOption" class="hidden mt-2">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="replacePdfCheck" onchange="toggleReplaceMode(this.checked)">
+            <span>PDFファイルを差し替える</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">保存する</button>
+      <a href="/" class="btn btn-secondary btn-lg">キャンセル</a>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let currentUser = null;
+let editId = null;
+let currentType = 'rich_text';
+let editManual = null;
+let quill = null;
+
+async function init() {
+  currentUser = await loadCurrentUser();
+  if (!currentUser) return;
+  initNavbar(currentUser);
+
+  // Quillエディタ初期化
+  quill = new Quill('#editor', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ indent: '-1' }, { indent: '+1' }],
+        ['blockquote', 'code-block'],
+        ['link', 'image'],
+        ['clean']
+      ]
+    },
+    placeholder: 'マニュアルの本文を入力してください...'
+  });
+
+  await loadCategories();
+
+  // 編集モードの確認
+  const params = new URLSearchParams(window.location.search);
+  editId = params.get('id');
+  if (editId) await loadEditData();
+
+  // ファイルアップロードのイベント
+  document.getElementById('pdfFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      document.getElementById('fileNameDisplay').textContent = `選択: ${file.name}`;
+    }
+  });
+
+  // ドラッグ＆ドロップ
+  const area = document.getElementById('uploadArea');
+  area.addEventListener('dragover', (e) => { e.preventDefault(); area.classList.add('dragover'); });
+  area.addEventListener('dragleave', () => area.classList.remove('dragover'));
+  area.addEventListener('drop', (e) => {
+    e.preventDefault();
+    area.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+      document.getElementById('pdfFile').files = e.dataTransfer.files;
+      document.getElementById('fileNameDisplay').textContent = `選択: ${file.name}`;
+    } else {
+      showAlert('alert', 'PDFファイルのみ対応しています', 'error');
+    }
+  });
+
+  document.getElementById('manualForm').addEventListener('submit', handleSubmit);
+}
+
+async function loadCategories() {
+  const res = await fetch('/api/categories');
+  const cats = await res.json();
+  const select = document.getElementById('categorySelect');
+  cats.forEach(c => {
+    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+  });
+}
+
+async function loadEditData() {
+  const res = await fetch(`/api/manuals/${editId}`);
+  if (!res.ok) { window.location.href = '/'; return; }
+
+  editManual = await res.json();
+  document.getElementById('pageTitle').textContent = 'マニュアルを編集';
+  document.getElementById('submitBtn').textContent = '更新する';
+  document.getElementById('title').value = editManual.title;
+  document.getElementById('description').value = editManual.description || '';
+  document.getElementById('categorySelect').value = editManual.category_id || '';
+
+  if (editManual.type === 'pdf') {
+    // タブを非表示にして PDF モードに固定
+    document.getElementById('typeTabs').classList.add('hidden');
+    switchType('pdf');
+    document.getElementById('uploadArea').innerHTML = `
+      <div class="upload-area-icon">📄</div>
+      <div class="upload-area-text" style="color: var(--text);">${editManual.file_name}</div>
+      <div class="upload-area-hint">${formatFileSize(editManual.file_size)}</div>
+    `;
+    document.getElementById('replacePdfOption').classList.remove('hidden');
+  } else {
+    document.getElementById('typeTabs').classList.add('hidden');
+    switchType('rich_text');
+    quill.root.innerHTML = editManual.content || '';
+  }
+}
+
+function switchType(type, tabEl) {
+  currentType = type;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+
+  if (type === 'rich_text') {
+    document.getElementById('textSection').classList.remove('hidden');
+    document.getElementById('pdfSection').classList.add('hidden');
+  } else {
+    document.getElementById('textSection').classList.add('hidden');
+    document.getElementById('pdfSection').classList.remove('hidden');
+  }
+}
+
+function toggleReplaceMode(checked) {
+  const area = document.getElementById('uploadArea');
+  if (checked) {
+    area.onclick = () => document.getElementById('pdfFile').click();
+    area.style.cursor = 'pointer';
+  } else {
+    area.onclick = null;
+    area.style.cursor = 'default';
+  }
+}
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  const title = document.getElementById('title').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const categoryId = document.getElementById('categorySelect').value;
+
+  if (!title) {
+    showAlert('alert', 'タイトルを入力してください', 'error');
+    btn.disabled = false;
+    btn.textContent = editId ? '更新する' : '保存する';
+    return;
+  }
+
+  try {
+    if (editId) {
+      await updateManual(title, description, categoryId);
+    } else {
+      await createManual(title, description, categoryId);
+    }
+  } catch (err) {
+    showAlert('alert', '予期せぬエラーが発生しました', 'error');
+    btn.disabled = false;
+    btn.textContent = editId ? '更新する' : '保存する';
+  }
+}
+
+async function createManual(title, description, categoryId) {
+  let res, data;
+
+  if (currentType === 'rich_text') {
+    const content = quill.root.innerHTML;
+    if (!content || content === '<p><br></p>') {
+      showAlert('alert', '本文を入力してください', 'error');
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').textContent = '保存する';
+      return;
+    }
+    res = await fetch('/api/manuals/text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
+    });
+  } else {
+    const file = document.getElementById('pdfFile').files[0];
+    if (!file) {
+      showAlert('alert', 'PDFファイルを選択してください', 'error');
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').textContent = '保存する';
+      return;
+    }
+    const form = new FormData();
+    form.append('pdf', file);
+    form.append('title', title);
+    form.append('description', description);
+    if (categoryId) form.append('category_id', categoryId);
+    res = await fetch('/api/manuals/pdf', { method: 'POST', body: form });
+  }
+
+  data = await res.json();
+  if (res.ok) {
+    window.location.href = `/view.html?id=${data.id}`;
+  } else {
+    showAlert('alert', data.error || '保存に失敗しました', 'error');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = '保存する';
+  }
+}
+
+async function updateManual(title, description, categoryId) {
+  let res, data;
+
+  if (editManual.type === 'pdf') {
+    const replaceCheck = document.getElementById('replacePdfCheck');
+    if (replaceCheck && replaceCheck.checked) {
+      const file = document.getElementById('pdfFile').files[0];
+      if (!file) {
+        showAlert('alert', '新しいPDFファイルを選択してください', 'error');
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('submitBtn').textContent = '更新する';
+        return;
+      }
+      const form = new FormData();
+      form.append('pdf', file);
+      form.append('title', title);
+      form.append('description', description);
+      if (categoryId) form.append('category_id', categoryId);
+      res = await fetch(`/api/manuals/${editId}/pdf`, { method: 'PUT', body: form });
+    } else {
+      res = await fetch(`/api/manuals/${editId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, category_id: categoryId || null })
+      });
+    }
+  } else {
+    const content = quill.root.innerHTML;
+    res = await fetch(`/api/manuals/${editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
+    });
+  }
+
+  data = await res.json();
+  if (res.ok) {
+    window.location.href = `/view.html?id=${editId}`;
+  } else {
+    showAlert('alert', data.error || '更新に失敗しました', 'error');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = '更新する';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
