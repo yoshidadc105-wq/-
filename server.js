@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const SqliteStore = require('connect-sqlite3')(session);
+const FileStore = require('session-file-store')(session);
 const path = require('path');
 const fs = require('fs');
 
@@ -27,7 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // セッション設定
 app.use(session({
-  store: new SqliteStore({ dir: sessionDir, db: 'sessions.db' }),
+  store: new FileStore({ path: sessionDir, retries: 1 }),
   secret: process.env.SESSION_SECRET || 'manual-system-secret-change-in-production',
   resave: false,
   saveUninitialized: false,

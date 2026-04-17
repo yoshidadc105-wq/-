@@ -1,6 +1,7 @@
-const Database = require('better-sqlite3');
-const bcrypt = require('bcrypt');
+const { DatabaseSync } = require('node:sqlite');
+const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'manual_system.db');
 
@@ -8,12 +9,11 @@ let db;
 
 function getDb() {
   if (!db) {
-    const fs = require('fs');
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
+    db = new DatabaseSync(DB_PATH);
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA foreign_keys = ON');
   }
   return db;
 }
@@ -21,7 +21,6 @@ function getDb() {
 function initializeDb() {
   const db = getDb();
 
-  // ユーザーテーブル
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +35,6 @@ function initializeDb() {
     )
   `);
 
-  // カテゴリテーブル
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +45,6 @@ function initializeDb() {
     )
   `);
 
-  // マニュアルテーブル
   db.exec(`
     CREATE TABLE IF NOT EXISTS manuals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +64,6 @@ function initializeDb() {
     )
   `);
 
-  // 閲覧履歴テーブル
   db.exec(`
     CREATE TABLE IF NOT EXISTS view_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,16 +73,12 @@ function initializeDb() {
     )
   `);
 
-  // 検索用インデックス
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_manuals_category ON manuals(category_id);
-    CREATE INDEX IF NOT EXISTS idx_manuals_created_by ON manuals(created_by);
     CREATE INDEX IF NOT EXISTS idx_manuals_deleted ON manuals(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_view_history_user ON view_history(user_id);
-    CREATE INDEX IF NOT EXISTS idx_view_history_manual ON view_history(manual_id);
   `);
 
-  // 初期管理者アカウントの作成（存在しない場合のみ）
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!adminExists) {
     const hash = bcrypt.hashSync('admin123', 10);
@@ -97,7 +89,6 @@ function initializeDb() {
     console.log('初期管理者アカウントを作成しました: admin / admin123');
   }
 
-  // デフォルトカテゴリの作成（存在しない場合のみ）
   const categoryExists = db.prepare('SELECT id FROM categories LIMIT 1').get();
   if (!categoryExists) {
     const insert = db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
