@@ -5,11 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>マニュアル作成 - 社内マニュアルシステム</title>
   <link rel="stylesheet" href="/css/style.css">
-  <!-- Quill.js リッチテキストエディタ -->
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
   <style>
     .ql-container { font-size: 15px; min-height: 400px; }
     .ql-editor { min-height: 400px; }
+    .step-image-drop {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .step-image-drop:hover { border-color: var(--primary); background: var(--primary-light); }
+    .step-image-drop img { max-width: 100%; max-height: 300px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -38,6 +52,7 @@
   <div id="typeTabs" class="tabs">
     <div class="tab active" onclick="switchType('rich_text', this)">📝 テキストで作成</div>
     <div class="tab" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
+    <div class="tab" onclick="switchType('steps', this)">📋 ステップで作成</div>
   </div>
 
   <form id="manualForm">
@@ -81,14 +96,33 @@
         </div>
         <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
         <p class="text-sm text-muted mt-1">最大100MBのPDFファイル</p>
-
-        <!-- 編集時：PDFの差し替えオプション -->
         <div id="replacePdfOption" class="hidden mt-2">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="replacePdfCheck" onchange="toggleReplaceMode(this.checked)">
             <span>PDFファイルを差し替える</span>
           </label>
         </div>
+      </div>
+    </div>
+
+    <!-- ステップエディタ -->
+    <div id="stepsSection" class="hidden">
+      <!-- カバー画像 -->
+      <div class="card mb-2">
+        <div class="card-header"><span class="card-title">カバー画像（任意）</span></div>
+        <div class="card-body">
+          <div class="step-image-drop" id="coverImageDrop" onclick="document.getElementById('coverImageInput').click()">
+            <div style="color:var(--text-muted); font-size:14px;">🖼 クリックして画像を選択（任意）</div>
+          </div>
+          <input type="file" id="coverImageInput" accept="image/*" style="display:none;" onchange="uploadCoverImage(this)">
+        </div>
+      </div>
+
+      <!-- ステップリスト -->
+      <div id="stepsList"></div>
+
+      <div class="mb-2">
+        <button type="button" onclick="addStep()" class="btn btn-secondary w-full" style="font-size:15px; padding:12px;">＋ ステップを追加</button>
       </div>
     </div>
 
@@ -108,12 +142,16 @@ let currentType = 'rich_text';
 let editManual = null;
 let quill = null;
 
+// ステップ管理
+let coverImageName = null;
+let steps = [];
+let stepCounter = 0;
+
 async function init() {
   currentUser = await loadCurrentUser();
   if (!currentUser) return;
   initNavbar(currentUser);
 
-  // Quillエディタ初期化
   quill = new Quill('#editor', {
     theme: 'snow',
     modules: {
@@ -133,20 +171,15 @@ async function init() {
 
   await loadCategories();
 
-  // 編集モードの確認
   const params = new URLSearchParams(window.location.search);
   editId = params.get('id');
   if (editId) await loadEditData();
 
-  // ファイルアップロードのイベント
   document.getElementById('pdfFile').addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (file) {
-      document.getElementById('fileNameDisplay').textContent = `選択: ${file.name}`;
-    }
+    if (file) document.getElementById('fileNameDisplay').textContent = `選択: ${file.name}`;
   });
 
-  // ドラッグ＆ドロップ
   const area = document.getElementById('uploadArea');
   area.addEventListener('dragover', (e) => { e.preventDefault(); area.classList.add('dragover'); });
   area.addEventListener('dragleave', () => area.classList.remove('dragover'));
@@ -169,9 +202,16 @@ async function loadCategories() {
   const res = await fetch('/api/categories');
   const cats = await res.json();
   const select = document.getElementById('categorySelect');
-  cats.forEach(c => {
-    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
-  });
+  select.innerHTML = '<option value="">カテゴリなし</option>';
+  function addOpts(parentId, depth) {
+    cats.filter(c => parentId === null ? !c.parent_id : c.parent_id == parentId).forEach(c => {
+      const prefix = '　'.repeat(depth);
+      const label = depth > 0 ? prefix + '└ ' + c.name : c.name;
+      select.innerHTML += `<option value="${c.id}">${label}</option>`;
+      addOpts(c.id, depth + 1);
+    });
+  }
+  addOpts(null, 0);
 }
 
 async function loadEditData() {
@@ -185,9 +225,9 @@ async function loadEditData() {
   document.getElementById('description').value = editManual.description || '';
   document.getElementById('categorySelect').value = editManual.category_id || '';
 
+  document.getElementById('typeTabs').classList.add('hidden');
+
   if (editManual.type === 'pdf') {
-    // タブを非表示にして PDF モードに固定
-    document.getElementById('typeTabs').classList.add('hidden');
     switchType('pdf');
     document.getElementById('uploadArea').innerHTML = `
       <div class="upload-area-icon">📄</div>
@@ -195,8 +235,23 @@ async function loadEditData() {
       <div class="upload-area-hint">${formatFileSize(editManual.file_size)}</div>
     `;
     document.getElementById('replacePdfOption').classList.remove('hidden');
+  } else if (editManual.type === 'steps') {
+    switchType('steps');
+    let stepsData = {};
+    try { stepsData = JSON.parse(editManual.content || '{}'); } catch(e) {}
+    coverImageName = stepsData.cover_image || null;
+    if (coverImageName) {
+      const drop = document.getElementById('coverImageDrop');
+      drop.innerHTML = `<img src="/uploads/${coverImageName}" style="max-width:100%; max-height:200px; border-radius:4px;">`;
+    }
+    steps = (stepsData.steps || []).map(s => ({
+      id: ++stepCounter,
+      title: s.title || '',
+      imageName: s.image || null,
+      description: s.description || ''
+    }));
+    renderSteps();
   } else {
-    document.getElementById('typeTabs').classList.add('hidden');
     switchType('rich_text');
     quill.root.innerHTML = editManual.content || '';
   }
@@ -206,14 +261,9 @@ function switchType(type, tabEl) {
   currentType = type;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   if (tabEl) tabEl.classList.add('active');
-
-  if (type === 'rich_text') {
-    document.getElementById('textSection').classList.remove('hidden');
-    document.getElementById('pdfSection').classList.add('hidden');
-  } else {
-    document.getElementById('textSection').classList.add('hidden');
-    document.getElementById('pdfSection').classList.remove('hidden');
-  }
+  document.getElementById('textSection').classList.toggle('hidden', type !== 'rich_text');
+  document.getElementById('pdfSection').classList.toggle('hidden', type !== 'pdf');
+  document.getElementById('stepsSection').classList.toggle('hidden', type !== 'steps');
 }
 
 function toggleReplaceMode(checked) {
@@ -226,6 +276,95 @@ function toggleReplaceMode(checked) {
     area.style.cursor = 'default';
   }
 }
+
+// ---- ステップ管理 ----
+
+function addStep() {
+  steps.push({ id: ++stepCounter, title: '', imageName: null, description: '' });
+  renderSteps();
+  // 追加されたステップにスクロール
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.step-card');
+    if (cards.length > 0) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+function removeStep(id) {
+  steps = steps.filter(s => s.id !== id);
+  renderSteps();
+}
+
+function updateStepField(id, field, value) {
+  const step = steps.find(s => s.id === id);
+  if (step) step[field] = value;
+}
+
+async function uploadCoverImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
+  if (!res.ok) { alert('画像のアップロードに失敗しました'); return; }
+  const data = await res.json();
+  coverImageName = data.filename;
+  const drop = document.getElementById('coverImageDrop');
+  drop.innerHTML = `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:200px; border-radius:4px;">`;
+}
+
+async function uploadStepImage(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
+  if (!res.ok) { alert('画像のアップロードに失敗しました'); return; }
+  const data = await res.json();
+  const step = steps.find(s => s.id === id);
+  if (step) step.imageName = data.filename;
+  const drop = document.getElementById(`stepImgDrop_${id}`);
+  if (drop) drop.innerHTML = `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:300px; border-radius:4px;">`;
+}
+
+function renderSteps() {
+  const container = document.getElementById('stepsList');
+  container.innerHTML = steps.map((step, i) => `
+    <div class="card mb-2 step-card" data-step-id="${step.id}">
+      <div class="card-header" style="background:#f8f9fa; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+          <span style="background:var(--primary);color:white;border-radius:4px;padding:3px 10px;font-weight:700;white-space:nowrap;font-size:13px;">STEP ${i + 1}</span>
+          <input type="text" class="form-control" placeholder="ステップのタイトル（任意）"
+            value="${escAttr(step.title)}"
+            oninput="updateStepField(${step.id}, 'title', this.value)"
+            style="flex:1;">
+        </div>
+        <button type="button" onclick="removeStep(${step.id})" class="btn btn-danger btn-sm">削除</button>
+      </div>
+      <div class="card-body">
+        <div class="step-image-drop" id="stepImgDrop_${step.id}"
+          onclick="document.getElementById('stepImgInput_${step.id}').click()">
+          ${step.imageName
+            ? `<img src="/uploads/${step.imageName}" style="max-width:100%; max-height:300px; border-radius:4px;">`
+            : `<div style="color:var(--text-muted);font-size:13px;">📷 クリックして画像を追加（任意）</div>`}
+        </div>
+        <input type="file" id="stepImgInput_${step.id}" accept="image/*" style="display:none;"
+          onchange="uploadStepImage(${step.id}, this)">
+        <textarea class="form-control" rows="3" placeholder="このステップの説明（任意）"
+          oninput="updateStepField(${step.id}, 'description', this.value)"
+        >${escHtml(step.description)}</textarea>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escAttr(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+// ---- 保存処理 ----
 
 async function handleSubmit(e) {
   e.preventDefault();
@@ -260,7 +399,23 @@ async function handleSubmit(e) {
 async function createManual(title, description, categoryId) {
   let res, data;
 
-  if (currentType === 'rich_text') {
+  if (currentType === 'steps') {
+    if (steps.length === 0) {
+      showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').textContent = '保存する';
+      return;
+    }
+    const content = JSON.stringify({
+      cover_image: coverImageName,
+      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
+    });
+    res = await fetch('/api/manuals/steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
+    });
+  } else if (currentType === 'rich_text') {
     const content = quill.root.innerHTML;
     if (!content || content === '<p><br></p>') {
       showAlert('alert', '本文を入力してください', 'error');
@@ -302,7 +457,17 @@ async function createManual(title, description, categoryId) {
 async function updateManual(title, description, categoryId) {
   let res, data;
 
-  if (editManual.type === 'pdf') {
+  if (editManual.type === 'steps') {
+    const content = JSON.stringify({
+      cover_image: coverImageName,
+      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
+    });
+    res = await fetch(`/api/manuals/${editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
+    });
+  } else if (editManual.type === 'pdf') {
     const replaceCheck = document.getElementById('replacePdfCheck');
     if (replaceCheck && replaceCheck.checked) {
       const file = document.getElementById('pdfFile').files[0];

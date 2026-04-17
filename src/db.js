@@ -86,7 +86,7 @@ function initializeDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       description TEXT,
-      type TEXT NOT NULL CHECK(type IN ('pdf', 'rich_text')),
+      type TEXT NOT NULL CHECK(type IN ('pdf', 'rich_text', 'steps')),
       content TEXT,
       file_path TEXT,
       file_name TEXT,
@@ -99,6 +99,35 @@ function initializeDb() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     )
   `);
+
+  // Migration: add 'steps' type support for existing DBs
+  try {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='manuals'").get();
+    if (tableInfo && tableInfo.sql && !tableInfo.sql.includes("'steps'")) {
+      db.exec('PRAGMA foreign_keys = OFF');
+      db.exec(`CREATE TABLE manuals_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL CHECK(type IN ('pdf', 'rich_text', 'steps')),
+        content TEXT,
+        file_path TEXT,
+        file_name TEXT,
+        file_size INTEGER,
+        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+        created_by INTEGER NOT NULL REFERENCES users(id),
+        updated_by INTEGER REFERENCES users(id),
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      )`);
+      db.exec('INSERT INTO manuals_v2 SELECT * FROM manuals');
+      db.exec('DROP TABLE manuals');
+      db.exec('ALTER TABLE manuals_v2 RENAME TO manuals');
+      db.exec('PRAGMA foreign_keys = ON');
+      console.log('manualsテーブルをマイグレーションしました（stepsタイプ追加）');
+    }
+  } catch (e) { /* ignore */ }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS view_history (

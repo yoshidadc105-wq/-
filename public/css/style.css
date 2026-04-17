@@ -217,6 +217,7 @@ tr:last-child td { border-bottom: none; }
 
 .badge-pdf { background: #fef3c7; color: #92400e; }
 .badge-text { background: #d1fae5; color: #065f46; }
+.badge-steps { background: #e0e7ff; color: #3730a3; }
 .badge-admin { background: #ede9fe; color: #5b21b6; }
 .badge-user { background: #e0f2fe; color: #075985; }
 

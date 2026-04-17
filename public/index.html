@@ -200,7 +200,7 @@ function renderManuals(manuals) {
     container.innerHTML = manuals.map(m => `
       <a href="/view.html?id=${m.id}" class="manual-card">
         <div class="flex items-center gap-2">
-          <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : 'テキスト'}</span>
+          <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
           ${m.category_name ? `<span class="text-sm text-muted">${m.category_name}</span>` : ''}
         </div>
         <div class="manual-card-title">${m.title}</div>
@@ -232,7 +232,7 @@ function renderManuals(manuals) {
             <tbody>
               ${manuals.map(m => `
                 <tr onclick="location.href='/view.html?id=${m.id}'" style="cursor:pointer;">
-                  <td><span class="badge ${m.type === 'pdf' ? 'badge-pdf' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : 'テキスト'}</span></td>
+                  <td><span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span></td>
                   <td style="font-weight: 500;">${m.title}</td>
                   <td>${m.category_name || '<span class="text-muted">-</span>'}</td>
                   <td>${m.created_by_name}</td>

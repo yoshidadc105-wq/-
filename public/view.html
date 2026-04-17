@@ -106,6 +106,34 @@ async function loadManual() {
       </div>
       <iframe src="/uploads/${manualData.file_path}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>
     `;
+  } else if (manualData.type === 'steps') {
+    let stepsData = {};
+    try { stepsData = JSON.parse(manualData.content || '{}'); } catch(e) {}
+    const stepsList = stepsData.steps || [];
+
+    const coverHtml = stepsData.cover_image ? `
+      <div class="card mb-2">
+        <div class="card-body" style="text-align:center; padding:16px;">
+          <img src="/uploads/${stepsData.cover_image}" style="max-width:100%; max-height:400px; border-radius:8px;">
+        </div>
+      </div>` : '';
+
+    const stepsHtml = stepsList.map((step, i) => `
+      <div class="card mb-2">
+        <div class="card-header" style="background:var(--primary); color:white; border-bottom:none;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:13px; font-weight:700; background:rgba(255,255,255,0.2); border-radius:4px; padding:2px 10px; white-space:nowrap;">STEP ${step.order || i + 1}</span>
+            ${step.title ? `<span style="font-size:16px; font-weight:600;">${escHtml(step.title)}</span>` : ''}
+          </div>
+        </div>
+        <div class="card-body">
+          ${step.image ? `<div style="text-align:center; margin-bottom:16px;"><img src="/uploads/${step.image}" style="max-width:100%; max-height:500px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);"></div>` : ''}
+          ${step.description ? `<div style="white-space:pre-wrap; font-size:15px; line-height:1.8;">${escHtml(step.description)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    bodyHtml = coverHtml + (stepsList.length > 0 ? stepsHtml : '<div class="empty"><div class="empty-icon">📋</div>ステップがまだありません</div>');
   } else {
     bodyHtml = `
       <div class="card">
@@ -121,7 +149,7 @@ async function loadManual() {
       <div class="card-header">
         <div>
           <div class="flex items-center gap-2 mb-1">
-            <span class="badge ${manualData.type === 'pdf' ? 'badge-pdf' : 'badge-text'}">${manualData.type === 'pdf' ? 'PDF' : 'テキスト'}</span>
+            <span class="badge ${manualData.type === 'pdf' ? 'badge-pdf' : manualData.type === 'steps' ? 'badge-steps' : 'badge-text'}">${manualData.type === 'pdf' ? 'PDF' : manualData.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
             ${manualData.category_name ? `<span class="badge" style="background:#f1f5f9;color:var(--text-muted);">${manualData.category_name}</span>` : ''}
           </div>
           <h1 style="font-size: 22px; font-weight: 700;">${manualData.title}</h1>
@@ -142,6 +170,10 @@ async function loadManual() {
     </div>
     ${bodyHtml}
   `;
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 async function deleteManual() {

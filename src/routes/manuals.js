@@ -40,6 +40,26 @@ const uploadMany = multer({
   }
 });
 
+// ステップ画像アップロード設定
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', '..', 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `step_${Date.now()}${ext}`);
+  }
+});
+
+const uploadImage = multer({
+  storage: imageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('画像ファイルのみアップロードできます'));
+  }
+});
+
 // マニュアル一覧取得（検索・フィルタ対応）
 router.get('/', requireLogin, (req, res) => {
   const { search, category_id, type, page = 1, limit = 20 } = req.query;
@@ -207,6 +227,26 @@ router.delete('/:id', requireLogin, (req, res) => {
   res.json({ message: 'マニュアルを削除しました' });
 });
 
+// ステップ画像アップロード
+router.post('/step-image', requireLogin, uploadImage.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '画像ファイルを選択してください' });
+  res.json({ filename: req.file.filename });
+});
+
+// ステップマニュアル作成
+router.post('/steps', requireLogin, (req, res) => {
+  const { title, description, content, category_id } = req.body;
+  if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
+
+  const db = getDb();
+  const result = db.prepare(`
+    INSERT INTO manuals (title, description, type, content, category_id, created_by, updated_by)
+    VALUES (?, ?, 'steps', ?, ?, ?, ?)
+  `).run(title, description || null, content || '{}', category_id || null, req.session.userId, req.session.userId);
+
+  res.status(201).json({ id: result.lastInsertRowid, message: 'マニュアルを作成しました' });
+});
+
 // PDF一括アップロード
 router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res) => {
   if (!req.files || req.files.length === 0) {
@@ -223,9 +263,7 @@ router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res)
   const results = [];
   for (const file of req.files) {
     const raw = file.originalname;
-    const asUtf8  = Buffer.from(raw, 'latin1').toString('utf8');
-    const asBin   = Buffer.from(raw).toString('hex');
-    console.log('[DEBUG filename]', JSON.stringify(raw), '→', JSON.stringify(asUtf8), 'hex:', asBin.slice(0, 40));
+    const asUtf8 = Buffer.from(raw, 'latin1').toString('utf8');
     const fixedName = asUtf8.includes('\uFFFD') ? raw : asUtf8;
     const title = path.parse(fixedName).name;
     const result = insert.run(
