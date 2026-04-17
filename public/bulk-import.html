@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF一括インポート - 社内マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .drop-zone {
+      border: 3px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 60px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--white);
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+    .drop-zone-icon { font-size: 56px; margin-bottom: 12px; }
+    .drop-zone-text { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .drop-zone-hint { font-size: 14px; color: var(--text-muted); }
+    .file-list { margin-top: 20px; }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 6px;
+      background: var(--white);
+      font-size: 14px;
+    }
+    .file-item-name { flex: 1; font-weight: 500; }
+    .file-item-size { color: var(--text-muted); font-size: 12px; }
+    .file-item-status { font-size: 13px; font-weight: 600; min-width: 60px; text-align: right; }
+    .status-waiting { color: var(--text-muted); }
+    .status-ok { color: var(--success); }
+    .status-error { color: var(--danger); }
+    .progress-bar-wrap {
+      background: var(--border);
+      border-radius: 99px;
+      height: 8px;
+      margin: 16px 0;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 99px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+  <div class="navbar-right">
+    <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
+    <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 800px;">
+  <div class="mb-3">
+    <a href="/" class="text-sm" style="color: var(--primary);">← 一覧に戻る</a>
+    <h1 style="font-size: 22px; font-weight: 700; margin-top: 4px;">PDF一括インポート</h1>
+    <p class="text-muted text-sm mt-1">Teachme BizからダウンロードしたPDFをまとめて登録できます</p>
+  </div>
+
+  <div id="alert" class="hidden"></div>
+
+  <div class="card mb-2">
+    <div class="card-body">
+      <div class="form-group">
+        <label class="form-label">カテゴリ（任意）</label>
+        <select id="categorySelect" class="form-control" style="max-width: 300px;">
+          <option value="">カテゴリなし</option>
+        </select>
+        <p class="text-sm text-muted mt-1">全ファイルに同じカテゴリが設定されます。後から個別に変更もできます。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ドロップゾーン -->
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="drop-zone-icon">📂</div>
+    <div class="drop-zone-text">ここにPDFをドラッグ＆ドロップ</div>
+    <div class="drop-zone-hint">またはクリックしてファイルを選択（複数選択可）</div>
+  </div>
+  <input type="file" id="fileInput" accept=".pdf" multiple style="display:none;">
+
+  <!-- ファイルリスト -->
+  <div id="fileListSection" class="hidden mt-2">
+    <div class="flex items-center justify-between mb-1">
+      <span id="fileCount" class="text-sm text-muted"></span>
+      <div class="flex gap-2">
+        <button onclick="clearFiles()" class="btn btn-secondary btn-sm">クリア</button>
+        <button onclick="startUpload()" class="btn btn-primary" id="uploadBtn">一括登録する</button>
+      </div>
+    </div>
+
+    <div class="progress-bar-wrap hidden" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div id="progressText" class="text-sm text-muted mb-1 hidden"></div>
+
+    <div class="file-list" id="fileList"></div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+let selectedFiles = [];
+let currentUser = null;
+
+async function init() {
+  currentUser = await loadCurrentUser();
+  if (!currentUser) return;
+  initNavbar(currentUser);
+  await loadCategories();
+  setupDragDrop();
+
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    addFiles(Array.from(e.target.files));
+    e.target.value = '';
+  });
+}
+
+async function loadCategories() {
+  const res = await fetch('/api/categories');
+  const cats = await res.json();
+  const sel = document.getElementById('categorySelect');
+  cats.forEach(c => {
+    sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+  });
+}
+
+function setupDragDrop() {
+  const zone = document.getElementById('dropZone');
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+    if (files.length === 0) {
+      showAlert('alert', 'PDFファイルのみ対応しています', 'error');
+      return;
+    }
+    addFiles(files);
+  });
+}
+
+function addFiles(files) {
+  const newFiles = files.filter(f => !selectedFiles.find(s => s.name === f.name && s.size === f.size));
+  selectedFiles = [...selectedFiles, ...newFiles];
+  renderFileList();
+}
+
+function clearFiles() {
+  selectedFiles = [];
+  renderFileList();
+}
+
+function renderFileList() {
+  const section = document.getElementById('fileListSection');
+  const list = document.getElementById('fileList');
+  const count = document.getElementById('fileCount');
+
+  if (selectedFiles.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  section.classList.remove('hidden');
+  count.textContent = `${selectedFiles.length}件のPDFが選択されています`;
+
+  list.innerHTML = selectedFiles.map((f, i) => `
+    <div class="file-item" id="file-item-${i}">
+      <span>📄</span>
+      <span class="file-item-name">${f.name}</span>
+      <span class="file-item-size">${formatFileSize(f.size)}</span>
+      <span class="file-item-status status-waiting" id="file-status-${i}">待機中</span>
+    </div>
+  `).join('');
+}
+
+async function startUpload() {
+  if (selectedFiles.length === 0) return;
+
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  btn.textContent = '登録中...';
+
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  progressWrap.classList.remove('hidden');
+  progressText.classList.remove('hidden');
+
+  const categoryId = document.getElementById('categorySelect').value;
+  const BATCH = 10; // 10件ずつ送信
+  let done = 0;
+  let errors = 0;
+
+  for (let i = 0; i < selectedFiles.length; i += BATCH) {
+    const batch = selectedFiles.slice(i, i + BATCH);
+    const form = new FormData();
+    batch.forEach((f, idx) => {
+      form.append('pdfs', f);
+      const el = document.getElementById(`file-status-${i + idx}`);
+      if (el) { el.textContent = '送信中...'; el.className = 'file-item-status'; }
+    });
+    if (categoryId) form.append('category_id', categoryId);
+
+    try {
+      const res = await fetch('/api/manuals/bulk-pdf', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (res.ok) {
+        batch.forEach((_, idx) => {
+          const el = document.getElementById(`file-status-${i + idx}`);
+          if (el) { el.textContent = '✓ 完了'; el.className = 'file-item-status status-ok'; }
+        });
+        done += batch.length;
+      } else {
+        batch.forEach((_, idx) => {
+          const el = document.getElementById(`file-status-${i + idx}`);
+          if (el) { el.textContent = 'エラー'; el.className = 'file-item-status status-error'; }
+        });
+        errors += batch.length;
+      }
+    } catch {
+      errors += batch.length;
+    }
+
+    const total = selectedFiles.length;
+    const progress = Math.round(((i + batch.length) / total) * 100);
+    progressBar.style.width = `${progress}%`;
+    progressText.textContent = `${Math.min(i + batch.length, total)} / ${total} 件処理済み`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '一括登録する';
+
+  if (errors === 0) {
+    showAlert('alert', `${done}件のPDFを登録しました！`, 'success');
+  } else {
+    showAlert('alert', `${done}件成功、${errors}件失敗`, errors > 0 ? 'error' : 'success');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -51,6 +51,7 @@
   <!-- タブ -->
   <div class="tabs">
     <div class="tab active" onclick="showTab('users', this)">ユーザー管理</div>
+    <div class="tab" onclick="showTab('groups', this)">グループ管理</div>
     <div class="tab" onclick="showTab('categories', this)">カテゴリ管理</div>
     <div class="tab" onclick="showTab('password', this)">パスワード変更</div>
   </div>
@@ -85,6 +86,27 @@
     </div>
   </div>
 
+  <!-- グループ管理 -->
+  <div id="tab-groups" class="hidden">
+    <div class="alert alert-info mb-2">グループを作成してスタッフを割り当て、カテゴリの閲覧権限を制限できます。</div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">グループ一覧</span>
+        <button onclick="openModal('groupModal'); resetGroupForm()" class="btn btn-primary btn-sm">+ グループ追加</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>グループ名</th><th>説明</th><th>メンバー数</th><th>操作</th></tr>
+          </thead>
+          <tbody id="groupTableBody">
+            <tr><td colspan="4" class="loading">読み込み中</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- カテゴリ管理 -->
   <div id="tab-categories" class="hidden">
     <div class="card">
@@ -99,6 +121,7 @@
               <th>カテゴリ名</th>
               <th>説明</th>
               <th>並び順</th>
+              <th>閲覧権限</th>
               <th>マニュアル数</th>
               <th>操作</th>
             </tr>
@@ -181,6 +204,50 @@
   </div>
 </div>
 
+<!-- グループモーダル -->
+<div class="modal-overlay hidden" id="groupModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="groupModalTitle">グループ追加</span>
+      <button class="modal-close" onclick="closeModal('groupModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editGroupId">
+      <div class="form-group">
+        <label class="form-label">グループ名 <span class="required">*</span></label>
+        <input type="text" id="gName" class="form-control" placeholder="例: ドクター、スタッフ、受付">
+      </div>
+      <div class="form-group">
+        <label class="form-label">説明（任意）</label>
+        <input type="text" id="gDesc" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeModal('groupModal')" class="btn btn-secondary">キャンセル</button>
+      <button onclick="saveGroup()" class="btn btn-primary" id="saveGroupBtn">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- グループメンバー管理モーダル -->
+<div class="modal-overlay hidden" id="groupMemberModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="groupMemberTitle">メンバー管理</span>
+      <button class="modal-close" onclick="closeModal('groupMemberModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editGroupMemberId">
+      <p class="text-sm text-muted mb-2">このグループに属するスタッフを選択してください</p>
+      <div id="memberCheckList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeModal('groupMemberModal')" class="btn btn-secondary">キャンセル</button>
+      <button onclick="saveGroupMembers()" class="btn btn-primary">保存する</button>
+    </div>
+  </div>
+</div>
+
 <!-- カテゴリモーダル -->
 <div class="modal-overlay hidden" id="categoryModal">
   <div class="modal">
@@ -201,6 +268,18 @@
       <div class="form-group">
         <label class="form-label">並び順</label>
         <input type="number" id="cSort" class="form-control" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">閲覧権限</label>
+        <select id="cVisibility" class="form-control" onchange="toggleGroupSelect(this.value)">
+          <option value="all">全員が閲覧できる</option>
+          <option value="admin">管理者のみ</option>
+          <option value="group">特定グループのみ</option>
+        </select>
+      </div>
+      <div class="form-group hidden" id="cGroupWrap">
+        <label class="form-label">閲覧できるグループ（複数選択可）</label>
+        <div id="cGroupList" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -242,7 +321,8 @@ function showTab(name, el) {
   el.classList.add('active');
 
   if (name === 'users') loadUsers();
-  if (name === 'categories') loadCategories();
+  if (name === 'groups') loadGroups();
+  if (name === 'categories') { loadGroups(); loadCategories(); }
 }
 
 // ── ユーザー管理 ──
@@ -345,20 +425,121 @@ async function deleteUser(id, name) {
   }
 }
 
+// ── グループ管理 ──
+let allGroups = [];
+
+async function loadGroups() {
+  const res = await fetch('/api/groups');
+  allGroups = await res.json();
+  const tbody = document.getElementById('groupTableBody');
+  if (allGroups.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding: 24px;">グループがありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allGroups.map(g => `
+    <tr>
+      <td style="font-weight:500;">${g.name}</td>
+      <td class="text-muted">${g.description || '-'}</td>
+      <td>${g.member_count}名</td>
+      <td>
+        <div class="flex gap-2">
+          <button onclick="openGroupMembers(${g.id}, '${g.name}')" class="btn btn-secondary btn-sm">メンバー設定</button>
+          <button onclick="editGroup(${JSON.stringify(g).replace(/"/g, '&quot;')})" class="btn btn-secondary btn-sm">編集</button>
+          <button onclick="deleteGroup(${g.id}, '${g.name}')" class="btn btn-danger btn-sm">削除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function resetGroupForm() {
+  document.getElementById('editGroupId').value = '';
+  document.getElementById('groupModalTitle').textContent = 'グループ追加';
+  document.getElementById('saveGroupBtn').textContent = '追加する';
+  document.getElementById('gName').value = '';
+  document.getElementById('gDesc').value = '';
+}
+
+function editGroup(g) {
+  document.getElementById('editGroupId').value = g.id;
+  document.getElementById('groupModalTitle').textContent = 'グループ編集';
+  document.getElementById('saveGroupBtn').textContent = '更新する';
+  document.getElementById('gName').value = g.name;
+  document.getElementById('gDesc').value = g.description || '';
+  openModal('groupModal');
+}
+
+async function saveGroup() {
+  const id = document.getElementById('editGroupId').value;
+  const body = { name: document.getElementById('gName').value.trim(), description: document.getElementById('gDesc').value.trim() };
+  const res = await fetch(id ? `/api/groups/${id}` : '/api/groups', {
+    method: id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (res.ok) { closeModal('groupModal'); showAlert('alert', data.message, 'success'); loadGroups(); }
+  else showAlert('alert', data.error || '操作に失敗しました', 'error');
+}
+
+async function deleteGroup(id, name) {
+  if (!confirmDialog(`「${name}」を削除しますか？`)) return;
+  const res = await fetch(`/api/groups/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (res.ok) { showAlert('alert', data.message, 'success'); loadGroups(); }
+  else showAlert('alert', data.error, 'error');
+}
+
+async function openGroupMembers(groupId, groupName) {
+  document.getElementById('editGroupMemberId').value = groupId;
+  document.getElementById('groupMemberTitle').textContent = `${groupName} - メンバー管理`;
+
+  const [usersRes, membersRes] = await Promise.all([
+    fetch('/api/admin/users'),
+    fetch(`/api/groups/${groupId}/members`)
+  ]);
+  const users = await usersRes.json();
+  const members = await membersRes.json();
+  const memberIds = new Set(members.map(m => m.id));
+
+  document.getElementById('memberCheckList').innerHTML = users.map(u => `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}>
+      <span>${u.display_name} <span class="text-muted text-sm">(${u.username})</span></span>
+    </label>
+  `).join('');
+  openModal('groupMemberModal');
+}
+
+async function saveGroupMembers() {
+  const groupId = document.getElementById('editGroupMemberId').value;
+  const checked = Array.from(document.querySelectorAll('#memberCheckList input:checked')).map(el => parseInt(el.value));
+  const res = await fetch(`/api/groups/${groupId}/members`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_ids: checked })
+  });
+  const data = await res.json();
+  if (res.ok) { closeModal('groupMemberModal'); showAlert('alert', data.message, 'success'); loadGroups(); }
+  else showAlert('alert', data.error, 'error');
+}
+
 // ── カテゴリ管理 ──
 async function loadCategories() {
   const res = await fetch('/api/categories');
   const cats = await res.json();
   const tbody = document.getElementById('categoryTableBody');
   if (cats.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding: 24px;">カテゴリがありません</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding: 24px;">カテゴリがありません</td></tr>';
     return;
   }
+  const visLabel = { all: '全員', admin: '管理者のみ', group: '特定グループ' };
   tbody.innerHTML = cats.map(c => `
     <tr>
       <td style="font-weight: 500;">${c.name}</td>
       <td class="text-muted">${c.description || '-'}</td>
       <td>${c.sort_order}</td>
+      <td><span class="badge ${c.visibility === 'all' ? 'badge-user' : 'badge-admin'}">${visLabel[c.visibility] || '全員'}</span></td>
       <td>${c.manual_count}</td>
       <td>
         <div class="flex gap-2">
@@ -370,6 +551,10 @@ async function loadCategories() {
   `).join('');
 }
 
+function toggleGroupSelect(val) {
+  document.getElementById('cGroupWrap').classList.toggle('hidden', val !== 'group');
+}
+
 function resetCategoryForm() {
   document.getElementById('editCategoryId').value = '';
   document.getElementById('categoryModalTitle').textContent = 'カテゴリ追加';
@@ -377,6 +562,11 @@ function resetCategoryForm() {
   document.getElementById('cName').value = '';
   document.getElementById('cDesc').value = '';
   document.getElementById('cSort').value = '0';
+  document.getElementById('cVisibility').value = 'all';
+  document.getElementById('cGroupWrap').classList.add('hidden');
+  document.getElementById('cGroupList').innerHTML = allGroups.map(g =>
+    `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" value="${g.id}"> <span>${g.name}</span></label>`
+  ).join('');
 }
 
 function editCategory(c) {
@@ -386,15 +576,24 @@ function editCategory(c) {
   document.getElementById('cName').value = c.name;
   document.getElementById('cDesc').value = c.description || '';
   document.getElementById('cSort').value = c.sort_order;
+  document.getElementById('cVisibility').value = c.visibility || 'all';
+  toggleGroupSelect(c.visibility);
+  document.getElementById('cGroupList').innerHTML = allGroups.map(g =>
+    `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" value="${g.id}"> <span>${g.name}</span></label>`
+  ).join('');
   openModal('categoryModal');
 }
 
 async function saveCategory() {
   const id = document.getElementById('editCategoryId').value;
+  const visibility = document.getElementById('cVisibility').value;
+  const groupIds = Array.from(document.querySelectorAll('#cGroupList input:checked')).map(el => parseInt(el.value));
   const body = {
     name: document.getElementById('cName').value.trim(),
     description: document.getElementById('cDesc').value.trim(),
-    sort_order: parseInt(document.getElementById('cSort').value) || 0
+    sort_order: parseInt(document.getElementById('cSort').value) || 0,
+    visibility,
+    group_ids: groupIds
   };
 
   const url = id ? `/api/categories/${id}` : '/api/categories';

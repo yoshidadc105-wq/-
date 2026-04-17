@@ -41,7 +41,36 @@ function initializeDb() {
       name TEXT UNIQUE NOT NULL,
       description TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      visibility TEXT NOT NULL DEFAULT 'all',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
+  // グループテーブル（スタッフの部署・役割グループ）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS groups_table (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
+  // ユーザーとグループの紐付け
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_groups (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      group_id INTEGER NOT NULL REFERENCES groups_table(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, group_id)
+    )
+  `);
+
+  // カテゴリとグループの紐付け（特定グループのみ閲覧可能）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS category_groups (
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+      group_id INTEGER NOT NULL REFERENCES groups_table(id) ON DELETE CASCADE,
+      PRIMARY KEY (category_id, group_id)
     )
   `);
 
@@ -92,10 +121,17 @@ function initializeDb() {
   const categoryExists = db.prepare('SELECT id FROM categories LIMIT 1').get();
   if (!categoryExists) {
     const insert = db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
-    insert.run('業務マニュアル', 1);
-    insert.run('規程・規則', 2);
-    insert.run('研修資料', 3);
-    insert.run('その他', 99);
+    insert.run('01.のびのびマニュアル', 1);
+    insert.run('02.技工', 2);
+    insert.run('03.Dr.', 3);
+    insert.run('04.プライムスキャン / プライムミル', 4);
+    insert.run('05.入社時に確認する内容', 5);
+    insert.run('06.作成完了　みんなチェックしてねマニュアル', 6);
+    insert.run('07.修正中　作成中　完了待ち', 7);
+    insert.run('08.ゆ未完成', 8);
+    insert.run('09.吉田未完成', 9);
+    insert.run('10.編集が必要なマニュアル', 10);
+    insert.run('11.使ってないマニュアル', 11);
   }
 
   console.log('データベースを初期化しました');

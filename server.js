@@ -9,6 +9,7 @@ const authRoutes = require('./src/routes/auth');
 const manualRoutes = require('./src/routes/manuals');
 const categoryRoutes = require('./src/routes/categories');
 const adminRoutes = require('./src/routes/admin');
+const groupRoutes = require('./src/routes/groups');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,6 +44,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/manuals', manualRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/groups', groupRoutes);
 
 // PDFファイルの配信（認証済みのみ）
 app.use('/uploads', (req, res, next) => {
@@ -67,6 +69,11 @@ app.get('/admin.html', (req, res) => {
   if (!req.session.userId) return res.redirect('/login.html');
   if (req.session.role !== 'admin') return res.redirect('/');
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/bulk-import.html', (req, res) => {
+  if (!req.session.userId) return res.redirect('/login.html');
+  res.sendFile(path.join(__dirname, 'public', 'bulk-import.html'));
 });
 
 // DB初期化してサーバー起動

@@ -31,6 +31,15 @@ const upload = multer({
   }
 });
 
+const uploadMany = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('PDFファイルのみアップロードできます'));
+  }
+});
+
 // マニュアル一覧取得（検索・フィルタ対応）
 router.get('/', requireLogin, (req, res) => {
   const { search, category_id, type, page = 1, limit = 20 } = req.query;
@@ -195,6 +204,32 @@ router.delete('/:id', requireLogin, (req, res) => {
 
   db.prepare("UPDATE manuals SET is_deleted = 1, updated_at = datetime('now', 'localtime') WHERE id = ?").run(req.params.id);
   res.json({ message: 'マニュアルを削除しました' });
+});
+
+// PDF一括アップロード
+router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'PDFファイルを選択してください' });
+  }
+
+  const { category_id } = req.body;
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO manuals (title, type, file_path, file_name, file_size, category_id, created_by, updated_by)
+    VALUES (?, 'pdf', ?, ?, ?, ?, ?, ?)
+  `);
+
+  const results = [];
+  for (const file of req.files) {
+    const title = path.parse(file.originalname).name;
+    const result = insert.run(
+      title, file.filename, file.originalname, file.size,
+      category_id || null, req.session.userId, req.session.userId
+    );
+    results.push({ id: result.lastInsertRowid, title });
+  }
+
+  res.status(201).json({ message: `${results.length}件のPDFを登録しました`, results });
 });
 
 // 最近閲覧したマニュアル
