@@ -222,7 +222,11 @@ router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res)
 
   const results = [];
   for (const file of req.files) {
-    const fixedName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const raw = file.originalname;
+    const asUtf8  = Buffer.from(raw, 'latin1').toString('utf8');
+    const asBin   = Buffer.from(raw).toString('hex');
+    console.log('[DEBUG filename]', JSON.stringify(raw), '→', JSON.stringify(asUtf8), 'hex:', asBin.slice(0, 40));
+    const fixedName = asUtf8.includes('\uFFFD') ? raw : asUtf8;
     const title = path.parse(fixedName).name;
     const result = insert.run(
       title, file.filename, fixedName, file.size,
