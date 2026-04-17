@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アカウント設定 - 社内マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+  <div class="navbar-right">
+    <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
+    <a href="/admin.html" id="navAdminLink" class="btn btn-secondary btn-sm hidden">管理者設定</a>
+    <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 480px;">
+  <div class="mb-3">
+    <a href="/" class="text-sm" style="color: var(--primary);">← 一覧に戻る</a>
+    <h1 style="font-size: 22px; font-weight: 700; margin-top: 4px;">アカウント設定</h1>
+  </div>
+
+  <div id="alert" class="hidden"></div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">パスワード変更</span></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label class="form-label">現在のパスワード <span class="required">*</span></label>
+        <input type="password" id="currentPw" class="form-control" placeholder="現在のパスワード">
+      </div>
+      <div class="form-group">
+        <label class="form-label">新しいパスワード <span class="required">*</span></label>
+        <input type="password" id="newPw" class="form-control" placeholder="6文字以上">
+      </div>
+      <div class="form-group">
+        <label class="form-label">新しいパスワード（確認） <span class="required">*</span></label>
+        <input type="password" id="confirmPw" class="form-control" placeholder="もう一度入力">
+      </div>
+      <button onclick="changePassword()" class="btn btn-primary">変更する</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+async function init() {
+  const user = await loadCurrentUser();
+  if (!user) return;
+  initNavbar(user);
+}
+
+async function changePassword() {
+  const current = document.getElementById('currentPw').value;
+  const newPw = document.getElementById('newPw').value;
+  const confirm = document.getElementById('confirmPw').value;
+
+  if (!current || !newPw || !confirm) {
+    showAlert('alert', 'すべての項目を入力してください', 'error');
+    return;
+  }
+  if (newPw.length < 6) {
+    showAlert('alert', '新しいパスワードは6文字以上にしてください', 'error');
+    return;
+  }
+  if (newPw !== confirm) {
+    showAlert('alert', '新しいパスワードが一致しません', 'error');
+    return;
+  }
+
+  const res = await fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    showAlert('alert', 'パスワードを変更しました', 'success');
+    document.getElementById('currentPw').value = '';
+    document.getElementById('newPw').value = '';
+    document.getElementById('confirmPw').value = '';
+  } else {
+    showAlert('alert', data.error || '変更に失敗しました', 'error');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -76,6 +76,11 @@ app.get('/bulk-import.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'bulk-import.html'));
 });
 
+app.get('/account.html', (req, res) => {
+  if (!req.session.userId) return res.redirect('/login.html');
+  res.sendFile(path.join(__dirname, 'public', 'account.html'));
+});
+
 // DB初期化してサーバー起動
 initializeDb();
 app.listen(PORT, () => {
