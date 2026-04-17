@@ -98,12 +98,13 @@ async function loadManual() {
 
   if (manualData.type === 'pdf') {
     bodyHtml = `
-      <div class="mb-2 flex gap-2">
+      <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+        <a href="/uploads/${manualData.file_path}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
         <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
         ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
         ${canEdit ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
       </div>
-      <iframe src="/uploads/${manualData.file_path}" class="pdf-viewer"></iframe>
+      <iframe src="/uploads/${manualData.file_path}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>
     `;
   } else {
     bodyHtml = `

@@ -128,7 +128,8 @@ router.post('/pdf', requireLogin, upload.single('pdf'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'PDFファイルを選択してください' });
 
   const { title, description, category_id } = req.body;
-  const manualTitle = title || path.parse(req.file.originalname).name;
+  const fixedName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+  const manualTitle = title || path.parse(fixedName).name;
 
   const db = getDb();
   const result = db.prepare(`
@@ -221,9 +222,10 @@ router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res)
 
   const results = [];
   for (const file of req.files) {
-    const title = path.parse(file.originalname).name;
+    const fixedName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const title = path.parse(fixedName).name;
     const result = insert.run(
-      title, file.filename, file.originalname, file.size,
+      title, file.filename, fixedName, file.size,
       category_id || null, req.session.userId, req.session.userId
     );
     results.push({ id: result.lastInsertRowid, title });
