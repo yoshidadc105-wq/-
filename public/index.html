@@ -96,30 +96,46 @@ async function loadCategories() {
   const nav = document.getElementById('categoryNav');
   nav.innerHTML = `<li><a href="#" class="${currentCategory === '' ? 'active' : ''}" onclick="filterByCategory('', 'すべて', this)">すべて</a></li>`;
 
-  // ツリー構造を構築
   const roots = cats.filter(c => !c.parent_id);
   const children = (parentId) => cats.filter(c => c.parent_id == parentId);
 
   function renderNode(c, depth) {
     const indent = depth * 12;
     const kids = children(c.id);
-    const hasKids = kids.length > 0;
     const nameEscaped = c.name.replace(/'/g, "\\'");
-    let html = `
-      <li>
-        <a href="#" onclick="filterByCategory(${c.id}, '${nameEscaped}', this)"
-           style="padding-left: ${12 + indent}px; font-size: ${depth > 0 ? '13px' : '14px'};">
-          ${depth > 0 ? '└ ' : ''}${c.name}
-          <span class="text-muted text-sm">(${c.manual_count})</span>
+
+    if (kids.length > 0) {
+      let html = `<li>
+        <a href="#" onclick="toggleCategory(${c.id}, '${nameEscaped}', this)"
+           style="padding-left:${12 + indent}px; font-size:${depth > 0 ? '13px' : '14px'}; display:flex; align-items:center; justify-content:space-between;">
+          <span>${depth > 0 ? '└ ' : ''}${c.name} <span class="text-muted text-sm">(${c.manual_count})</span></span>
+          <span id="arrow-${c.id}" style="font-size:10px; margin-right:6px; color:var(--text-muted); flex-shrink:0;">▶</span>
         </a>
-      </li>`;
-    if (hasKids) {
+        <ul id="sub-${c.id}" style="display:none; list-style:none; margin:0; padding:0;">`;
       kids.forEach(kid => { html += renderNode(kid, depth + 1); });
+      html += `</ul></li>`;
+      return html;
     }
-    return html;
+
+    return `<li><a href="#" onclick="filterByCategory(${c.id}, '${nameEscaped}', this)"
+       style="padding-left:${12 + indent}px; font-size:${depth > 0 ? '13px' : '14px'};">
+      ${depth > 0 ? '└ ' : ''}${c.name}
+      <span class="text-muted text-sm">(${c.manual_count})</span>
+    </a></li>`;
   }
 
   roots.forEach(c => { nav.innerHTML += renderNode(c, 0); });
+}
+
+function toggleCategory(id, name, el) {
+  filterByCategory(id, name, el);
+  const sub = document.getElementById(`sub-${id}`);
+  const arrow = document.getElementById(`arrow-${id}`);
+  if (sub) {
+    const isOpen = sub.style.display !== 'none';
+    sub.style.display = isOpen ? 'none' : '';
+    if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+  }
 }
 
 async function loadRecent() {
