@@ -94,10 +94,32 @@ async function loadCategories() {
   const res = await fetch('/api/categories');
   const cats = await res.json();
   const nav = document.getElementById('categoryNav');
-  nav.innerHTML = `<li><a href="#" class="${currentCategory === '' ? 'active' : ''}" data-category="" onclick="filterByCategory('', 'すべて', this)">すべて</a></li>`;
-  cats.forEach(c => {
-    nav.innerHTML += `<li><a href="#" data-category="${c.id}" onclick="filterByCategory(${c.id}, '${c.name}', this)">${c.name} <span class="text-muted text-sm">(${c.manual_count})</span></a></li>`;
-  });
+  nav.innerHTML = `<li><a href="#" class="${currentCategory === '' ? 'active' : ''}" onclick="filterByCategory('', 'すべて', this)">すべて</a></li>`;
+
+  // ツリー構造を構築
+  const roots = cats.filter(c => !c.parent_id);
+  const children = (parentId) => cats.filter(c => c.parent_id == parentId);
+
+  function renderNode(c, depth) {
+    const indent = depth * 12;
+    const kids = children(c.id);
+    const hasKids = kids.length > 0;
+    const nameEscaped = c.name.replace(/'/g, "\\'");
+    let html = `
+      <li>
+        <a href="#" onclick="filterByCategory(${c.id}, '${nameEscaped}', this)"
+           style="padding-left: ${12 + indent}px; font-size: ${depth > 0 ? '13px' : '14px'};">
+          ${depth > 0 ? '└ ' : ''}${c.name}
+          <span class="text-muted text-sm">(${c.manual_count})</span>
+        </a>
+      </li>`;
+    if (hasKids) {
+      kids.forEach(kid => { html += renderNode(kid, depth + 1); });
+    }
+    return html;
+  }
+
+  roots.forEach(c => { nav.innerHTML += renderNode(c, 0); });
 }
 
 async function loadRecent() {

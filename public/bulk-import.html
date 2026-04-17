@@ -137,9 +137,15 @@ async function loadCategories() {
   const res = await fetch('/api/categories');
   const cats = await res.json();
   const sel = document.getElementById('categorySelect');
-  cats.forEach(c => {
-    sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
-  });
+
+  function addOpts(parentId, depth) {
+    cats.filter(c => parentId === null ? !c.parent_id : c.parent_id == parentId).forEach(c => {
+      const prefix = '　'.repeat(depth);
+      sel.innerHTML += `<option value="${c.id}">${depth > 0 ? prefix + '└ ' : ''}${c.name}</option>`;
+      addOpts(c.id, depth + 1);
+    });
+  }
+  addOpts(null, 0);
 }
 
 function setupDragDrop() {

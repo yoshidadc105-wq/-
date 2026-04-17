@@ -38,13 +38,20 @@ function initializeDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
       description TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       visibility TEXT NOT NULL DEFAULT 'all',
-      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE(name, parent_id)
     )
   `);
+
+  // 既存DBへのマイグレーション（parent_idカラムがない場合は追加）
+  try {
+    db.exec('ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL');
+  } catch (e) { /* すでに存在する場合は無視 */ }
 
   // グループテーブル（スタッフの部署・役割グループ）
   db.exec(`

@@ -259,8 +259,15 @@
     <div class="modal-body">
       <input type="hidden" id="editCategoryId">
       <div class="form-group">
+        <label class="form-label">親カテゴリ（任意）</label>
+        <select id="cParentId" class="form-control">
+          <option value="">なし（最上位）</option>
+        </select>
+        <p class="text-sm text-muted mt-1">サブカテゴリにする場合は親を選択</p>
+      </div>
+      <div class="form-group">
         <label class="form-label">カテゴリ名 <span class="required">*</span></label>
-        <input type="text" id="cName" class="form-control" placeholder="例: 業務マニュアル">
+        <input type="text" id="cName" class="form-control" placeholder="例: 01.診療関係">
       </div>
       <div class="form-group">
         <label class="form-label">説明（任意）</label>
@@ -314,7 +321,7 @@ async function loadStats() {
 }
 
 function showTab(name, el) {
-  ['users', 'categories', 'password'].forEach(t => {
+  ['users', 'groups', 'categories', 'password'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.add('hidden');
   });
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -526,30 +533,70 @@ async function saveGroupMembers() {
 }
 
 // ── カテゴリ管理 ──
+let allCategories = [];
+
 async function loadCategories() {
   const res = await fetch('/api/categories');
-  const cats = await res.json();
+  allCategories = await res.json();
   const tbody = document.getElementById('categoryTableBody');
-  if (cats.length === 0) {
+  if (allCategories.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding: 24px;">カテゴリがありません</td></tr>';
     return;
   }
   const visLabel = { all: '全員', admin: '管理者のみ', group: '特定グループ' };
-  tbody.innerHTML = cats.map(c => `
-    <tr>
-      <td style="font-weight: 500;">${c.name}</td>
-      <td class="text-muted">${c.description || '-'}</td>
-      <td>${c.sort_order}</td>
-      <td><span class="badge ${c.visibility === 'all' ? 'badge-user' : 'badge-admin'}">${visLabel[c.visibility] || '全員'}</span></td>
-      <td>${c.manual_count}</td>
-      <td>
-        <div class="flex gap-2">
-          <button onclick="editCategory(${JSON.stringify(c).replace(/"/g, '&quot;')})" class="btn btn-secondary btn-sm">編集</button>
-          <button onclick="deleteCategory(${c.id}, '${c.name}')" class="btn btn-danger btn-sm">削除</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+
+  function renderRows(parentId, depth) {
+    let html = '';
+    allCategories
+      .filter(c => parentId === null ? !c.parent_id : c.parent_id == parentId)
+      .forEach(c => {
+        const indent = depth * 20;
+        const nameEscaped = c.name.replace(/'/g, "\\'");
+        html += `<tr>
+          <td style="font-weight:500; padding-left:${8 + indent}px;">${depth > 0 ? '└ ' : ''}${c.name}</td>
+          <td class="text-muted">${c.description || '-'}</td>
+          <td>${c.sort_order}</td>
+          <td><span class="badge ${c.visibility === 'all' ? 'badge-user' : 'badge-admin'}">${visLabel[c.visibility] || '全員'}</span></td>
+          <td>${c.manual_count}</td>
+          <td>
+            <div class="flex gap-2">
+              <button onclick="editCategory(${JSON.stringify(c).replace(/"/g, '&quot;')})" class="btn btn-secondary btn-sm">編集</button>
+              <button onclick="deleteCategory(${c.id}, '${nameEscaped}')" class="btn btn-danger btn-sm">削除</button>
+            </div>
+          </td>
+        </tr>`;
+        html += renderRows(c.id, depth + 1);
+      });
+    return html;
+  }
+  tbody.innerHTML = renderRows(null, 0);
+}
+
+function populateParentSelect(excludeId) {
+  const sel = document.getElementById('cParentId');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">なし（最上位）</option>';
+
+  const excluded = new Set();
+  if (excludeId) {
+    function collectDesc(id) {
+      excluded.add(id);
+      allCategories.filter(c => c.parent_id == id).forEach(c => collectDesc(c.id));
+    }
+    collectDesc(excludeId);
+  }
+
+  function addOpts(parentId, depth) {
+    allCategories
+      .filter(c => (parentId === null ? !c.parent_id : c.parent_id == parentId) && !excluded.has(c.id))
+      .forEach(c => {
+        const prefix = '　'.repeat(depth);
+        sel.innerHTML += `<option value="${c.id}">${depth > 0 ? prefix + '└ ' : ''}${c.name}</option>`;
+        if (depth < 1) addOpts(c.id, depth + 1);
+      });
+  }
+  addOpts(null, 0);
+  sel.value = current;
 }
 
 function toggleGroupSelect(val) {
@@ -568,6 +615,8 @@ function resetCategoryForm() {
   document.getElementById('cGroupList').innerHTML = allGroups.map(g =>
     `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" value="${g.id}"> <span>${g.name}</span></label>`
   ).join('');
+  populateParentSelect(null);
+  document.getElementById('cParentId').value = '';
 }
 
 function editCategory(c) {
@@ -582,6 +631,8 @@ function editCategory(c) {
   document.getElementById('cGroupList').innerHTML = allGroups.map(g =>
     `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" value="${g.id}"> <span>${g.name}</span></label>`
   ).join('');
+  populateParentSelect(c.id);
+  document.getElementById('cParentId').value = c.parent_id || '';
   openModal('categoryModal');
 }
 
@@ -589,12 +640,14 @@ async function saveCategory() {
   const id = document.getElementById('editCategoryId').value;
   const visibility = document.getElementById('cVisibility').value;
   const groupIds = Array.from(document.querySelectorAll('#cGroupList input:checked')).map(el => parseInt(el.value));
+  const parentId = document.getElementById('cParentId').value;
   const body = {
     name: document.getElementById('cName').value.trim(),
     description: document.getElementById('cDesc').value.trim(),
     sort_order: parseInt(document.getElementById('cSort').value) || 0,
     visibility,
-    group_ids: groupIds
+    group_ids: groupIds,
+    parent_id: parentId ? parseInt(parentId) : null
   };
 
   const url = id ? `/api/categories/${id}` : '/api/categories';
