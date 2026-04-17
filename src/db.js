@@ -127,95 +127,102 @@ function initializeDb() {
 
   const categoryExists = db.prepare('SELECT id FROM categories LIMIT 1').get();
   if (!categoryExists) {
-    const ins = db.prepare('INSERT INTO categories (name, sort_order, parent_id) VALUES (?, ?, ?)');
-    const l1 = (name, sort) => ins.run(name, sort, null).lastInsertRowid;
-    const l2 = (name, sort, pid) => ins.run(name, sort, pid).lastInsertRowid;
+    const insL1 = db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
+    const insL2 = db.prepare('INSERT INTO categories (name, sort_order, parent_id) VALUES (?, ?, ?)');
+    const getId = (name) => db.prepare('SELECT id FROM categories WHERE name = ?').get(name).id;
 
     // Level 1
-    const nobinobiId = l1('01.のびのびマニュアル', 1);
-    l1('02.技工', 2);
-    l1('03.Dr.', 3);
-    const primeId  = l1('04.プライムスキャン / プライムミル', 4);
-    const nyushaId = l1('05.入社時に確認する内容', 5);
-    l1('06.作成完了　みんなチェックしてねマニュアル', 6);
-    l1('07.修正中　作成中　完了待ち', 7);
-    const yuId     = l1('08.ゆ未完成', 8);
-    l1('09.吉田未完成', 9);
-    l1('10.編集が必要なマニュアル', 10);
-    l1('11.使ってないマニュアル', 11);
+    insL1.run('01.のびのびマニュアル', 1);
+    insL1.run('02.技工', 2);
+    insL1.run('03.Dr.', 3);
+    insL1.run('04.プライムスキャン / プライムミル', 4);
+    insL1.run('05.入社時に確認する内容', 5);
+    insL1.run('06.作成完了　みんなチェックしてねマニュアル', 6);
+    insL1.run('07.修正中　作成中　完了待ち', 7);
+    insL1.run('08.ゆ未完成', 8);
+    insL1.run('09.吉田未完成', 9);
+    insL1.run('10.編集が必要なマニュアル', 10);
+    insL1.run('11.使ってないマニュアル', 11);
+
+    // IDを名前で取得
+    const nobinobiId = getId('01.のびのびマニュアル');
+    const primeId    = getId('04.プライムスキャン / プライムミル');
+    const nyushaId   = getId('05.入社時に確認する内容');
+    const yuId       = getId('08.ゆ未完成');
 
     // Level 2 — 01.のびのびマニュアル
-    const shinryoId = l2('01.診療関係', 1, nobinobiId);
-    l2('02.滅菌・消毒室', 2, nobinobiId);
-    const unitId    = l2('03.ユニット関係、案内', 3, nobinobiId);
-    const kyoseiId  = l2('04.矯正', 4, nobinobiId);
-    l2('05.インプラント', 5, nobinobiId);
-    l2('06.レントゲン、口腔内写真', 6, nobinobiId);
-    l2('07.ホワイトニング', 7, nobinobiId);
-    l2('08..技術操作', 8, nobinobiId);
-    l2('09.機械の操作', 9, nobinobiId);
-    const uketsukId = l2('10.受付、電話', 10, nobinobiId);
-    l2('11.器具の個数', 11, nobinobiId);
-    l2('12.品物管理、棚', 12, nobinobiId);
-    const asaId     = l2('13.朝の準備', 13, nobinobiId);
-    l2('14.帰りの片付け', 14, nobinobiId);
-    l2('18.手が空いたときにやること', 18, nobinobiId);
-    l2('19.ミーティング、勉強会', 19, nobinobiId);
-    l2('21.ヘルプ', 21, nobinobiId);
-    l2('22.訪問', 22, nobinobiId);
-    l2('23.ほとんど使ってない機械など', 23, nobinobiId);
-    l2('24.小児矯正', 24, nobinobiId);
-    l2('99.その他', 99, nobinobiId);
+    insL2.run('01.診療関係', 1, nobinobiId);
+    insL2.run('02.滅菌・消毒室', 2, nobinobiId);
+    insL2.run('03.ユニット関係、案内', 3, nobinobiId);
+    insL2.run('04.矯正', 4, nobinobiId);
+    insL2.run('05.インプラント', 5, nobinobiId);
+    insL2.run('06.レントゲン、口腔内写真', 6, nobinobiId);
+    insL2.run('07.ホワイトニング', 7, nobinobiId);
+    insL2.run('08..技術操作', 8, nobinobiId);
+    insL2.run('09.機械の操作', 9, nobinobiId);
+    insL2.run('10.受付、電話', 10, nobinobiId);
+    insL2.run('11.器具の個数', 11, nobinobiId);
+    insL2.run('12.品物管理、棚', 12, nobinobiId);
+    insL2.run('13.朝の準備', 13, nobinobiId);
+    insL2.run('14.帰りの片付け', 14, nobinobiId);
+    insL2.run('18.手が空いたときにやること', 18, nobinobiId);
+    insL2.run('19.ミーティング、勉強会', 19, nobinobiId);
+    insL2.run('21.ヘルプ', 21, nobinobiId);
+    insL2.run('22.訪問', 22, nobinobiId);
+    insL2.run('23.ほとんど使ってない機械など', 23, nobinobiId);
+    insL2.run('24.小児矯正', 24, nobinobiId);
+    insL2.run('99.その他', 99, nobinobiId);
 
     // Level 2 — 04.プライムスキャン / プライムミル
-    l2('プライムスキャン', 1, primeId);
-    l2('プライムミル', 2, primeId);
+    insL2.run('プライムスキャン', 1, primeId);
+    insL2.run('プライムミル', 2, primeId);
 
     // Level 2 — 05.入社時に確認する内容
-    l2('01.オリエンテーション', 1, nyushaId);
-    l2('02.アカウント登録', 2, nyushaId);
+    insL2.run('01.オリエンテーション', 1, nyushaId);
+    insL2.run('02.アカウント登録', 2, nyushaId);
 
     // Level 2 — 08.ゆ未完成
-    l2('DHミーティング', 1, yuId);
-    l2('DrHRマニュアル', 2, yuId);
-    l2('説明', 3, yuId);
+    insL2.run('DHミーティング', 1, yuId);
+    insL2.run('DrHRマニュアル', 2, yuId);
+    insL2.run('説明', 3, yuId);
 
-    // Level 3 — 01.診療関係
-    l2('01.C処・形成・セット関係', 1, shinryoId);
-    l2('02.根治関係・コア', 2, shinryoId);
-    l2('03.外科関係', 3, shinryoId);
-    l2('04.その他', 4, shinryoId);
-    l2('DH業務', 5, shinryoId);
+    // Level 3 — IDをここで取得
+    const shinryoId = getId('01.診療関係');
+    const unitId    = getId('03.ユニット関係、案内');
+    const kyoseiId  = getId('04.矯正');
+    const uketsukId = getId('10.受付、電話');
+    const asaId     = getId('13.朝の準備');
 
-    // Level 3 — 03.ユニット関係、案内
-    l2('01.案内・片付け', 1, unitId);
-    l2('02.ユニットのこと', 2, unitId);
+    insL2.run('01.C処・形成・セット関係', 1, shinryoId);
+    insL2.run('02.根治関係・コア', 2, shinryoId);
+    insL2.run('03.外科関係', 3, shinryoId);
+    insL2.run('04.その他', 4, shinryoId);
+    insL2.run('DH業務', 5, shinryoId);
 
-    // Level 3 — 04.矯正
-    l2('01.検査', 1, kyoseiId);
-    l2('02.急速拡大', 2, kyoseiId);
-    l2('03.エンジェル', 3, kyoseiId);
-    l2('04.アライナー', 4, kyoseiId);
-    l2('05.インビザ', 5, kyoseiId);
-    l2('06.その他', 6, kyoseiId);
+    insL2.run('01.案内・片付け', 1, unitId);
+    insL2.run('02.ユニットのこと', 2, unitId);
 
-    // Level 3 — 10.受付、電話
-    l2('01.アポツール関係', 1, uketsukId);
-    l2('02.レジ関係', 2, uketsukId);
-    l2('03.レセコン関係（資格証明書・医療書・マイナンバー）', 3, uketsukId);
-    l2('04.電話関係', 4, uketsukId);
-    l2('05.朝準備・締め作業', 5, uketsukId);
+    insL2.run('01.検査', 1, kyoseiId);
+    insL2.run('02.急速拡大', 2, kyoseiId);
+    insL2.run('03.エンジェル', 3, kyoseiId);
+    insL2.run('04.アライナー', 4, kyoseiId);
+    insL2.run('05.インビザ', 5, kyoseiId);
+    insL2.run('06.その他', 6, kyoseiId);
 
-    // Level 3 — 13.朝の準備
-    l2('朝の準備サブ', 1, asaId);
+    insL2.run('01.アポツール関係', 1, uketsukId);
+    insL2.run('02.レジ関係', 2, uketsukId);
+    insL2.run('03.レセコン関係（資格証明書・医療書・マイナンバー）', 3, uketsukId);
+    insL2.run('04.電話関係', 4, uketsukId);
+    insL2.run('05.朝準備・締め作業', 5, uketsukId);
+
+    insL2.run('朝の準備サブ', 1, asaId);
   }
 
   // 既存DBマイグレーション：サブカテゴリが未登録なら追加
   const hasSubCats = db.prepare('SELECT id FROM categories WHERE parent_id IS NOT NULL LIMIT 1').get();
   if (!hasSubCats) {
+    const insL2m = db.prepare('INSERT OR IGNORE INTO categories (name, sort_order, parent_id) VALUES (?, ?, ?)');
     const get = (name) => db.prepare('SELECT id FROM categories WHERE name = ?').get(name);
-    const ins2 = db.prepare('INSERT OR IGNORE INTO categories (name, sort_order, parent_id) VALUES (?, ?, ?)');
-    const m = (name, sort, pid) => ins2.run(name, sort, pid).lastInsertRowid;
 
     const nobinobi = get('01.のびのびマニュアル');
     const prime    = get('04.プライムスキャン / プライムミル');
@@ -223,55 +230,66 @@ function initializeDb() {
     const yu       = get('08.ゆ未完成');
 
     if (nobinobi) {
-      const shinryoId = m('01.診療関係', 1, nobinobi.id);
-      m('02.滅菌・消毒室', 2, nobinobi.id);
-      const unitId    = m('03.ユニット関係、案内', 3, nobinobi.id);
-      const kyoseiId  = m('04.矯正', 4, nobinobi.id);
-      m('05.インプラント', 5, nobinobi.id);
-      m('06.レントゲン、口腔内写真', 6, nobinobi.id);
-      m('07.ホワイトニング', 7, nobinobi.id);
-      m('08..技術操作', 8, nobinobi.id);
-      m('09.機械の操作', 9, nobinobi.id);
-      const uketsukId = m('10.受付、電話', 10, nobinobi.id);
-      m('11.器具の個数', 11, nobinobi.id);
-      m('12.品物管理、棚', 12, nobinobi.id);
-      const asaId     = m('13.朝の準備', 13, nobinobi.id);
-      m('14.帰りの片付け', 14, nobinobi.id);
-      m('18.手が空いたときにやること', 18, nobinobi.id);
-      m('19.ミーティング、勉強会', 19, nobinobi.id);
-      m('21.ヘルプ', 21, nobinobi.id);
-      m('22.訪問', 22, nobinobi.id);
-      m('23.ほとんど使ってない機械など', 23, nobinobi.id);
-      m('24.小児矯正', 24, nobinobi.id);
-      m('99.その他', 99, nobinobi.id);
+      insL2m.run('01.診療関係', 1, nobinobi.id);
+      insL2m.run('02.滅菌・消毒室', 2, nobinobi.id);
+      insL2m.run('03.ユニット関係、案内', 3, nobinobi.id);
+      insL2m.run('04.矯正', 4, nobinobi.id);
+      insL2m.run('05.インプラント', 5, nobinobi.id);
+      insL2m.run('06.レントゲン、口腔内写真', 6, nobinobi.id);
+      insL2m.run('07.ホワイトニング', 7, nobinobi.id);
+      insL2m.run('08..技術操作', 8, nobinobi.id);
+      insL2m.run('09.機械の操作', 9, nobinobi.id);
+      insL2m.run('10.受付、電話', 10, nobinobi.id);
+      insL2m.run('11.器具の個数', 11, nobinobi.id);
+      insL2m.run('12.品物管理、棚', 12, nobinobi.id);
+      insL2m.run('13.朝の準備', 13, nobinobi.id);
+      insL2m.run('14.帰りの片付け', 14, nobinobi.id);
+      insL2m.run('18.手が空いたときにやること', 18, nobinobi.id);
+      insL2m.run('19.ミーティング、勉強会', 19, nobinobi.id);
+      insL2m.run('21.ヘルプ', 21, nobinobi.id);
+      insL2m.run('22.訪問', 22, nobinobi.id);
+      insL2m.run('23.ほとんど使ってない機械など', 23, nobinobi.id);
+      insL2m.run('24.小児矯正', 24, nobinobi.id);
+      insL2m.run('99.その他', 99, nobinobi.id);
 
-      m('01.C処・形成・セット関係', 1, shinryoId);
-      m('02.根治関係・コア', 2, shinryoId);
-      m('03.外科関係', 3, shinryoId);
-      m('04.その他', 4, shinryoId);
-      m('DH業務', 5, shinryoId);
+      const getL2 = (name) => db.prepare('SELECT id FROM categories WHERE name = ? AND parent_id = ?').get(name, nobinobi.id);
+      const shinryo = getL2('01.診療関係');
+      const unit    = getL2('03.ユニット関係、案内');
+      const kyosei  = getL2('04.矯正');
+      const uketsuk = getL2('10.受付、電話');
+      const asa     = getL2('13.朝の準備');
 
-      m('01.案内・片付け', 1, unitId);
-      m('02.ユニットのこと', 2, unitId);
-
-      m('01.検査', 1, kyoseiId);
-      m('02.急速拡大', 2, kyoseiId);
-      m('03.エンジェル', 3, kyoseiId);
-      m('04.アライナー', 4, kyoseiId);
-      m('05.インビザ', 5, kyoseiId);
-      m('06.その他', 6, kyoseiId);
-
-      m('01.アポツール関係', 1, uketsukId);
-      m('02.レジ関係', 2, uketsukId);
-      m('03.レセコン関係（資格証明書・医療書・マイナンバー）', 3, uketsukId);
-      m('04.電話関係', 4, uketsukId);
-      m('05.朝準備・締め作業', 5, uketsukId);
-
-      m('朝の準備サブ', 1, asaId);
+      if (shinryo) {
+        insL2m.run('01.C処・形成・セット関係', 1, shinryo.id);
+        insL2m.run('02.根治関係・コア', 2, shinryo.id);
+        insL2m.run('03.外科関係', 3, shinryo.id);
+        insL2m.run('04.その他', 4, shinryo.id);
+        insL2m.run('DH業務', 5, shinryo.id);
+      }
+      if (unit) {
+        insL2m.run('01.案内・片付け', 1, unit.id);
+        insL2m.run('02.ユニットのこと', 2, unit.id);
+      }
+      if (kyosei) {
+        insL2m.run('01.検査', 1, kyosei.id);
+        insL2m.run('02.急速拡大', 2, kyosei.id);
+        insL2m.run('03.エンジェル', 3, kyosei.id);
+        insL2m.run('04.アライナー', 4, kyosei.id);
+        insL2m.run('05.インビザ', 5, kyosei.id);
+        insL2m.run('06.その他', 6, kyosei.id);
+      }
+      if (uketsuk) {
+        insL2m.run('01.アポツール関係', 1, uketsuk.id);
+        insL2m.run('02.レジ関係', 2, uketsuk.id);
+        insL2m.run('03.レセコン関係（資格証明書・医療書・マイナンバー）', 3, uketsuk.id);
+        insL2m.run('04.電話関係', 4, uketsuk.id);
+        insL2m.run('05.朝準備・締め作業', 5, uketsuk.id);
+      }
+      if (asa) insL2m.run('朝の準備サブ', 1, asa.id);
     }
-    if (prime)  { m('プライムスキャン', 1, prime.id); m('プライムミル', 2, prime.id); }
-    if (nyusha) { m('01.オリエンテーション', 1, nyusha.id); m('02.アカウント登録', 2, nyusha.id); }
-    if (yu)     { m('DHミーティング', 1, yu.id); m('DrHRマニュアル', 2, yu.id); m('説明', 3, yu.id); }
+    if (prime)  { insL2m.run('プライムスキャン', 1, prime.id); insL2m.run('プライムミル', 2, prime.id); }
+    if (nyusha) { insL2m.run('01.オリエンテーション', 1, nyusha.id); insL2m.run('02.アカウント登録', 2, nyusha.id); }
+    if (yu)     { insL2m.run('DHミーティング', 1, yu.id); insL2m.run('DrHRマニュアル', 2, yu.id); insL2m.run('説明', 3, yu.id); }
   }
 
   console.log('データベースを初期化しました');
