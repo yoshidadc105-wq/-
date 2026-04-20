@@ -93,6 +93,7 @@ async function init() {
 async function loadCategories() {
   const res = await fetch('/api/categories');
   const cats = await res.json();
+  window._allCats = cats; // サブフォルダ表示に使用
   const nav = document.getElementById('categoryNav');
   nav.innerHTML = `<li><a href="#" class="${currentCategory === '' ? 'active' : ''}" onclick="filterByCategory('', 'すべて', this)">すべて</a></li>`;
 
@@ -199,14 +200,39 @@ async function loadManuals(page = 1) {
 function renderManuals(manuals) {
   const container = document.getElementById('manualList');
 
-  if (manuals.length === 0) {
+  // 選択中カテゴリの直下サブカテゴリをフォルダとして表示
+  const subCats = currentCategory
+    ? (window._allCats || []).filter(c => c.parent_id == currentCategory)
+    : [];
+
+  const subCatHtml = subCats.length > 0 ? `
+    <div class="manual-grid mb-2">
+      ${subCats.map(c => `
+        <a href="#" onclick="drillDown(${c.id}); return false;" class="manual-card" style="flex-direction:row; align-items:center; gap:12px; padding:12px 16px;">
+          <span style="font-size:28px; line-height:1; flex-shrink:0;">📁</span>
+          <div style="min-width:0;">
+            <div class="manual-card-title">${c.name}</div>
+            <div class="manual-card-meta">${c.manual_count}件</div>
+          </div>
+        </a>
+      `).join('')}
+    </div>` : '';
+
+  if (manuals.length === 0 && subCats.length === 0) {
+    container.className = '';
     container.innerHTML = `<div class="empty"><div class="empty-icon">📂</div>マニュアルが見つかりません</div>`;
     return;
   }
 
+  if (manuals.length === 0) {
+    container.className = '';
+    container.innerHTML = subCatHtml;
+    return;
+  }
+
+  let manualsHtml = '';
   if (viewMode === 'grid') {
-    container.className = 'manual-grid';
-    container.innerHTML = manuals.map(m => `
+    manualsHtml = `<div class="manual-grid">${manuals.map(m => `
       <a href="/view.html?id=${m.id}" class="manual-card">
         <div class="flex items-center gap-2">
           <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
@@ -221,28 +247,22 @@ function renderManuals(manuals) {
           ${m.file_size ? `<span>· ${formatFileSize(m.file_size)}</span>` : ''}
         </div>
       </a>
-    `).join('');
+    `).join('')}</div>`;
   } else {
-    container.className = '';
-    container.innerHTML = `
+    manualsHtml = `
       <div class="card">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>種別</th>
-                <th>タイトル</th>
-                <th>カテゴリ</th>
-                <th>作成者</th>
-                <th>更新日時</th>
-                <th>サイズ</th>
+                <th>種別</th><th>タイトル</th><th>カテゴリ</th><th>作成者</th><th>更新日時</th><th>サイズ</th>
               </tr>
             </thead>
             <tbody>
               ${manuals.map(m => `
                 <tr onclick="location.href='/view.html?id=${m.id}'" style="cursor:pointer;">
                   <td><span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span></td>
-                  <td style="font-weight: 500;">${m.title}</td>
+                  <td style="font-weight:500;">${m.title}</td>
                   <td>${m.category_name || '<span class="text-muted">-</span>'}</td>
                   <td>${m.created_by_name}</td>
                   <td>${formatDate(m.updated_at)}</td>
@@ -252,9 +272,21 @@ function renderManuals(manuals) {
             </tbody>
           </table>
         </div>
-      </div>
-    `;
+      </div>`;
   }
+
+  container.className = '';
+  container.innerHTML = subCatHtml + manualsHtml;
+}
+
+// メインコンテンツのフォルダカードをクリックしてドリルダウン
+function drillDown(id) {
+  const cat = (window._allCats || []).find(c => c.id == id);
+  if (!cat) return;
+  currentCategory = id;
+  document.getElementById('pageTitle').textContent = cat.name;
+  document.querySelectorAll('#categoryNav a').forEach(a => a.classList.remove('active'));
+  loadManuals(1);
 }
 
 function renderPagination(total, page, limit) {
