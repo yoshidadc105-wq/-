@@ -104,6 +104,7 @@ function initializeDb() {
   try {
     const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='manuals'").get();
     if (tableInfo && tableInfo.sql && !tableInfo.sql.includes("'steps'")) {
+      const originalCount = db.prepare('SELECT COUNT(*) as n FROM manuals').get().n;
       db.exec('PRAGMA foreign_keys = OFF');
       db.exec(`CREATE TABLE manuals_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,12 +123,23 @@ function initializeDb() {
         updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
       )`);
       db.exec('INSERT INTO manuals_v2 SELECT * FROM manuals');
-      db.exec('DROP TABLE manuals');
-      db.exec('ALTER TABLE manuals_v2 RENAME TO manuals');
-      db.exec('PRAGMA foreign_keys = ON');
-      console.log('manualsテーブルをマイグレーションしました（stepsタイプ追加）');
+      const newCount = db.prepare('SELECT COUNT(*) as n FROM manuals_v2').get().n;
+      if (newCount === originalCount) {
+        db.exec('DROP TABLE manuals');
+        db.exec('ALTER TABLE manuals_v2 RENAME TO manuals');
+        db.exec('PRAGMA foreign_keys = ON');
+        console.log(`manualsテーブルをマイグレーションしました（${newCount}件のデータを保持）`);
+      } else {
+        db.exec('DROP TABLE IF EXISTS manuals_v2');
+        db.exec('PRAGMA foreign_keys = ON');
+        console.error('マイグレーション失敗：データ件数不一致のためロールバックしました');
+      }
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    try { db.exec('DROP TABLE IF EXISTS manuals_v2'); } catch (_) {}
+    try { db.exec('PRAGMA foreign_keys = ON'); } catch (_) {}
+    console.error('マイグレーション失敗:', e.message);
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS view_history (
