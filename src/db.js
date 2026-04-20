@@ -2,8 +2,11 @@ const { DatabaseSync } = require('node:sqlite');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'manual_system.db');
+// データはユーザーフォルダに保存（ZIPを再展開してもデータが消えない）
+const DATA_DIR = path.join(os.homedir(), 'ManualSystemData');
+const DB_PATH = path.join(DATA_DIR, 'manual_system.db');
 
 let db;
 

@@ -3,6 +3,7 @@ const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const { initializeDb } = require('./src/db');
 const authRoutes = require('./src/routes/auth');
@@ -14,8 +15,9 @@ const groupRoutes = require('./src/routes/groups');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// アップロードディレクトリの確保
-const uploadDir = path.join(__dirname, 'uploads');
+// データはユーザーフォルダに保存（ZIPを再展開してもデータが消えない）
+const DATA_DIR = path.join(os.homedir(), 'ManualSystemData');
+const uploadDir = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const sessionDir = path.join(__dirname, 'sessions');

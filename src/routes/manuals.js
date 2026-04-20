@@ -2,15 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { getDb } = require('../db');
 const { requireLogin } = require('../middleware/auth');
 
 const router = express.Router();
 
+const UPLOAD_DIR = path.join(os.homedir(), 'ManualSystemData', 'uploads');
+
 // PDF アップロード設定
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', '..', 'uploads'));
+    cb(null, UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
@@ -43,7 +46,7 @@ const uploadMany = multer({
 // ステップ画像アップロード設定
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', '..', 'uploads'));
+    cb(null, UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg';
@@ -193,7 +196,7 @@ router.put('/:id/pdf', requireLogin, upload.single('pdf'), (req, res) => {
 
   // 古いファイルを削除
   if (manual.file_path) {
-    const oldPath = path.join(__dirname, '..', '..', 'uploads', manual.file_path);
+    const oldPath = path.join(UPLOAD_DIR, manual.file_path);
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
   }
 
