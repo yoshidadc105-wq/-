@@ -522,10 +522,35 @@ tr:last-child td { border-bottom: none; }
 @media (max-width: 768px) {
   .layout { flex-direction: column; }
   .sidebar { width: 100%; }
-  .container { padding: 16px; }
+  .container { padding: 12px; }
   .manual-grid { grid-template-columns: 1fr; }
-  .navbar { padding: 0 16px; }
   .search-bar { flex-direction: column; }
+
+  /* ナビバー：モバイルはスクロール追従しない・コンパクトに */
+  .navbar {
+    position: relative;
+    height: auto;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .navbar-brand {
+    font-size: 14px;
+  }
+  .navbar-brand::before {
+    font-size: 16px;
+  }
+  .navbar-user {
+    display: none;
+  }
+  .navbar-right {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .navbar-right .btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
 }
 
 /* ユーティリティ */
