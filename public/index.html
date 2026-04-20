@@ -158,7 +158,11 @@ function filterByCategory(id, name, el) {
   document.querySelectorAll('#categoryNav a').forEach(a => a.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('pageTitle').textContent = name;
-  loadManuals(1);
+  loadManuals(1).then(() => {
+    if (window.innerWidth <= 768) {
+      document.querySelector('.main-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
 }
 
 function setViewMode(mode) {

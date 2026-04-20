@@ -93,37 +93,20 @@ async function loadManual() {
   document.title = `${manualData.title} - マニュアルシステム`;
 
   const canEdit = currentUser.role === 'admin' || manualData.created_by === currentUser.id;
+  const canDelete = currentUser.role === 'admin';
 
   let bodyHtml = '';
 
   if (manualData.type === 'pdf') {
-    const isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-      bodyHtml = `
-        <div class="card">
-          <div class="card-body" style="text-align:center; padding:32px 20px;">
-            <div style="font-size:56px; margin-bottom:12px;">📄</div>
-            <p style="color:var(--text-muted); margin-bottom:24px; font-size:14px;">PDFは「開く」ボタンで全画面表示できます</p>
-            <div style="display:flex; flex-direction:column; gap:12px; max-width:280px; margin:0 auto;">
-              <a href="/uploads/${manualData.file_path}" target="_blank" class="btn btn-primary btn-lg" style="justify-content:center;">🔍 PDFを開く（全画面）</a>
-              <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-lg" style="justify-content:center;">⬇ ダウンロード</a>
-              ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary" style="justify-content:center;">✏ 編集</a>` : ''}
-              ${canEdit ? `<button onclick="openModal('deleteModal')" class="btn btn-danger" style="justify-content:center;">🗑 削除</button>` : ''}
-            </div>
-          </div>
-        </div>
-      `;
-    } else {
-      bodyHtml = `
-        <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-          <a href="/uploads/${manualData.file_path}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
-          <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
-          ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
-          ${canEdit ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
-        </div>
-        <iframe src="/uploads/${manualData.file_path}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>
-      `;
-    }
+    bodyHtml = `
+      <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+        <a href="/uploads/${manualData.file_path}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
+        <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+        ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+        ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+      </div>
+      <iframe src="/uploads/${manualData.file_path}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>
+    `;
   } else if (manualData.type === 'steps') {
     let stepsData = {};
     try { stepsData = JSON.parse(manualData.content || '{}'); } catch(e) {}
@@ -181,7 +164,7 @@ async function loadManual() {
         ${manualData.type !== 'pdf' ? `
         <div class="flex gap-2">
           ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
-          ${canEdit ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+          ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
         </div>
         ` : ''}
       </div>
