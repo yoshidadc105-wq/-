@@ -128,13 +128,17 @@ async function loadCategories() {
 }
 
 function toggleCategory(id, name, el) {
-  filterByCategory(id, name, el);
+  filterByCategory(id, name, el, true);
   const sub = document.getElementById(`sub-${id}`);
   const arrow = document.getElementById(`arrow-${id}`);
   if (sub) {
     const isOpen = sub.style.display !== 'none';
     sub.style.display = isOpen ? 'none' : '';
     if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+    // モバイル：開いたとき、サブカテゴリが見えるようにスクロール
+    if (!isOpen && window.innerWidth <= 768) {
+      setTimeout(() => sub.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+    }
   }
 }
 
@@ -153,13 +157,14 @@ async function loadRecent() {
   `).join('');
 }
 
-function filterByCategory(id, name, el) {
+function filterByCategory(id, name, el, hasChildren) {
   currentCategory = id;
   document.querySelectorAll('#categoryNav a').forEach(a => a.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('pageTitle').textContent = name;
+  // 子カテゴリがない（末端）場合のみメインコンテンツへスクロール
   loadManuals(1).then(() => {
-    if (window.innerWidth <= 768) {
+    if (window.innerWidth <= 768 && !hasChildren) {
       document.querySelector('.main-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });

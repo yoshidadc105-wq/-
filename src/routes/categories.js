@@ -33,6 +33,18 @@ router.get('/', requireLogin, (req, res) => {
       ORDER BY c.parent_id, c.sort_order, c.name
     `).all(req.session.userId);
   }
+
+  // 各カテゴリの直接カウントを記録し、子孫の合計を上位階層に積み上げる
+  const directCounts = {};
+  categories.forEach(c => { directCounts[c.id] = Number(c.manual_count) || 0; });
+
+  function totalCount(id) {
+    const children = categories.filter(c => c.parent_id == id);
+    return directCounts[id] + children.reduce((sum, child) => sum + totalCount(child.id), 0);
+  }
+
+  categories.forEach(c => { c.manual_count = totalCount(c.id); });
+
   res.json(categories);
 });
 
