@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>問診表 | のびのび歯科・矯正歯科</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Hiragino Kaku Gothic Pro", "Meiryo", sans-serif;
+      background: #f4f7f9;
+      color: #333;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    header {
+      background: #2aab96;
+      color: #fff;
+      padding: 18px 20px;
+      text-align: center;
+    }
+    header h1 { font-size: 20px; font-weight: bold; }
+    header p  { font-size: 13px; margin-top: 4px; opacity: .85; }
+    .container { max-width: 720px; margin: 24px auto; padding: 0 16px 60px; }
+
+    /* カード */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 24px 20px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #fff;
+      background: #2aab96;
+      border-radius: 6px;
+      padding: 6px 14px;
+      margin-bottom: 18px;
+    }
+    .section-label {
+      font-size: 13px;
+      background: #e8f7f5;
+      color: #2aab96;
+      border-left: 4px solid #2aab96;
+      padding: 6px 10px;
+      margin: 20px 0 14px;
+      font-weight: bold;
+    }
+
+    /* 入力 */
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+    .required::after { content: "必須"; font-size: 11px; color: #fff; background: #e05; border-radius: 3px; padding: 1px 5px; margin-left: 6px; }
+    input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border .2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #2aab96; }
+    textarea { resize: vertical; min-height: 80px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 160px; }
+    .form-group { margin-bottom: 16px; }
+
+    /* チェック・ラジオ */
+    .check-group, .radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .check-group label, .radio-group label {
+      display: flex; align-items: center; gap: 6px;
+      background: #f6f6f6; border: 1px solid #ddd; border-radius: 20px;
+      padding: 5px 12px; cursor: pointer; font-size: 14px; color: #333;
+      transition: background .15s, border .15s;
+      white-space: nowrap;
+    }
+    .check-group input[type="checkbox"],
+    .radio-group input[type="radio"] { accent-color: #2aab96; width:16px; height:16px; }
+    .check-group label:has(input:checked),
+    .radio-group label:has(input:checked) {
+      background: #e8f7f5; border-color: #2aab96; color: #2aab96; font-weight: bold;
+    }
+    .sub-input { margin-top: 8px; }
+
+    /* 通院スケジュール */
+    .schedule-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .schedule-table th, .schedule-table td {
+      border: 1px solid #ddd; text-align: center; padding: 6px 4px;
+    }
+    .schedule-table th { background: #e8f7f5; color: #2aab96; }
+    .schedule-table select {
+      width: 54px; padding: 3px; font-size: 13px; border-radius: 4px;
+    }
+
+    /* 送信ボタン */
+    .submit-btn {
+      display: block; width: 100%;
+      background: #2aab96; color: #fff;
+      border: none; border-radius: 30px;
+      padding: 16px; font-size: 17px; font-weight: bold;
+      cursor: pointer; margin-top: 10px;
+      transition: background .2s;
+    }
+    .submit-btn:hover { background: #228f7c; }
+    .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* 完了メッセージ */
+    #success {
+      display: none; text-align: center; padding: 40px 20px;
+    }
+    #success .icon { font-size: 60px; }
+    #success h2 { font-size: 22px; color: #2aab96; margin: 16px 0 10px; }
+    #success p { color: #666; }
+
+    @media (max-width: 480px) {
+      .card { padding: 18px 14px; }
+      .row > * { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>のびのび歯科・矯正歯科</h1>
+  <p>初診問診表 — ご来院前にご記入ください</p>
+</header>
+
+<div class="container">
+
+  <!-- 完了メッセージ -->
+  <div id="success" class="card">
+    <div class="icon">✅</div>
+    <h2>送信が完了しました</h2>
+    <p>問診表のご記入ありがとうございます。<br>当日受付にてお声がけください。</p>
+  </div>
+
+  <form id="form">
+
+    <!-- 基本情報 -->
+    <div class="card">
+      <div class="card-title">基本情報</div>
+
+      <div class="row">
+        <div class="form-group">
+          <label class="required">お名前</label>
+          <input type="text" name="name" placeholder="山田 太郎" required />
+        </div>
+        <div class="form-group">
+          <label class="required">フリガナ</label>
+          <input type="text" name="kana" placeholder="ヤマダ タロウ" required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label class="required">生年月日</label>
+          <input type="text" name="dob" placeholder="昭和60年 5月1日" required />
+        </div>
+        <div class="form-group">
+          <label class="required">性別</label>
+          <div class="radio-group" style="margin-top:6px">
+            <label><input type="radio" name="gender" value="男" required />男性</label>
+            <label><input type="radio" name="gender" value="女" />女性</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>ご住所 〒</label>
+        <input type="text" name="address" placeholder="東京都〇〇区〇〇1-2-3" />
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>電話番号</label>
+          <input type="tel" name="tel" placeholder="03-XXXX-XXXX" />
+        </div>
+        <div class="form-group">
+          <label>携帯電話番号</label>
+          <input type="tel" name="mobile" placeholder="090-XXXX-XXXX" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>勤務先・学校名</label>
+          <input type="text" name="workplace" />
+        </div>
+        <div class="form-group">
+          <label>ご職業</label>
+          <input type="text" name="job" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 来院理由 -->
+    <div class="card">
+      <div class="card-title">来院・治療について</div>
+
+      <!-- Q1 -->
+      <div class="form-group">
+        <div class="section-label">Q1. 本日はどうされましたか？（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q1" value="むし歯が気になる" />むし歯が気になる</label>
+          <label><input type="checkbox" name="q1" value="噛むと痛い" />噛む（咬む）と痛い</label>
+          <label><input type="checkbox" name="q1" value="歯が痛い" />歯が痛い</label>
+          <label><input type="checkbox" name="q1" value="歯ぐきから出血する" />歯ぐきから出血する</label>
+          <label><input type="checkbox" name="q1" value="歯がしみる" />歯がしみる</label>
+          <label><input type="checkbox" name="q1" value="歯ぐきが腫れた" />歯ぐきが腫れた</label>
+          <label><input type="checkbox" name="q1" value="歯石をとってほしい" />歯石をとってほしい</label>
+          <label><input type="checkbox" name="q1" value="検診をしてほしい" />検診をしてほしい</label>
+          <label><input type="checkbox" name="q1" value="詰め物・かぶせ物がとれた" />詰め物・かぶせ物がとれた</label>
+          <label><input type="checkbox" name="q1" value="入れ歯が合わない・作りたい" />入れ歯が合わない・作りたい</label>
+          <label><input type="checkbox" name="q1" value="歯周病が気になる" />歯周病が気になる</label>
+          <label><input type="checkbox" name="q1" value="歯を白くしたい" />歯を白くしたい</label>
+          <label><input type="checkbox" name="q1" value="あごの調子が悪い" />あごの調子が悪い</label>
+          <label><input type="checkbox" name="q1" value="歯並びが気になる" />歯並びが気になる</label>
+          <label><input type="checkbox" name="q1" value="相談（インプラント・矯正等）" />相談（インプラント・矯正等）</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q1_other" placeholder="その他：" />
+        </div>
+      </div>
+
+      <!-- Q2 -->
+      <div class="form-group">
+        <div class="section-label">Q2. 当院をどのようにお知りになりましたか？（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q2" value="お家から近いから" />お家から近いから</label>
+          <label><input type="checkbox" name="q2" value="HPを見て" />HPを見て</label>
+          <label><input type="checkbox" name="q2" value="医院の前を通って" />医院の前を通って</label>
+          <label><input type="checkbox" name="q2" value="雑誌やチラシを見て" />雑誌やチラシを見て</label>
+          <label><input type="checkbox" name="q2" value="家族・友人の紹介" />家族・友人の紹介</label>
+          <label><input type="checkbox" name="q2" value="他の歯科医院・病院からの紹介" />他の歯科・病院からの紹介</label>
+        </div>
+        <div class="sub-input row">
+          <input type="text" name="q2_ref_name" placeholder="ご紹介者名（あれば）：" />
+          <input type="text" name="q2_hospital" placeholder="紹介元病院名（あれば）：" />
+        </div>
+      </div>
+
+      <!-- Q3 -->
+      <div class="form-group">
+        <div class="section-label">Q3. 具体的にどの部分が気になりますか？</div>
+        <input type="text" name="q3" placeholder="例：右上の奥歯、前歯全体 など" />
+      </div>
+
+      <!-- Q4 -->
+      <div class="form-group">
+        <div class="section-label">Q4. 最後に歯医者へ行ったのはいつですか？</div>
+        <div class="radio-group">
+          <label><input type="radio" name="q4" value="他の医院で最近" />他の医院で最近</label>
+          <label><input type="radio" name="q4" value="当院で最近" />当院で最近</label>
+          <label><input type="radio" name="q4" value="かなり前" />覚えていないほど前</label>
+          <label><input type="radio" name="q4" value="歯科は初めて" />歯科は初めて</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q4_detail" placeholder="おおよその時期や医院名（あれば）：" />
+        </div>
+      </div>
+
+      <!-- Q5 -->
+      <div class="form-group">
+        <div class="section-label">Q5. 以前の歯科受診の感想をお聞かせください（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q5" value="痛かった" />痛かった</label>
+          <label><input type="checkbox" name="q5" value="痛くなかった" />痛くなかった</label>
+          <label><input type="checkbox" name="q5" value="怖かった" />怖かった</label>
+          <label><input type="checkbox" name="q5" value="優しかった" />優しかった</label>
+          <label><input type="checkbox" name="q5" value="通院が大変" />通院が大変</label>
+          <label><input type="checkbox" name="q5" value="説明不足だった" />説明が不十分だった</label>
+          <label><input type="checkbox" name="q5" value="説明がわかりやすかった" />説明がわかりやすかった</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q5_other" placeholder="その他：" />
+        </div>
+      </div>
+
+      <!-- Q6 -->
+      <div class="form-group">
+        <div class="section-label">Q6. 治療の中で重視することを教えてください（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q6" value="耐久性" />できるだけ長持ちすること（耐久性）</label>
+          <label><input type="checkbox" name="q6" value="審美性" />自然に美しく見えること（審美性）</label>
+          <label><input type="checkbox" name="q6" value="再発リスク低減" />再発のリスクが低いこと</label>
+          <label><input type="checkbox" name="q6" value="機能性" />天然の歯のように噛めること（機能性）</label>
+        </div>
+      </div>
+
+      <!-- Q7 -->
+      <div class="form-group">
+        <div class="section-label">Q7. ご興味のある治療を教えてください（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q7" value="インプラント" />インプラント</label>
+          <label><input type="checkbox" name="q7" value="目立ちにくい入れ歯" />目立ちにくい入れ歯</label>
+          <label><input type="checkbox" name="q7" value="インビザライン" />マウスピース矯正（インビザライン）</label>
+          <label><input type="checkbox" name="q7" value="セラミック" />セラミックの詰め物・かぶせ物</label>
+          <label><input type="checkbox" name="q7" value="ホワイトニング" />ホワイトニング</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 健康状態 -->
+    <div class="card">
+      <div class="card-title">健康状態について</div>
+
+      <!-- Q8 -->
+      <div class="form-group">
+        <div class="section-label">Q8. 今までにかかったことのある病気はありますか？（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q8" value="心臓疾患" />心臓疾患</label>
+          <label><input type="checkbox" name="q8" value="脳疾患" />脳疾患</label>
+          <label><input type="checkbox" name="q8" value="高血圧" />高血圧</label>
+          <label><input type="checkbox" name="q8" value="腎臓疾患" />腎臓疾患</label>
+          <label><input type="checkbox" name="q8" value="肝臓疾患" />肝臓疾患（B型・C型肝炎等）</label>
+          <label><input type="checkbox" name="q8" value="ガン" />ガン</label>
+          <label><input type="checkbox" name="q8" value="ぜん息" />ぜん息</label>
+          <label><input type="checkbox" name="q8" value="貧血" />貧血</label>
+          <label><input type="checkbox" name="q8" value="てんかん" />てんかん</label>
+          <label><input type="checkbox" name="q8" value="糖尿病" />糖尿病</label>
+          <label><input type="checkbox" name="q8" value="AIDS" />AIDS</label>
+          <label><input type="checkbox" name="q8" value="骨そしょう症" />骨そしょう症</label>
+          <label><input type="checkbox" name="q8" value="膠原病・リウマチ" />膠原病・リウマチ</label>
+          <label><input type="checkbox" name="q8" value="胃腸病" />胃腸病</label>
+          <label><input type="checkbox" name="q8" value="蓄膿症" />蓄膿症</label>
+          <label><input type="checkbox" name="q8" value="甲状腺疾患" />甲状腺疾患</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q8_detail" placeholder="高血圧の数値・その他の病名など：" />
+        </div>
+      </div>
+
+      <!-- Q9 -->
+      <div class="form-group">
+        <div class="section-label">Q9. 現在の健康状態はいかがですか？</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q9" value="特に問題はない" />特に問題はない</label>
+          <label><input type="checkbox" name="q9" value="他の医院に通院中" />他の医院（内科・外科等）に通院中</label>
+          <label><input type="checkbox" name="q9" value="薬を飲んでいる" />薬を飲んでいる</label>
+        </div>
+        <div class="sub-input row">
+          <input type="text" name="q9_hospital" placeholder="通院中の病院名：" />
+          <input type="text" name="q9_medicine" placeholder="薬剤名：" />
+        </div>
+      </div>
+
+      <!-- Q10 -->
+      <div class="form-group">
+        <div class="section-label">Q10. アレルギーはありますか？（食品・素材・薬等）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q10" value="なし" />なし</label>
+          <label><input type="checkbox" name="q10" value="金属アレルギー" />金属アレルギー</label>
+          <label><input type="checkbox" name="q10" value="アスピリン" />アスピリン</label>
+          <label><input type="checkbox" name="q10" value="ヨード" />ヨード</label>
+          <label><input type="checkbox" name="q10" value="麻酔薬" />麻酔薬</label>
+          <label><input type="checkbox" name="q10" value="アルコール" />アルコール</label>
+          <label><input type="checkbox" name="q10" value="ラテックス" />ラテックス</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q10_other" placeholder="その他・薬剤名：" />
+        </div>
+      </div>
+
+      <!-- Q11 -->
+      <div class="form-group">
+        <div class="section-label">Q11. 薬で体調が悪くなったことはありますか？</div>
+        <div class="radio-group">
+          <label><input type="radio" name="q11" value="ない" />ない</label>
+          <label><input type="radio" name="q11" value="ある" />ある</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q11_detail" placeholder="薬剤名・症状：" />
+        </div>
+      </div>
+
+      <!-- Q12 -->
+      <div class="form-group">
+        <div class="section-label">Q12. 麻酔をしたことはありますか？</div>
+        <div class="radio-group">
+          <label><input type="radio" name="q12" value="ない" />ない</label>
+          <label><input type="radio" name="q12" value="ある・異常なし" />ある（異常なし）</label>
+          <label><input type="radio" name="q12" value="ある・異常あり" />ある（異常があった）</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q12_detail" placeholder="どのような異常でしたか？：" />
+        </div>
+      </div>
+
+      <!-- Q13 -->
+      <div class="form-group">
+        <div class="section-label">Q13. 喫煙されますか？</div>
+        <div class="radio-group">
+          <label><input type="radio" name="q13" value="吸わない" />吸わない</label>
+          <label><input type="radio" name="q13" value="吸う" />吸う</label>
+        </div>
+        <div class="sub-input">
+          <input type="text" name="q13_count" placeholder="1日 約　本" style="max-width:180px" />
+        </div>
+      </div>
+
+      <!-- Q14 -->
+      <div class="form-group">
+        <div class="section-label">Q14. 女性の方にお伺いします</div>
+        <div style="margin-bottom:10px">
+          <label style="margin-bottom:6px">①現在、妊娠中ですか？</label>
+          <div class="radio-group">
+            <label><input type="radio" name="q14_pregnant" value="いいえ" />いいえ</label>
+            <label><input type="radio" name="q14_pregnant" value="はい" />はい</label>
+          </div>
+          <input type="text" name="q14_week" placeholder="　週目" style="max-width:160px; margin-top:8px" />
+        </div>
+        <div>
+          <label style="margin-bottom:6px">②現在、授乳中ですか？</label>
+          <div class="radio-group">
+            <label><input type="radio" name="q14_breastfeed" value="いいえ" />いいえ</label>
+            <label><input type="radio" name="q14_breastfeed" value="はい" />はい</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q15 -->
+      <div class="form-group">
+        <div class="section-label">Q15. 診療に対するご要望を教えてください（複数回答可）</div>
+        <div class="check-group">
+          <label><input type="checkbox" name="q15" value="悪いところを全て治療" />悪いところを全て治療したい</label>
+          <label><input type="checkbox" name="q15" value="痛みのある歯のみ" />現在痛みのある歯のみ治したい</label>
+          <label><input type="checkbox" name="q15" value="最適な材料・治療法（自費可）" />最も適した材料・治療法で（自費可）</label>
+          <label><input type="checkbox" name="q15" value="保険中心・一部自費相談" />なるべく保険で、一部自費は相談したい</label>
+          <label><input type="checkbox" name="q15" value="すべて保険内" />すべて保険の範囲内で治療してほしい</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ご要望 -->
+    <div class="card">
+      <div class="card-title">当院へのご要望・通院希望</div>
+
+      <div class="form-group">
+        <div class="section-label">当院へのご要望・気になること（自由記述）</div>
+        <textarea name="requests" placeholder="例：痛いのが苦手なので、なるべく麻酔を使ってほしい"></textarea>
+      </div>
+
+      <div class="form-group">
+        <div class="section-label">通いやすい曜日・時間帯（○：通いやすい　△：日による　×：通院困難）</div>
+        <div style="overflow-x:auto">
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>時間帯</th>
+                <th>月</th><th>火</th><th>水</th><th>木</th>
+                <th>金</th><th>土</th><th>日</th><th>祝</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>9:30〜13:30</td>
+                <td><select name="sch_am_mon"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_tue"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_wed"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_thu"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_fri"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_sat"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_sun"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_am_hol"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+              </tr>
+              <tr>
+                <td>14:30〜18:30</td>
+                <td><select name="sch_pm_mon"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_tue"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_wed"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_thu"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_fri"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_sat"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_sun"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+                <td><select name="sch_pm_hol"><option value="">-</option><option>○</option><option>△</option><option>×</option></select></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">問診表を送信する</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  document.getElementById('form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+
+    const data = {};
+    const fd = new FormData(this);
+
+    // チェックボックスを配列で収集
+    const checkFields = ['q1','q2','q5','q6','q7','q8','q9','q10','q15'];
+    checkFields.forEach(f => { data[f] = []; });
+    for (const [key, val] of fd.entries()) {
+      if (checkFields.includes(key)) {
+        data[key].push(val);
+      } else {
+        data[key] = val;
+      }
+    }
+
+    try {
+      const res = await fetch('/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        document.getElementById('form').style.display = 'none';
+        document.getElementById('success').style.display = 'block';
+        window.scrollTo(0, 0);
+      } else {
+        throw new Error('server error');
+      }
+    } catch {
+      alert('送信に失敗しました。時間をおいて再度お試しください。');
+      btn.disabled = false;
+      btn.textContent = '問診表を送信する';
+    }
+  });
+</script>
+
+</body>
+</html>
