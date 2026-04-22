@@ -63,7 +63,10 @@ app.post('/webhook', async (req, res) => {
 
   const events = req.body.events || [];
   for (const event of events) {
-    console.log(`イベント受信: type=${event.type}, userId=${event.source?.userId}`);
+    // イベント全内容をログ出力（初診ボタンの検知に使用）
+    console.log('=== イベント受信 ===');
+    console.log(JSON.stringify(event, null, 2));
+
     if (event.type === 'follow') {
       await sendQuestionnaire(event.source.userId);
     }
