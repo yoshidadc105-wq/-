@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
@@ -34,24 +35,19 @@ app.use(
 
 let jaFont = null;
 
-async function loadJapaneseFont() {
-  const urls = [
-    'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansJP/NotoSansJP-Regular.ttf',
-    'https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansJP/NotoSansJP-Regular.ttf',
-    'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansJP/NotoSansJP-Regular.ttf',
+function loadJapaneseFont() {
+  const candidates = [
+    path.join(__dirname, 'node_modules', '@expo-google-fonts', 'noto-sans-jp', 'NotoSansJP_400Regular.ttf'),
+    path.join(__dirname, 'node_modules', '@expo-google-fonts', 'noto-sans-jp', 'NotoSansJP-Regular.ttf'),
   ];
-  for (const url of urls) {
+  for (const p of candidates) {
     try {
-      console.log(`フォント取得中: ${url}`);
-      const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
-      jaFont = Buffer.from(res.data);
+      jaFont = fs.readFileSync(p);
       console.log('フォント読み込み完了');
       return;
-    } catch (err) {
-      console.warn(`フォント取得失敗: ${err.message}`);
-    }
+    } catch (_) {}
   }
-  console.error('フォントを取得できませんでした（印刷は日本語なしで続行）');
+  console.error('フォントを読み込めませんでした（印刷は日本語なしで続行）');
 }
 
 loadJapaneseFont();
