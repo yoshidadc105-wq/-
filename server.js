@@ -37,8 +37,7 @@ let jaFont = null;
 
 function loadJapaneseFont() {
   const candidates = [
-    path.join(__dirname, 'node_modules', '@expo-google-fonts', 'noto-sans-jp', 'NotoSansJP_400Regular.ttf'),
-    path.join(__dirname, 'node_modules', '@expo-google-fonts', 'noto-sans-jp', 'NotoSansJP-Regular.ttf'),
+    path.join(__dirname, 'node_modules', '@expo-google-fonts', 'noto-sans-jp', '400Regular', 'NotoSansJP_400Regular.ttf'),
   ];
   for (const p of candidates) {
     try {
