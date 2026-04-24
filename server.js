@@ -18,6 +18,56 @@ const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const PRINTNODE_API_KEY = process.env.PRINTNODE_API_KEY;
 const PRINTNODE_PRINTER_ID = process.env.PRINTNODE_PRINTER_ID;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+
+// ---- 簡易DB（JSONファイル）----
+
+const DB_FILE = path.join(__dirname, 'data', 'submissions.json');
+
+function loadDB() {
+  try {
+    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveDB(records) {
+  try {
+    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+    fs.writeFileSync(DB_FILE, JSON.stringify(records, null, 2), 'utf8');
+  } catch (err) {
+    console.error('DB保存エラー:', err.message);
+  }
+}
+
+// ---- 管理者認証 ----
+
+function checkAdminAuth(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
+    res.status(401).send('認証が必要です');
+    return false;
+  }
+  const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+  const colonIdx = decoded.indexOf(':');
+  const pass = colonIdx >= 0 ? decoded.slice(colonIdx + 1) : '';
+  if (pass !== ADMIN_PASSWORD) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
+    res.status(401).send('パスワードが違います');
+    return false;
+  }
+  return true;
+}
+
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 // 静的ファイル配信
 app.use(express.static(path.join(__dirname, 'public')));
@@ -31,7 +81,7 @@ app.use(
   })
 );
 
-// ---- 日本語フォント（起動時にダウンロード・キャッシュ） ----
+// ---- 日本語フォント（起動時にダウンロード・キャッシュ）----
 
 let jaFont = null;
 
@@ -71,7 +121,6 @@ app.post('/webhook', async (req, res) => {
 
   res.status(200).send('OK');
 
-  // Stransa へ転送（テストモード時はスキップ）
   if (!TEST_MODE && STRANSA_WEBHOOK_URL) {
     axios
       .post(STRANSA_WEBHOOK_URL, req.body, {
@@ -91,12 +140,10 @@ app.post('/webhook', async (req, res) => {
     console.log('=== イベント受信 ===');
     console.log(JSON.stringify(event, null, 2));
 
-    // 友達追加時
     if (event.type === 'follow') {
       await sendFollowMessage(event.source.userId);
     }
 
-    // 「問診表」キーワード受信時 → 問診表URLを送信
     if (event.type === 'message' && event.message.type === 'text') {
       const text = event.message.text.trim();
       if (text === '問診表') {
@@ -106,7 +153,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// 友達追加時のウェルカムメッセージ
 async function sendFollowMessage(userId) {
   const message = [
     'のびのび歯科・矯正歯科へようこそ！',
@@ -132,7 +178,6 @@ async function sendFollowMessage(userId) {
   }
 }
 
-// 問診表URLを送信
 async function sendQuestionnaire(userId) {
   const message = [
     '📋 問診表をお送りします。',
@@ -170,19 +215,120 @@ app.post('/submit', async (req, res) => {
   console.log(`問診表受信: ${d.name}`);
   res.status(200).json({ ok: true });
 
-  // メール送信
-  sendFormEmail(d).catch((err) => console.error('メール送信エラー:', err.message));
+  // DBに保存
+  const records = loadDB();
+  records.unshift({
+    id: crypto.randomUUID(),
+    receivedAt: new Date().toISOString(),
+    name: d.name,
+    kana: d.kana || '',
+    tel: d.tel || d.mobile || '',
+    q1: d.q1 || [],
+    checked: false,
+    data: d,
+  });
+  saveDB(records);
 
-  // 自動印刷
+  sendFormEmail(d).catch((err) => console.error('メール送信エラー:', err.message));
   printQuestionnaire(d).catch((err) => console.error('印刷エラー:', err.message));
 });
+
+// ---- 管理画面 ----
+
+app.get('/admin', (req, res) => {
+  if (!checkAdminAuth(req, res)) return;
+
+  const records = loadDB();
+  const unchecked = records.filter((r) => !r.checked).length;
+
+  const rows = records
+    .map((r) => {
+      const dt = new Date(r.receivedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+      const q1Text = Array.isArray(r.q1) ? r.q1.join('、') : r.q1 || '';
+      const rowClass = r.checked ? '' : 'new';
+      const badge = r.checked
+        ? '<span class="badge-done">確認済</span>'
+        : `<form method="post" action="/admin/check/${r.id}"><button class="btn-check" type="submit">確認済にする</button></form>`;
+      return `
+      <tr class="${rowClass}">
+        <td>${escHtml(dt)}</td>
+        <td><strong>${escHtml(r.name)}</strong><br><small>${escHtml(r.kana)}</small></td>
+        <td>${escHtml(r.tel)}</td>
+        <td>${escHtml(q1Text)}</td>
+        <td>${badge}</td>
+      </tr>`;
+    })
+    .join('');
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>問診表 管理画面 | のびのび歯科</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #f3f4f6; color: #333; }
+header { background: #1d4ed8; color: #fff; padding: 14px 24px; display: flex; align-items: center; gap: 14px; }
+header h1 { font-size: 17px; font-weight: bold; }
+.badge-new { background: #ef4444; color: #fff; border-radius: 999px; padding: 2px 12px; font-size: 13px; font-weight: bold; }
+.container { padding: 20px; max-width: 1100px; margin: 0 auto; }
+.summary { margin-bottom: 12px; font-size: 14px; color: #6b7280; }
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+th { background: #eff6ff; padding: 10px 14px; text-align: left; font-size: 13px; color: #1e40af; white-space: nowrap; }
+td { padding: 10px 14px; border-top: 1px solid #e5e7eb; font-size: 14px; vertical-align: top; }
+tr.new td { background: #fefce8; }
+tr.new td:first-child { border-left: 4px solid #f59e0b; }
+.badge-done { background: #d1fae5; color: #065f46; padding: 3px 10px; border-radius: 999px; font-size: 12px; display: inline-block; }
+.btn-check { background: #1d4ed8; color: #fff; border: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.btn-check:hover { background: #1e40af; }
+.empty { text-align: center; padding: 48px; color: #9ca3af; font-size: 15px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>のびのび歯科 問診表管理</h1>
+  ${unchecked > 0 ? `<span class="badge-new">未確認 ${unchecked}件</span>` : '<span style="font-size:13px;opacity:.8">未確認なし</span>'}
+</header>
+<div class="container">
+  <p class="summary">合計 ${records.length}件 ／ 未確認 ${unchecked}件</p>
+  <table>
+    <thead>
+      <tr>
+        <th>受信日時</th>
+        <th>お名前</th>
+        <th>電話番号</th>
+        <th>主訴</th>
+        <th>状態</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || '<tr><td colspan="5" class="empty">まだ受信した問診表はありません</td></tr>'}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>`);
+});
+
+app.post('/admin/check/:id', (req, res) => {
+  if (!checkAdminAuth(req, res)) return;
+
+  const records = loadDB();
+  const record = records.find((r) => r.id === req.params.id);
+  if (record) {
+    record.checked = true;
+    saveDB(records);
+  }
+  res.redirect('/admin');
+});
+
+// ---- メール送信 ----
 
 function formatChecks(arr) {
   if (!arr || arr.length === 0) return '（なし）';
   return Array.isArray(arr) ? arr.join('、') : arr;
 }
-
-// ---- メール送信 ----
 
 async function sendFormEmail(d) {
   const transporter = nodemailer.createTransport({
@@ -280,14 +426,12 @@ function buildPDF(d) {
 
     const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
-    // ヘッダー
     doc.fontSize(16).text('のびのび歯科・矯正歯科 問診表', { align: 'center' });
     doc.fontSize(9).text(`受信: ${now}`, { align: 'right' });
     doc.moveDown(0.5);
     doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
     doc.moveDown(0.5);
 
-    // 基本情報
     doc.fontSize(11).text('■ 基本情報');
     doc.fontSize(10)
       .text(`お名前: ${d.name}（${d.kana}）`)
@@ -296,7 +440,6 @@ function buildPDF(d) {
       .text(`ご住所: ${d.address || ''}`);
     doc.moveDown(0.5);
 
-    // 来院・治療
     doc.fontSize(11).text('■ 来院・治療について');
     doc.fontSize(10)
       .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
@@ -308,7 +451,6 @@ function buildPDF(d) {
       .text(`Q7 興味ある治療: ${formatChecks(d.q7)}`);
     doc.moveDown(0.5);
 
-    // 健康状態
     doc.fontSize(11).text('■ 健康状態');
     doc.fontSize(10)
       .text(`Q8 既往歴: ${formatChecks(d.q8)}${d.q8_detail ? ' / ' + d.q8_detail : ''}`)
@@ -322,12 +464,10 @@ function buildPDF(d) {
       .text(`Q15 診療希望: ${formatChecks(d.q15)}`);
     doc.moveDown(0.5);
 
-    // ご要望
     doc.fontSize(11).text('■ ご要望');
     doc.fontSize(10).text(d.requests || 'なし');
     doc.moveDown(0.5);
 
-    // 通院希望
     doc.fontSize(11).text('■ 通院希望曜日');
     doc.fontSize(10)
       .text(`午前(9:30〜13:30): 月${d.sch_am_mon||'-'} 火${d.sch_am_tue||'-'} 水${d.sch_am_wed||'-'} 木${d.sch_am_thu||'-'} 金${d.sch_am_fri||'-'} 土${d.sch_am_sat||'-'} 日${d.sch_am_sun||'-'} 祝${d.sch_am_hol||'-'}`)
