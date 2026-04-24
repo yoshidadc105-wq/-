@@ -372,4 +372,5 @@ app.listen(PORT, () => {
   console.log(`テストモード: ${TEST_MODE}`);
   console.log(`メール送信先: ${MAIL_TO || '未設定'}`);
   console.log(`印刷先プリンターID: ${PRINTNODE_PRINTER_ID || '未設定'}`);
+  console.log(`PrintNode APIキー: ${PRINTNODE_API_KEY ? PRINTNODE_API_KEY.slice(0,6) + '...' : '未設定'}`);
 });
