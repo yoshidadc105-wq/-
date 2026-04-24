@@ -212,17 +212,18 @@ app.post('/submit', async (req, res) => {
   const d = req.body;
   if (!d || !d.name) return res.status(400).json({ error: 'invalid data' });
 
-  console.log(`問診表受信: ${d.name}`);
+  const typeLabel = d.type === 'child' ? '小児用' : '成人用';
+  console.log(`問診表受信(${typeLabel}): ${d.name}`);
   res.status(200).json({ ok: true });
 
-  // DBに保存
   const records = loadDB();
   records.unshift({
     id: crypto.randomUUID(),
     receivedAt: new Date().toISOString(),
+    type: d.type || 'adult',
     name: d.name,
     kana: d.kana || '',
-    tel: d.tel || d.mobile || '',
+    tel: d.tel || '',
     q1: d.q1 || [],
     checked: false,
     data: d,
@@ -246,12 +247,14 @@ app.get('/admin', (req, res) => {
       const dt = new Date(r.receivedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
       const q1Text = Array.isArray(r.q1) ? r.q1.join('、') : r.q1 || '';
       const rowClass = r.checked ? '' : 'new';
+      const typeLabel = r.type === 'child' ? '<span class="badge-child">小児</span>' : '<span class="badge-adult">成人</span>';
       const badge = r.checked
         ? '<span class="badge-done">確認済</span>'
         : `<form method="post" action="/admin/check/${r.id}"><button class="btn-check" type="submit">確認済にする</button></form>`;
       return `
       <tr class="${rowClass}">
         <td>${escHtml(dt)}</td>
+        <td>${typeLabel}</td>
         <td><strong>${escHtml(r.name)}</strong><br><small>${escHtml(r.kana)}</small></td>
         <td>${escHtml(r.tel)}</td>
         <td>${escHtml(q1Text)}</td>
@@ -272,7 +275,7 @@ body { font-family: sans-serif; background: #f3f4f6; color: #333; }
 header { background: #1d4ed8; color: #fff; padding: 14px 24px; display: flex; align-items: center; gap: 14px; }
 header h1 { font-size: 17px; font-weight: bold; }
 .badge-new { background: #ef4444; color: #fff; border-radius: 999px; padding: 2px 12px; font-size: 13px; font-weight: bold; }
-.container { padding: 20px; max-width: 1100px; margin: 0 auto; }
+.container { padding: 20px; max-width: 1200px; margin: 0 auto; }
 .summary { margin-bottom: 12px; font-size: 14px; color: #6b7280; }
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 th { background: #eff6ff; padding: 10px 14px; text-align: left; font-size: 13px; color: #1e40af; white-space: nowrap; }
@@ -280,6 +283,8 @@ td { padding: 10px 14px; border-top: 1px solid #e5e7eb; font-size: 14px; vertica
 tr.new td { background: #fefce8; }
 tr.new td:first-child { border-left: 4px solid #f59e0b; }
 .badge-done { background: #d1fae5; color: #065f46; padding: 3px 10px; border-radius: 999px; font-size: 12px; display: inline-block; }
+.badge-adult { background: #dbeafe; color: #1d4ed8; padding: 2px 10px; border-radius: 999px; font-size: 12px; display: inline-block; font-weight: bold; }
+.badge-child { background: #fce7f3; color: #9d174d; padding: 2px 10px; border-radius: 999px; font-size: 12px; display: inline-block; font-weight: bold; }
 .btn-check { background: #1d4ed8; color: #fff; border: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .btn-check:hover { background: #1e40af; }
 .empty { text-align: center; padding: 48px; color: #9ca3af; font-size: 15px; }
@@ -296,6 +301,7 @@ tr.new td:first-child { border-left: 4px solid #f59e0b; }
     <thead>
       <tr>
         <th>受信日時</th>
+        <th>種別</th>
         <th>お名前</th>
         <th>電話番号</th>
         <th>主訴</th>
@@ -303,7 +309,7 @@ tr.new td:first-child { border-left: 4px solid #f59e0b; }
       </tr>
     </thead>
     <tbody>
-      ${rows || '<tr><td colspan="5" class="empty">まだ受信した問診表はありません</td></tr>'}
+      ${rows || '<tr><td colspan="6" class="empty">まだ受信した問診表はありません</td></tr>'}
     </tbody>
   </table>
 </div>
@@ -330,6 +336,14 @@ function formatChecks(arr) {
   return Array.isArray(arr) ? arr.join('、') : arr;
 }
 
+function scheduleText(d) {
+  return [
+    `　　　月　火　水　木　金　土　日　祝`,
+    `午前　${d.sch_am_mon||'-'}　${d.sch_am_tue||'-'}　${d.sch_am_wed||'-'}　${d.sch_am_thu||'-'}　${d.sch_am_fri||'-'}　${d.sch_am_sat||'-'}　${d.sch_am_sun||'-'}　${d.sch_am_hol||'-'}`,
+    `午後　${d.sch_pm_mon||'-'}　${d.sch_pm_tue||'-'}　${d.sch_pm_wed||'-'}　${d.sch_pm_thu||'-'}　${d.sch_pm_fri||'-'}　${d.sch_pm_sat||'-'}　${d.sch_pm_sun||'-'}　${d.sch_pm_hol||'-'}`,
+  ].join('\n');
+}
+
 async function sendFormEmail(d) {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -337,74 +351,99 @@ async function sendFormEmail(d) {
   });
 
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  const isChild = d.type === 'child';
+  const typeLabel = isChild ? '小児用' : '成人用';
 
-  const text = `
+  let text;
+  if (isChild) {
+    text = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  のびのび歯科・矯正歯科　問診表
+  のびのび歯科・矯正歯科　問診表（小児用）
   受信日時: ${now}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【基本情報】
-お名前　　: ${d.name}（${d.kana}）
-生年月日　: ${d.dob}
-性別　　　: ${d.gender || '未記入'}
-ご住所　　: ${d.address || '未記入'}
-電話番号　: ${d.tel || '未記入'}
-携帯　　　: ${d.mobile || '未記入'}
-勤務先　　: ${d.workplace || '未記入'}
-ご職業　　: ${d.job || '未記入'}
+お子様の名前: ${d.name}（${d.kana || ''}）
+生年月日　　: ${d.dob}
+性別　　　　: ${d.gender || '未記入'}
+学校・保育園: ${d.school || '未記入'}
+保護者名　　: ${d.guardian || '未記入'}
+電話番号　　: ${d.tel || '未記入'}
 
-━━ 来院・治療について ━━━━━━━━━━━━━
+━━ 問診 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 Q1. 本日の主訴
-  ${formatChecks(d.q1)}
-  その他: ${d.q1_other || 'なし'}
+  ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}
 
-Q2. 来院のきっかけ
-  ${formatChecks(d.q2)}
-  紹介者: ${d.q2_ref_name || 'なし'} / 紹介元: ${d.q2_hospital || 'なし'}
+Q2. 過去の受診経験: ${d.q2 || '未記入'}
 
-Q3. 気になる部位: ${d.q3 || '未記入'}
+Q3. 既往歴・アレルギー
+  ${formatChecks(d.q3)}${d.q3_other ? ' / ' + d.q3_other : ''}
 
-Q4. 最後の受診: ${d.q4 || '未記入'}
-  詳細: ${d.q4_detail || 'なし'}
+Q4. 現在の服薬: ${d.q4 || '未記入'}
+  薬剤名: ${d.q4_medicine || 'なし'}
 
-Q5. 以前の受診の感想: ${formatChecks(d.q5)}
-Q6. 治療で重視すること: ${formatChecks(d.q6)}
-Q7. 興味のある治療: ${formatChecks(d.q7)}
+Q5. 口腔習癖
+  ${formatChecks(d.q5)}
 
-━━ 健康状態について ━━━━━━━━━━━━━━
+Q6. 食事・飲み物の習慣
+  ${formatChecks(d.q6)}
 
-Q8. 既往歴: ${formatChecks(d.q8)}
-  詳細: ${d.q8_detail || 'なし'}
+Q7. ご不安・気になること
+  ${d.q7 || 'なし'}
 
-Q9. 現在の健康状態: ${formatChecks(d.q9)}
-  通院病院: ${d.q9_hospital || 'なし'} / 薬剤: ${d.q9_medicine || 'なし'}
+━━ 通院希望曜日 ━━━━━━━━━━━━━━━━━━━━
+${scheduleText(d)}
 
-Q10. アレルギー: ${formatChecks(d.q10)} ${d.q10_other || ''}
-Q11. 薬での体調不良: ${d.q11 || '未記入'} ${d.q11_detail || ''}
-Q12. 麻酔経験: ${d.q12 || '未記入'} ${d.q12_detail || ''}
-Q13. 喫煙: ${d.q13 || '未記入'} ${d.q13_count || ''}
-Q14. 妊娠中: ${d.q14_pregnant || '未回答'} ${d.q14_week ? d.q14_week + '週目' : ''} / 授乳中: ${d.q14_breastfeed || '未回答'}
-Q15. 診療へのご要望: ${formatChecks(d.q15)}
-
-━━ ご要望・通院希望 ━━━━━━━━━━━━━━
-
-【当院へのご要望】
-${d.requests || 'なし'}
-
-【通院希望曜日】
-　　　月　火　水　木　金　土　日　祝
-午前　${d.sch_am_mon||'-'}　${d.sch_am_tue||'-'}　${d.sch_am_wed||'-'}　${d.sch_am_thu||'-'}　${d.sch_am_fri||'-'}　${d.sch_am_sat||'-'}　${d.sch_am_sun||'-'}　${d.sch_am_hol||'-'}
-午後　${d.sch_pm_mon||'-'}　${d.sch_pm_tue||'-'}　${d.sch_pm_wed||'-'}　${d.sch_pm_thu||'-'}　${d.sch_pm_fri||'-'}　${d.sch_pm_sat||'-'}　${d.sch_pm_sun||'-'}　${d.sch_pm_hol||'-'}
-
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━`.trim();
+  } else {
+    text = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`.trim();
+  のびのび歯科・矯正歯科　問診表（成人用）
+  受信日時: ${now}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【基本情報】
+お名前　: ${d.name}（${d.kana || ''}）
+生年月日: ${d.dob}
+性別　　: ${d.gender || '未記入'}
+電話番号: ${d.tel || '未記入'}
+
+━━ 問診 ━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q1. 本日の主訴
+  ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}
+
+Q2. 最後の受診: ${d.q2 || '未記入'}
+
+Q3. 既往歴
+  ${formatChecks(d.q3)}${d.q3_other ? ' / ' + d.q3_other : ''}
+
+Q4. 現在の服薬: ${d.q4 || '未記入'}
+  薬剤名: ${d.q4_medicine || 'なし'}
+
+Q5. アレルギー
+  ${formatChecks(d.q5)}${d.q5_other ? ' / ' + d.q5_other : ''}
+
+Q6. 当院を知ったきっかけ
+  ${formatChecks(d.q6)}${d.q6_other ? ' / ' + d.q6_other : ''}
+
+Q7. 治療の希望
+  ${formatChecks(d.q7)}${d.q7_other ? ' / ' + d.q7_other : ''}
+
+Q8. ご不安・気になること
+  ${d.q8 || 'なし'}
+
+━━ 通院希望曜日 ━━━━━━━━━━━━━━━━━━━━
+${scheduleText(d)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━`.trim();
+  }
 
   await transporter.sendMail({
     from: `"のびのび歯科 問診表" <${GMAIL_USER}>`,
     to: MAIL_TO,
-    subject: `【問診表】${d.name} 様（${now}）`,
+    subject: `【問診表・${typeLabel}】${d.name} 様（${now}）`,
     text,
   });
 }
@@ -425,47 +464,53 @@ function buildPDF(d) {
     }
 
     const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const isChild = d.type === 'child';
+    const typeLabel = isChild ? '小児用' : '成人用';
 
-    doc.fontSize(16).text('のびのび歯科・矯正歯科 問診表', { align: 'center' });
+    doc.fontSize(16).text(`のびのび歯科・矯正歯科 問診表（${typeLabel}）`, { align: 'center' });
     doc.fontSize(9).text(`受信: ${now}`, { align: 'right' });
     doc.moveDown(0.5);
     doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
     doc.moveDown(0.5);
 
     doc.fontSize(11).text('■ 基本情報');
-    doc.fontSize(10)
-      .text(`お名前: ${d.name}（${d.kana}）`)
-      .text(`生年月日: ${d.dob}　性別: ${d.gender || '未記入'}`)
-      .text(`電話: ${d.tel || ''}　携帯: ${d.mobile || ''}`)
-      .text(`ご住所: ${d.address || ''}`);
+    if (isChild) {
+      doc.fontSize(10)
+        .text(`お子様の名前: ${d.name}（${d.kana || ''}）`)
+        .text(`生年月日: ${d.dob}　性別: ${d.gender || '未記入'}`)
+        .text(`学校・保育園: ${d.school || '未記入'}`)
+        .text(`保護者名: ${d.guardian || '未記入'}　電話: ${d.tel || '未記入'}`);
+    } else {
+      doc.fontSize(10)
+        .text(`お名前: ${d.name}（${d.kana || ''}）`)
+        .text(`生年月日: ${d.dob}　性別: ${d.gender || '未記入'}`)
+        .text(`電話: ${d.tel || '未記入'}`);
+    }
     doc.moveDown(0.5);
 
-    doc.fontSize(11).text('■ 来院・治療について');
-    doc.fontSize(10)
-      .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
-      .text(`Q2 来院のきっかけ: ${formatChecks(d.q2)}`)
-      .text(`Q3 気になる部位: ${d.q3 || '未記入'}`)
-      .text(`Q4 最後の受診: ${d.q4 || '未記入'}${d.q4_detail ? ' / ' + d.q4_detail : ''}`)
-      .text(`Q5 以前の感想: ${formatChecks(d.q5)}`)
-      .text(`Q6 治療で重視: ${formatChecks(d.q6)}`)
-      .text(`Q7 興味ある治療: ${formatChecks(d.q7)}`);
-    doc.moveDown(0.5);
-
-    doc.fontSize(11).text('■ 健康状態');
-    doc.fontSize(10)
-      .text(`Q8 既往歴: ${formatChecks(d.q8)}${d.q8_detail ? ' / ' + d.q8_detail : ''}`)
-      .text(`Q9 現在の健康: ${formatChecks(d.q9)}`)
-      .text(`　通院: ${d.q9_hospital || 'なし'}　薬剤: ${d.q9_medicine || 'なし'}`)
-      .text(`Q10 アレルギー: ${formatChecks(d.q10)}${d.q10_other ? ' / ' + d.q10_other : ''}`)
-      .text(`Q11 薬での体調不良: ${d.q11 || '未記入'}${d.q11_detail ? ' / ' + d.q11_detail : ''}`)
-      .text(`Q12 麻酔経験: ${d.q12 || '未記入'}${d.q12_detail ? ' / ' + d.q12_detail : ''}`)
-      .text(`Q13 喫煙: ${d.q13 || '未記入'}${d.q13_count ? ' ' + d.q13_count : ''}`)
-      .text(`Q14 妊娠中: ${d.q14_pregnant || '未回答'}${d.q14_week ? ' ' + d.q14_week + '週目' : ''}　授乳中: ${d.q14_breastfeed || '未回答'}`)
-      .text(`Q15 診療希望: ${formatChecks(d.q15)}`);
-    doc.moveDown(0.5);
-
-    doc.fontSize(11).text('■ ご要望');
-    doc.fontSize(10).text(d.requests || 'なし');
+    doc.fontSize(11).text('■ 問診');
+    if (isChild) {
+      doc.fontSize(10)
+        .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
+        .text(`Q2 過去の受診経験: ${d.q2 || '未記入'}`)
+        .text(`Q3 既往歴・アレルギー: ${formatChecks(d.q3)}${d.q3_other ? ' / ' + d.q3_other : ''}`)
+        .text(`Q4 服薬: ${d.q4 || '未記入'}${d.q4_medicine ? ' / ' + d.q4_medicine : ''}`)
+        .text(`Q5 口腔習癖: ${formatChecks(d.q5)}`)
+        .text(`Q6 食事の習慣: ${formatChecks(d.q6)}`)
+        .text(`Q7 ご不安・気になること:`);
+      doc.fontSize(10).text(d.q7 || 'なし', { indent: 12 });
+    } else {
+      doc.fontSize(10)
+        .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
+        .text(`Q2 最後の受診: ${d.q2 || '未記入'}`)
+        .text(`Q3 既往歴: ${formatChecks(d.q3)}${d.q3_other ? ' / ' + d.q3_other : ''}`)
+        .text(`Q4 服薬: ${d.q4 || '未記入'}${d.q4_medicine ? ' / ' + d.q4_medicine : ''}`)
+        .text(`Q5 アレルギー: ${formatChecks(d.q5)}${d.q5_other ? ' / ' + d.q5_other : ''}`)
+        .text(`Q6 きっかけ: ${formatChecks(d.q6)}${d.q6_other ? ' / ' + d.q6_other : ''}`)
+        .text(`Q7 治療の希望: ${formatChecks(d.q7)}${d.q7_other ? ' / ' + d.q7_other : ''}`)
+        .text(`Q8 ご不安・気になること:`);
+      doc.fontSize(10).text(d.q8 || 'なし', { indent: 12 });
+    }
     doc.moveDown(0.5);
 
     doc.fontSize(11).text('■ 通院希望曜日');
@@ -486,11 +531,12 @@ async function printQuestionnaire(d) {
   }
   try {
     const pdfBuf = await buildPDF(d);
+    const typeLabel = d.type === 'child' ? '小児' : '成人';
     await axios.post(
       'https://api.printnode.com/printjobs',
       {
         printerId: parseInt(PRINTNODE_PRINTER_ID),
-        title: `問診表 ${d.name}`,
+        title: `問診表(${typeLabel}) ${d.name}`,
         contentType: 'pdf_base64',
         content: pdfBuf.toString('base64'),
         source: 'nobinobi-questionnaire',
