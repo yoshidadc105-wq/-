@@ -1,0 +1,6 @@
+node_modules/
+.env
+backend/inventory.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+dist/
