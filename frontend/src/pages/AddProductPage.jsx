@@ -7,6 +7,7 @@ export default function AddProductPage() {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPath, setPhotoPath] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [rawText, setRawText] = useState('');
   const [form, setForm] = useState({ name: '', maker: '', item_code: '', stock: '0', alert_threshold: '5' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -34,8 +35,9 @@ export default function AddProductPage() {
         item_code: result.item_code || prev.item_code,
       }));
       setPhotoPath(result.photo_path || '');
+      setRawText(result.raw_text || '');
     } catch (e) {
-      setError('AI読み取りに失敗しました。手動で入力してください。');
+      setError('OCR読み取りに失敗しました。手動で入力してください。');
     } finally {
       setScanning(false);
     }
@@ -100,7 +102,7 @@ export default function AddProductPage() {
             <div style={{ fontSize: 40 }}>📷</div>
             <div style={{ fontWeight: 600, marginTop: 8 }}>商品の写真を撮る</div>
             <div style={{ fontSize: 13, marginTop: 4 }}>タップして撮影・選択</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>AIが自動で商品名を読み取ります</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>自動でテキストを読み取ります</div>
           </div>
         )}
 
@@ -133,6 +135,13 @@ export default function AddProductPage() {
         >
           📷 写真を撮り直す
         </button>
+      )}
+
+      {rawText && (
+        <div style={{ background: '#f1f5f9', borderRadius: 8, padding: 10, marginBottom: 4, fontSize: 12, color: '#64748b' }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>📄 読み取ったテキスト（参考）</div>
+          <div>{rawText}</div>
+        </div>
       )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

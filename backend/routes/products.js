@@ -1,13 +1,11 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
-const Anthropic = require('@anthropic-ai/sdk');
+const { createWorker } = require('tesseract.js');
 const db = require('../database');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
@@ -34,56 +32,34 @@ router.get('/:id', authMiddleware, (req, res) => {
   res.json(product);
 });
 
-// 写真からAIで商品情報を読み取る
+// 写真からOCRで商品情報を読み取る（Tesseract.js・無料）
 router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '写真をアップロードしてください' });
 
   try {
-    const imageData = fs.readFileSync(req.file.path);
-    const base64 = imageData.toString('base64');
-    const mimeType = req.file.mimetype;
+    const worker = await createWorker(['jpn', 'eng']);
+    const { data: { text } } = await worker.recognize(req.file.path);
+    await worker.terminate();
 
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mimeType, data: base64 },
-          },
-          {
-            type: 'text',
-            text: `この歯科材料・医療用品の画像から商品情報を読み取ってください。
-以下のJSON形式で返してください（読み取れない項目はnullにしてください）：
-{
-  "name": "商品名",
-  "maker": "メーカー名",
-  "item_code": "品番・品目コード"
-}
-JSONのみ返してください。説明文は不要です。`,
-          },
-        ],
-      }],
-    });
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
 
-    const text = message.content[0].text.trim();
-    let parsed;
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-    } catch {
-      parsed = { name: null, maker: null, item_code: null };
-    }
+    // 最初の意味のある行を商品名候補とする
+    const nameLine = lines.find(l => l.length >= 2 && !/^[0-9\s\-\/\.]+$/.test(l)) || null;
+
+    // 品番っぽいパターン（英数字混在）を探す
+    const codeMatch = text.match(/[A-Z]{1,4}[-\s]?\d{3,8}/);
+    const itemCode = codeMatch ? codeMatch[0].trim() : null;
 
     res.json({
-      ...parsed,
+      name: nameLine,
+      maker: null,
+      item_code: itemCode,
       photo_path: `/uploads/${req.file.filename}`,
+      raw_text: lines.slice(0, 8).join(' / '),
     });
   } catch (e) {
-    console.error('AI scan error:', e);
-    res.status(500).json({ error: 'AI読み取りに失敗しました。手動で入力してください。' });
+    console.error('OCR scan error:', e);
+    res.status(500).json({ error: 'OCR読み取りに失敗しました。手動で入力してください。' });
   }
 });
 

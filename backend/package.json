@@ -7,8 +7,8 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.37.0",
     "bcryptjs": "^2.4.3",
+    "tesseract.js": "^5.1.0",
     "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
     "express": "^4.18.2",
