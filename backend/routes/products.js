@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { createWorker } = require('tesseract.js');
+const fs = require('fs');
 const db = require('../database');
 const authMiddleware = require('../middleware/auth');
 
@@ -32,22 +32,34 @@ router.get('/:id', authMiddleware, (req, res) => {
   res.json(product);
 });
 
-// 写真からOCRで商品情報を読み取る（Tesseract.js・無料）
+// 写真からGoogle Vision APIで商品情報を読み取る
 router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '写真をアップロードしてください' });
 
+  const apiKey = process.env.GOOGLE_VISION_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Google Vision APIキーが設定されていません' });
+
   try {
-    const worker = await createWorker(['jpn', 'eng']);
-    const { data: { text } } = await worker.recognize(req.file.path);
-    await worker.terminate();
+    const base64 = fs.readFileSync(req.file.path).toString('base64');
 
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: base64 },
+          features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+          imageContext: { languageHints: ['ja', 'en'] },
+        }]
+      })
+    });
 
-    // 最初の意味のある行を商品名候補とする
+    const data = await response.json();
+    const fullText = data.responses?.[0]?.fullTextAnnotation?.text || '';
+    const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+
     const nameLine = lines.find(l => l.length >= 2 && !/^[0-9\s\-\/\.]+$/.test(l)) || null;
-
-    // 品番っぽいパターン（英数字混在）を探す
-    const codeMatch = text.match(/[A-Z]{1,4}[-\s]?\d{3,8}/);
+    const codeMatch = fullText.match(/[A-Z]{1,4}[-\s]?\d{3,8}/);
     const itemCode = codeMatch ? codeMatch[0].trim() : null;
 
     res.json({
@@ -58,7 +70,7 @@ router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) =>
       raw_text: lines.slice(0, 8).join(' / '),
     });
   } catch (e) {
-    console.error('OCR scan error:', e);
+    console.error('Google Vision error:', e);
     res.status(500).json({ error: 'OCR読み取りに失敗しました。手動で入力してください。' });
   }
 });
