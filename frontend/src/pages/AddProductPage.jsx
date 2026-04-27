@@ -15,6 +15,19 @@ export default function AddProductPage() {
   const fileRef = useRef();
   const navigate = useNavigate();
 
+  const resizeImage = (file, maxSize = 1024) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.75).split(',')[1]);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -25,9 +38,8 @@ export default function AddProductPage() {
     setError('');
 
     try {
-      const fd = new FormData();
-      fd.append('photo', file);
-      const result = await api.scanProduct(fd);
+      const base64 = await resizeImage(file);
+      const result = await api.scanProduct({ base64, filename: file.name });
       setForm(prev => ({
         ...prev,
         name: result.name || prev.name,

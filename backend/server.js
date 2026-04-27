@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => { console.log(req.method, req.path); next(); });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

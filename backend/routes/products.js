@@ -33,27 +33,23 @@ router.get('/:id', authMiddleware, (req, res) => {
   res.json(product);
 });
 
-// 写真からGoogle Vision APIで商品情報を読み取る
-router.post('/scan', authMiddleware, (req, res, next) => {
-  upload.single('photo')(req, res, (err) => {
-    if (err) { console.error('multer エラー:', err.message); return res.status(500).json({ error: 'アップロードエラー: ' + err.message }); }
-    console.log('multer 完了, ファイル:', req.file ? req.file.filename : 'なし');
-    next();
-  });
-}, async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: '写真をアップロードしてください' });
+// 写真からGoogle Vision APIで商品情報を読み取る（JSON受け取り）
+router.post('/scan', authMiddleware, async (req, res) => {
+  const { base64, filename } = req.body;
+  if (!base64) return res.status(400).json({ error: '写真データがありません' });
 
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Google Vision APIキーが設定されていません' });
 
+  // 写真をファイルに保存
+  const ext = (filename || 'photo.jpg').split('.').pop();
+  const savedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const savedPath = path.join(__dirname, '../uploads', savedFilename);
+  fs.writeFileSync(savedPath, Buffer.from(base64, 'base64'));
+
   try {
     console.log('スキャン開始...');
-    // 写真を縮小してからAPIに送信（3MB→200KB程度）
-    const image = await Jimp.read(req.file.path);
-    image.resize(1024, Jimp.AUTO).quality(70);
-    const resizedBuffer = await image.getBufferAsync(Jimp.MIME_JPEG);
-    const base64 = resizedBuffer.toString('base64');
-    console.log(`画像縮小完了(${Math.round(resizedBuffer.length/1024)}KB)、Vision APIへ送信中...`);
+    console.log(`画像受信完了(${Math.round(base64.length * 0.75 / 1024)}KB)、Vision APIへ送信中...`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -91,7 +87,7 @@ router.post('/scan', authMiddleware, (req, res, next) => {
       name: nameLine,
       maker: null,
       item_code: itemCode,
-      photo_path: `/uploads/${req.file.filename}`,
+      photo_path: `/uploads/${savedFilename}`,
       raw_text: lines.slice(0, 8).join(' / '),
     });
   } catch (e) {
