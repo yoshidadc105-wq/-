@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const Jimp = require('jimp');
 const db = require('../database');
 const authMiddleware = require('../middleware/auth');
 
@@ -41,8 +42,12 @@ router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) =>
 
   try {
     console.log('スキャン開始...');
-    const base64 = fs.readFileSync(req.file.path).toString('base64');
-    console.log('画像読み込み完了、Vision APIへ送信中...');
+    // 写真を縮小してからAPIに送信（3MB→200KB程度）
+    const image = await Jimp.read(req.file.path);
+    image.resize(1024, Jimp.AUTO).quality(70);
+    const resizedBuffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+    const base64 = resizedBuffer.toString('base64');
+    console.log(`画像縮小完了(${Math.round(resizedBuffer.length/1024)}KB)、Vision APIへ送信中...`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
