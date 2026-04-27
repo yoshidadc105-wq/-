@@ -40,11 +40,17 @@ router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) =>
   if (!apiKey) return res.status(500).json({ error: 'Google Vision APIキーが設定されていません' });
 
   try {
+    console.log('スキャン開始...');
     const base64 = fs.readFileSync(req.file.path).toString('base64');
+    console.log('画像読み込み完了、Vision APIへ送信中...');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         requests: [{
           image: { content: base64 },
@@ -53,6 +59,8 @@ router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) =>
         }]
       })
     });
+    clearTimeout(timeout);
+    console.log('Vision API応答:', response.status);
 
     const data = await response.json();
 
