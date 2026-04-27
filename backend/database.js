@@ -1,10 +1,8 @@
-const Database = require('better-sqlite3');
+const { Database } = require('node-sqlite3-wasm');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const db = new Database(path.join(__dirname, 'inventory.db'));
-
-db.pragma('journal_mode = WAL');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
