@@ -55,6 +55,12 @@ router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) =>
     });
 
     const data = await response.json();
+
+    if (data.error) {
+      console.error('Google Vision API error:', JSON.stringify(data.error));
+      return res.status(500).json({ error: `Google Vision エラー: ${data.error.message}` });
+    }
+
     const fullText = data.responses?.[0]?.fullTextAnnotation?.text || '';
     const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 1);
 
