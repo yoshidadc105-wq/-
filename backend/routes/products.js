@@ -72,7 +72,7 @@ router.post('/', authMiddleware, upload.single('photo'), (req, res) => {
 
   const result = db.prepare(
     'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(name, maker || null, item_code || null, parseInt(stock) || 0, parseInt(alert_threshold) || 5, photoPath);
+  ).run([name, maker || null, item_code || null, parseInt(stock) || 0, parseInt(alert_threshold) || 5, photoPath]);
 
   res.json({ id: result.lastInsertRowid, message: '商品を登録しました' });
 });
@@ -87,7 +87,7 @@ router.put('/:id', authMiddleware, upload.single('photo'), (req, res) => {
 
   db.prepare(
     'UPDATE products SET name=?, maker=?, item_code=?, alert_threshold=?, photo_path=? WHERE id=?'
-  ).run(name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, req.params.id);
+  ).run([name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, req.params.id]);
 
   res.json({ message: '商品を更新しました' });
 });

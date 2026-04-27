@@ -51,7 +51,7 @@ db.exec(`
 const existing = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 if (!existing) {
   const hashed = bcrypt.hashSync('admin1234', 10);
-  db.prepare('INSERT INTO users (username, password, display_name) VALUES (?, ?, ?)').run('admin', hashed, '管理者');
+  db.prepare('INSERT INTO users (username, password, display_name) VALUES (?, ?, ?)').run(['admin', hashed, '管理者']);
 }
 
 module.exports = db;
