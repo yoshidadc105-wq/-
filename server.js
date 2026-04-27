@@ -389,8 +389,11 @@ Q5. 口腔習癖
 Q6. 食事・飲み物の習慣
   ${formatChecks(d.q6)}
 
-Q7. ご不安・気になること
-  ${d.q7 || 'なし'}
+Q7. 当院を知ったきっかけ
+  ${formatChecks(d.q7)}${d.q7_other ? ' / ' + d.q7_other : ''}
+
+Q8. ご不安・気になること
+  ${d.q8 || 'なし'}
 
 ━━ 通院希望曜日 ━━━━━━━━━━━━━━━━━━━━
 ${scheduleText(d)}
@@ -497,8 +500,9 @@ function buildPDF(d) {
         .text(`Q4 服薬: ${d.q4 || '未記入'}${d.q4_medicine ? ' / ' + d.q4_medicine : ''}`)
         .text(`Q5 口腔習癖: ${formatChecks(d.q5)}`)
         .text(`Q6 食事の習慣: ${formatChecks(d.q6)}`)
-        .text(`Q7 ご不安・気になること:`);
-      doc.fontSize(10).text(d.q7 || 'なし', { indent: 12 });
+        .text(`Q7 きっかけ: ${formatChecks(d.q7)}${d.q7_other ? ' / ' + d.q7_other : ''}`)
+        .text(`Q8 ご不安・気になること:`);
+      doc.fontSize(10).text(d.q8 || 'なし', { indent: 12 });
     } else {
       doc.fontSize(10)
         .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
