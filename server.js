@@ -372,7 +372,7 @@ async function sendFormEmail(d) {
 
 ━━ 問診 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-Q1. 本日の主訴
+Q1. 来院理由
   ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}
 
 Q2. 過去の受診経験: ${d.q2 || '未記入'}
@@ -414,7 +414,7 @@ ${scheduleText(d)}
 
 ━━ 問診 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-Q1. 本日の主訴
+Q1. 来院理由
   ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}
 
 Q2. 最後の受診: ${d.q2 || '未記入'}
@@ -494,7 +494,7 @@ function buildPDF(d) {
     doc.fontSize(11).text('■ 問診');
     if (isChild) {
       doc.fontSize(10)
-        .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
+        .text(`Q1 来院理由:${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
         .text(`Q2 過去の受診経験: ${d.q2 || '未記入'}`)
         .text(`Q3 既往歴・アレルギー: ${formatChecks(d.q3)}${d.q3_other ? ' / ' + d.q3_other : ''}`)
         .text(`Q4 服薬: ${d.q4 || '未記入'}${d.q4_medicine ? ' / ' + d.q4_medicine : ''}`)
@@ -505,7 +505,7 @@ function buildPDF(d) {
       doc.fontSize(10).text(d.q8 || 'なし', { indent: 12 });
     } else {
       doc.fontSize(10)
-        .text(`Q1 主訴: ${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
+        .text(`Q1 来院理由:${formatChecks(d.q1)}${d.q1_other ? ' / ' + d.q1_other : ''}`)
         .text(`Q2 最後の受診: ${d.q2 || '未記入'}`)
         .text(`Q3 既往歴: ${formatChecks(d.q3)}${d.q3_other ? ' / ' + d.q3_other : ''}`)
         .text(`Q4 服薬: ${d.q4 || '未記入'}${d.q4_medicine ? ' / ' + d.q4_medicine : ''}`)
