@@ -1,4 +1,7 @@
-const BASE = '/api';
+// スマホ等の別デバイスからは直接バックエンドに接続（Viteプロキシ経由だと大容量データが通らないため）
+const BASE = window.location.hostname === 'localhost'
+  ? '/api'
+  : `http://${window.location.hostname}:3001/api`;
 
 function getToken() {
   return localStorage.getItem('token');
