@@ -36,9 +36,12 @@ router.get('/:id', authMiddleware, (req, res) => {
 // 写真からGoogle Vision APIで商品情報を読み取る（JSON受け取り）
 router.post('/scan', authMiddleware, async (req, res) => {
   const { base64, filename } = req.body;
+  console.log('scan: base64=', base64 ? `${Math.round(base64.length/1024)}KB` : 'なし');
+
   if (!base64) return res.status(400).json({ error: '写真データがありません' });
 
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
+  console.log('scan: apiKey=', apiKey ? '設定済み' : '未設定');
   if (!apiKey) return res.status(500).json({ error: 'Google Vision APIキーが設定されていません' });
 
   // 写真をファイルに保存
