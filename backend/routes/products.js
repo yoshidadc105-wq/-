@@ -9,10 +9,10 @@ const authMiddleware = require('../middleware/auth');
 const router = express.Router();
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${path.extname(file.originalname)}`),
+  destination: (req, file, cb) => { console.log('multer: 保存先設定'); cb(null, path.join(__dirname, '../uploads')); },
+  filename: (req, file, cb) => { console.log('multer: ファイル名設定'); cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${path.extname(file.originalname)}`); },
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
 
 // 全商品一覧
 router.get('/', authMiddleware, (req, res) => {
@@ -34,7 +34,13 @@ router.get('/:id', authMiddleware, (req, res) => {
 });
 
 // 写真からGoogle Vision APIで商品情報を読み取る
-router.post('/scan', authMiddleware, upload.single('photo'), async (req, res) => {
+router.post('/scan', authMiddleware, (req, res, next) => {
+  upload.single('photo')(req, res, (err) => {
+    if (err) { console.error('multer エラー:', err.message); return res.status(500).json({ error: 'アップロードエラー: ' + err.message }); }
+    console.log('multer 完了, ファイル:', req.file ? req.file.filename : 'なし');
+    next();
+  });
+}, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '写真をアップロードしてください' });
 
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
