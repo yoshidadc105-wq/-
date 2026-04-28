@@ -50,7 +50,15 @@ router.get('/me', requireLogin, (req, res) => {
     WHERE mc.user_id = ?
     ORDER BY mc.checked_at DESC
   `).all(req.session.userId);
-  res.json({ total, checked, percent: total > 0 ? Math.round(checked / total * 100) : 0, checkedList });
+  const uncheckedList = db.prepare(`
+    SELECT m.id, m.title, m.type, c.name as category_name
+    FROM manuals m
+    LEFT JOIN categories c ON c.id = m.category_id
+    WHERE m.is_deleted = 0
+      AND m.id NOT IN (SELECT manual_id FROM manual_checks WHERE user_id = ?)
+    ORDER BY c.sort_order, m.updated_at DESC
+  `).all(req.session.userId);
+  res.json({ total, checked, percent: total > 0 ? Math.round(checked / total * 100) : 0, checkedList, uncheckedList });
 });
 
 // 管理者：全スタッフの進捗一覧

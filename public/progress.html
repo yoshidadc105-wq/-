@@ -87,6 +87,10 @@
     <div class="progress-bar-wrap mb-3" style="height:16px;">
       <div class="progress-bar-fill" id="myBar" style="width:0%"></div>
     </div>
+    <div class="card mb-2">
+      <div class="card-header"><span class="card-title">未確認マニュアル</span></div>
+      <div class="card-body" id="myUncheckedList"></div>
+    </div>
     <div class="card">
       <div class="card-header"><span class="card-title">確認済みマニュアル</span></div>
       <div class="card-body" id="myCheckedList"></div>
@@ -271,6 +275,18 @@ async function loadMyProgress() {
   const bar = document.getElementById('myBar');
   bar.style.width = `${data.percent}%`;
   bar.className = `progress-bar-fill ${barClass(data.percent)}`;
+
+  const uncheckedList = document.getElementById('myUncheckedList');
+  if (data.uncheckedList.length === 0) {
+    uncheckedList.innerHTML = '<p style="color:var(--success); font-weight:700;">✅ 全マニュアル確認済みです！</p>';
+  } else {
+    uncheckedList.innerHTML = data.uncheckedList.map(m => `
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
+        <a href="/view.html?id=${m.id}" style="flex:1; color:var(--text);">${m.title}</a>
+        <span class="text-sm text-muted">${m.category_name || '-'}</span>
+      </div>`).join('');
+  }
 
   const list = document.getElementById('myCheckedList');
   if (data.checkedList.length === 0) {
