@@ -154,9 +154,21 @@ function initializeDb() {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS manual_checks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      manual_id INTEGER NOT NULL REFERENCES manuals(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      checked_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE(manual_id, user_id)
+    )
+  `);
+
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_manuals_category ON manuals(category_id);
     CREATE INDEX IF NOT EXISTS idx_manuals_deleted ON manuals(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_view_history_user ON view_history(user_id);
+    CREATE INDEX IF NOT EXISTS idx_manual_checks_user ON manual_checks(user_id);
+    CREATE INDEX IF NOT EXISTS idx_manual_checks_manual ON manual_checks(manual_id);
   `);
 
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>進捗管理 - 社内マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .progress-bar-wrap { background: var(--border); border-radius: 99px; height: 10px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 99px; background: var(--primary); transition: width 0.4s; }
+    .progress-bar-fill.high { background: var(--success); }
+    .progress-bar-fill.mid { background: var(--warning); }
+    .progress-bar-fill.low { background: var(--danger); }
+    .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; box-shadow: var(--shadow); }
+    .stat-card .num { font-size: 36px; font-weight: 700; color: var(--primary); }
+    .stat-card .label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+    .tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+  <div class="navbar-right">
+    <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
+    <a href="/admin.html" id="navAdminLink" class="btn btn-secondary btn-sm hidden">管理者設定</a>
+    <a href="/progress.html" id="navProgressLink" class="btn btn-secondary btn-sm hidden">進捗管理</a>
+    <a href="/account.html" class="btn btn-secondary btn-sm">アカウント設定</a>
+    <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <a href="/" class="text-sm" style="color:var(--primary);">← マニュアル一覧</a>
+      <h1 style="font-size:22px; font-weight:700; margin-top:4px;">進捗管理</h1>
+    </div>
+  </div>
+
+  <!-- 管理者：タブ切り替え -->
+  <div id="adminSection" class="hidden">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('users', this)">スタッフ別進捗</div>
+      <div class="tab" onclick="showTab('manuals', this)">マニュアル別確認状況</div>
+    </div>
+
+    <!-- スタッフ別 -->
+    <div id="tabUsers">
+      <div id="userList"><div class="loading">読み込み中</div></div>
+      <!-- 未確認マニュアル詳細 -->
+      <div id="uncheckedDetail" class="hidden mt-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" id="uncheckedTitle"></span>
+            <button onclick="closeDetail()" class="btn btn-secondary btn-sm">閉じる</button>
+          </div>
+          <div class="card-body" id="uncheckedList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マニュアル別 -->
+    <div id="tabManuals" class="hidden">
+      <div id="manualProgressList"><div class="loading">読み込み中</div></div>
+      <div id="uncheckedUsersDetail" class="hidden mt-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" id="uncheckedUsersTitle"></span>
+            <button onclick="closeUsersDetail()" class="btn btn-secondary btn-sm">閉じる</button>
+          </div>
+          <div class="card-body" id="uncheckedUsersList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 一般スタッフ：自分の進捗 -->
+  <div id="mySection" class="hidden">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:16px; margin-bottom:24px;">
+      <div class="stat-card"><div class="num" id="myChecked">-</div><div class="label">確認済み</div></div>
+      <div class="stat-card"><div class="num" id="myTotal">-</div><div class="label">全マニュアル</div></div>
+      <div class="stat-card"><div class="num" id="myPercent">-%</div><div class="label">達成率</div></div>
+    </div>
+    <div class="progress-bar-wrap mb-3" style="height:16px;">
+      <div class="progress-bar-fill" id="myBar" style="width:0%"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">確認済みマニュアル</span></div>
+      <div class="card-body" id="myCheckedList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+let currentUser = null;
+
+async function init() {
+  currentUser = await loadCurrentUser();
+  if (!currentUser) return;
+  initNavbar(currentUser);
+
+  if (currentUser.role === 'admin') {
+    document.getElementById('adminSection').classList.remove('hidden');
+    await loadUserProgress();
+    await loadManualProgress();
+  } else {
+    document.getElementById('mySection').classList.remove('hidden');
+    await loadMyProgress();
+  }
+}
+
+function showTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tabUsers').classList.toggle('hidden', tab !== 'users');
+  document.getElementById('tabManuals').classList.toggle('hidden', tab !== 'manuals');
+}
+
+function barClass(pct) {
+  if (pct >= 80) return 'high';
+  if (pct >= 40) return 'mid';
+  return 'low';
+}
+
+// ---- 管理者：スタッフ別 ----
+async function loadUserProgress() {
+  const res = await fetch('/api/progress/users');
+  const users = await res.json();
+  const container = document.getElementById('userList');
+
+  if (users.length === 0) {
+    container.innerHTML = '<div class="empty">スタッフがいません</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>スタッフ名</th>
+              <th>確認済み</th>
+              <th>達成率</th>
+              <th>進捗</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td style="font-weight:500;">${u.display_name}</td>
+                <td>${u.checked} / ${u.total}</td>
+                <td style="font-weight:700; color:${u.percent >= 80 ? 'var(--success)' : u.percent >= 40 ? 'var(--warning)' : 'var(--danger)'};">${u.percent}%</td>
+                <td style="min-width:120px;">
+                  <div class="progress-bar-wrap">
+                    <div class="progress-bar-fill ${barClass(u.percent)}" style="width:${u.percent}%"></div>
+                  </div>
+                </td>
+                <td>
+                  <button onclick="showUnchecked(${u.id}, '${u.display_name.replace(/'/g,"\\'")}', ${u.total - u.checked})"
+                    class="btn btn-secondary btn-sm">未確認を見る</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function showUnchecked(userId, name, count) {
+  const res = await fetch(`/api/progress/users/${userId}/unchecked`);
+  const manuals = await res.json();
+  document.getElementById('uncheckedTitle').textContent = `${name} の未確認マニュアル（${count}件）`;
+  const list = document.getElementById('uncheckedList');
+  if (manuals.length === 0) {
+    list.innerHTML = '<p style="color:var(--success); font-weight:700;">✅ 全マニュアル確認済みです！</p>';
+  } else {
+    list.innerHTML = manuals.map(m => `
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
+        <a href="/view.html?id=${m.id}" style="flex:1; color:var(--text);">${m.title}</a>
+        <span class="text-sm text-muted">${m.category_name || '-'}</span>
+      </div>`).join('');
+  }
+  document.getElementById('uncheckedDetail').classList.remove('hidden');
+  document.getElementById('uncheckedDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeDetail() {
+  document.getElementById('uncheckedDetail').classList.add('hidden');
+}
+
+// ---- 管理者：マニュアル別 ----
+async function loadManualProgress() {
+  const res = await fetch('/api/progress/manuals');
+  const data = await res.json();
+  const container = document.getElementById('manualProgressList');
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>マニュアル名</th>
+              <th>カテゴリ</th>
+              <th>確認済み</th>
+              <th>達成率</th>
+              <th>進捗</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.manuals.map(m => `
+              <tr>
+                <td><a href="/view.html?id=${m.id}" style="color:var(--text); font-weight:500;">${m.title}</a></td>
+                <td class="text-muted text-sm">${m.category_name || '-'}</td>
+                <td>${m.checked_count} / ${data.totalUsers}</td>
+                <td style="font-weight:700; color:${m.percent >= 80 ? 'var(--success)' : m.percent >= 40 ? 'var(--warning)' : 'var(--danger)'};">${m.percent}%</td>
+                <td style="min-width:120px;">
+                  <div class="progress-bar-wrap">
+                    <div class="progress-bar-fill ${barClass(m.percent)}" style="width:${m.percent}%"></div>
+                  </div>
+                </td>
+                <td>
+                  <button onclick="showUncheckedUsers(${m.id}, '${m.title.replace(/'/g,"\\'")}', ${data.totalUsers - m.checked_count})"
+                    class="btn btn-secondary btn-sm">未確認者を見る</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function showUncheckedUsers(manualId, title, count) {
+  const res = await fetch(`/api/progress/manuals/${manualId}/unchecked`);
+  const users = await res.json();
+  document.getElementById('uncheckedUsersTitle').textContent = `「${title}」未確認スタッフ（${count}名）`;
+  const list = document.getElementById('uncheckedUsersList');
+  if (users.length === 0) {
+    list.innerHTML = '<p style="color:var(--success); font-weight:700;">✅ 全スタッフ確認済みです！</p>';
+  } else {
+    list.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:8px;">
+      ${users.map(u => `<span class="badge" style="background:var(--bg); color:var(--text); font-size:13px; padding:4px 12px;">${u.display_name}</span>`).join('')}
+    </div>`;
+  }
+  document.getElementById('uncheckedUsersDetail').classList.remove('hidden');
+  document.getElementById('uncheckedUsersDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeUsersDetail() {
+  document.getElementById('uncheckedUsersDetail').classList.add('hidden');
+}
+
+// ---- 一般スタッフ：自分の進捗 ----
+async function loadMyProgress() {
+  const res = await fetch('/api/progress/me');
+  const data = await res.json();
+
+  document.getElementById('myChecked').textContent = data.checked;
+  document.getElementById('myTotal').textContent = data.total;
+  document.getElementById('myPercent').textContent = `${data.percent}%`;
+  const bar = document.getElementById('myBar');
+  bar.style.width = `${data.percent}%`;
+  bar.className = `progress-bar-fill ${barClass(data.percent)}`;
+
+  const list = document.getElementById('myCheckedList');
+  if (data.checkedList.length === 0) {
+    list.innerHTML = '<p class="text-muted">まだ確認済みのマニュアルはありません</p>';
+  } else {
+    list.innerHTML = data.checkedList.map(m => `
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
+        <a href="/view.html?id=${m.id}" style="flex:1; color:var(--text);">${m.title}</a>
+        <span class="text-sm text-muted">${formatDate(m.checked_at)}</span>
+      </div>`).join('');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -29,6 +29,7 @@
   <div class="navbar-right">
     <span class="navbar-user">ようこそ、<strong id="navUserName"></strong></span>
     <a href="/admin.html" id="navAdminLink" class="btn btn-secondary btn-sm hidden">管理者設定</a>
+    <a href="/progress.html" id="navProgressLink" class="btn btn-secondary btn-sm hidden">進捗管理</a>
     <a href="/account.html" class="btn btn-secondary btn-sm">アカウント設定</a>
     <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
   </div>
@@ -76,6 +77,7 @@ async function init() {
   initNavbar(currentUser);
 
   await loadManual();
+  await loadCheckStatus();
 }
 
 async function loadManual() {
@@ -170,11 +172,52 @@ async function loadManual() {
       </div>
     </div>
     ${bodyHtml}
+    <div class="card mt-2">
+      <div class="card-body" style="text-align:center; padding:24px;" id="checkArea">
+        <div class="loading" style="padding:16px;"></div>
+      </div>
+    </div>
   `;
 }
 
 function escHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadCheckStatus() {
+  const res = await fetch(`/api/progress/check/${manualId}`);
+  const data = await res.json();
+  renderCheckButton(data.checked, data.checked_at);
+}
+
+function renderCheckButton(checked, checkedAt) {
+  const area = document.getElementById('checkArea');
+  if (!area) return;
+  if (checked) {
+    area.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="color:var(--success); font-weight:700; font-size:15px;">✅ 確認済み（${formatDate(checkedAt)}）</span>
+        <button onclick="uncheckManual()" class="btn btn-secondary btn-sm">取り消す</button>
+      </div>`;
+  } else {
+    area.innerHTML = `
+      <button onclick="checkManual()" class="btn btn-success" style="font-size:15px; padding:12px 32px;">
+        ✅ 確認しました
+      </button>`;
+  }
+}
+
+async function checkManual() {
+  const res = await fetch(`/api/progress/check/${manualId}`, { method: 'POST' });
+  if (res.ok) {
+    const data = await fetch(`/api/progress/check/${manualId}`).then(r => r.json());
+    renderCheckButton(data.checked, data.checked_at);
+  }
+}
+
+async function uncheckManual() {
+  const res = await fetch(`/api/progress/check/${manualId}`, { method: 'DELETE' });
+  if (res.ok) renderCheckButton(false, null);
 }
 
 async function deleteManual() {

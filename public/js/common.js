@@ -19,6 +19,7 @@ async function loadCurrentUser() {
 function initNavbar(user) {
   const nameEl = document.getElementById('navUserName');
   const adminLink = document.getElementById('navAdminLink');
+  const progressLink = document.getElementById('navProgressLink');
 
   if (nameEl) nameEl.textContent = user.displayName;
   if (adminLink) {
@@ -28,6 +29,7 @@ function initNavbar(user) {
       adminLink.classList.add('hidden');
     }
   }
+  if (progressLink) progressLink.classList.remove('hidden');
 }
 
 // ログアウト
