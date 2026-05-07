@@ -553,10 +553,6 @@ async function printQuestionnaire(d) {
   }
 }
 
-// ---- シフト管理 ----
-const shiftRouter = require('./shift-routes');
-app.use('/api/shift', shiftRouter);
-
 // 死活確認用
 app.get('/health', (_req, res) => res.send('OK'));
 
