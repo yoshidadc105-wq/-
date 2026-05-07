@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>シフト管理 | のびのび歯科・矯正歯科</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; }
+  .calendar-cell { min-height: 80px; }
+  .shift-chip { cursor: pointer; user-select: none; }
+  .shift-chip.dragging { opacity: 0.4; }
+  .day-drop-target { transition: border 0.1s; }
+  .day-drop-target.drag-over { border: 2px dashed #2563eb !important; background: #eff6ff !important; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: center; justify-content: center; }
+  .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 560px; width: 95vw; max-height: 90vh; overflow-y: auto; z-index: 51; }
+  .tab-btn { border-bottom: 2px solid transparent; }
+  .tab-btn.active { border-bottom-color: #2563eb; color: #2563eb; }
+  .role-dentist { background: #dbeafe; color: #1e40af; }
+  .role-hygienist { background: #dcfce7; color: #166534; }
+  .role-technician { background: #f3e8ff; color: #6b21a8; }
+  [v-cloak] { display: none; }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen" v-cloak>
+<div id="app">
+
+<!-- ヘッダー -->
+<header class="bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow">
+  <div class="flex items-center gap-3">
+    <span class="text-lg font-bold">のびのび歯科・矯正歯科</span>
+    <span class="text-sm opacity-80">シフト管理</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <span v-if="isAdmin" class="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded font-bold">管理者モード</span>
+    <button v-if="!isAdmin" @click="promptLogin" class="text-sm bg-white text-blue-700 px-3 py-1 rounded hover:bg-blue-50">ログイン</button>
+    <button v-else @click="logout" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-500">ログアウト</button>
+  </div>
+</header>
+
+<!-- タブ -->
+<div class="bg-white border-b flex gap-0 px-4 shadow-sm">
+  <button v-for="tab in tabs" :key="tab.key"
+    @click="currentTab = tab.key"
+    :class="['tab-btn px-4 py-3 text-sm font-medium text-gray-600 hover:text-blue-600', currentTab === tab.key ? 'active' : '']">
+    {{ tab.label }}
+  </button>
+</div>
+
+<!-- カレンダータブ -->
+<div v-if="currentTab === 'calendar'" class="p-4">
+  <!-- 月選択 -->
+  <div class="flex items-center gap-3 mb-4">
+    <button @click="prevMonth" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-lg">‹</button>
+    <span class="text-lg font-bold">{{ currentYear }}年 {{ currentMonth }}月</span>
+    <button @click="nextMonth" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-lg">›</button>
+    <button @click="goToday" class="px-3 py-1 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 hover:bg-blue-100">今月</button>
+    <button @click="loadAll" class="px-3 py-1 bg-gray-100 border rounded text-sm text-gray-600 hover:bg-gray-200">更新</button>
+  </div>
+
+  <!-- 曜日ヘッダー -->
+  <div class="grid grid-cols-7 gap-1 mb-1">
+    <div v-for="d in ['月','火','水','木','金','土','日']" :key="d"
+      :class="['text-center text-xs font-bold py-1', d==='日'?'text-red-500':d==='土'?'text-blue-500':'text-gray-500']">
+      {{ d }}
+    </div>
+  </div>
+
+  <!-- カレンダーグリッド -->
+  <div class="grid grid-cols-7 gap-1">
+    <!-- 先頭の空白 -->
+    <div v-for="n in calendarStartOffset" :key="'empty-'+n"></div>
+
+    <!-- 日付セル -->
+    <div v-for="day in calendarDays" :key="day.dateStr"
+      :class="['calendar-cell day-drop-target border rounded p-1 relative cursor-pointer transition-colors',
+        day.isToday ? 'ring-2 ring-blue-400' : '',
+        getDayBgClass(day),
+        !day.isCurrentMonth ? 'opacity-40' : '']"
+      @click="openDayModal(day)"
+      @dragover.prevent="onDragOver($event, day)"
+      @dragleave="onDragLeave($event)"
+      @drop.prevent="onDrop($event, day)">
+
+      <!-- 日付 + バッジ -->
+      <div class="flex items-center justify-between mb-0.5">
+        <span :class="['text-xs font-bold', day.dayType==='sunday'||day.dayType==='holiday'?'text-red-600':day.dayType==='saturday'?'text-blue-600':'text-gray-700']">
+          {{ day.date }}
+        </span>
+        <div class="flex gap-0.5">
+          <span v-if="day.isHoliday" class="text-xs text-red-500">祝</span>
+          <span v-if="!day.isOpen" class="text-xs bg-gray-200 text-gray-500 px-1 rounded">休</span>
+          <span v-if="day.isOpen && hasStaffingWarning(day)" class="w-2 h-2 bg-yellow-400 rounded-full mt-0.5" title="最低スタッフ数不足"></span>
+        </div>
+      </div>
+
+      <!-- シフトチップ -->
+      <div class="flex flex-col gap-0.5">
+        <div v-for="entry in getEntriesForDay(day.dateStr)" :key="entry.id"
+          :class="['shift-chip text-xs px-1 py-0.5 rounded flex items-center gap-0.5 truncate',
+            entry.isLocked ? 'opacity-80' : '',
+            isAdmin && !entry.isLocked ? 'cursor-grab' : 'cursor-default']"
+          :style="{ backgroundColor: getStaffColor(entry.staffId) + '33', borderLeft: '3px solid ' + getStaffColor(entry.staffId) }"
+          :draggable="isAdmin && !entry.isLocked"
+          @dragstart="onDragStart($event, entry, day)"
+          @dragend="onDragEnd"
+          @click.stop="isAdmin && openDayModal(day)">
+          <span v-if="entry.isLocked" title="ロック済み">🔒</span>
+          <span v-if="entry.isPaidLeave" class="bg-orange-100 text-orange-700 text-xs px-0.5 rounded font-bold">有</span>
+          <span class="truncate text-gray-800 font-medium">{{ getStaffName(entry.staffId) }}</span>
+          <span class="text-gray-500">{{ periodLabel(entry.period) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スタッフ管理タブ -->
+<div v-if="currentTab === 'staff'" class="p-4">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-bold text-gray-800">スタッフ管理</h2>
+    <button v-if="isAdmin" @click="openAddStaff" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">+ スタッフ追加</button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-gray-50 border-b">
+          <th class="text-left px-4 py-3 text-gray-600">名前</th>
+          <th class="text-left px-4 py-3 text-gray-600">役職</th>
+          <th class="text-left px-4 py-3 text-gray-600">契約</th>
+          <th class="text-left px-4 py-3 text-gray-600">カラー</th>
+          <th v-if="isAdmin" class="text-left px-4 py-3 text-gray-600">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-if="staffList.length === 0">
+          <td colspan="5" class="text-center py-8 text-gray-400">スタッフが登録されていません</td>
+        </tr>
+        <tr v-for="s in staffList" :key="s.id" class="border-b hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium">{{ s.name }}</td>
+          <td class="px-4 py-3">
+            <span :class="['px-2 py-0.5 rounded text-xs font-bold', roleClass(s.role)]">{{ roleLabel(s.role) }}</span>
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ contractLabel(s.contractType) }}</td>
+          <td class="px-4 py-3">
+            <span class="inline-block w-6 h-6 rounded" :style="{ background: s.color }"></span>
+          </td>
+          <td v-if="isAdmin" class="px-4 py-3">
+            <button @click="editStaff(s)" class="text-blue-600 hover:underline mr-3">編集</button>
+            <button @click="deleteStaff(s)" class="text-red-500 hover:underline">削除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 設定タブ -->
+<div v-if="currentTab === 'settings'" class="p-4 max-w-2xl">
+  <h2 class="text-lg font-bold text-gray-800 mb-4">設定</h2>
+
+  <div v-if="!isAdmin" class="bg-yellow-50 border border-yellow-200 rounded p-4 text-yellow-800 text-sm mb-4">
+    設定を変更するには管理者としてログインしてください。
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="font-bold text-gray-700 mb-3">デフォルト休診曜日</h3>
+    <div class="flex flex-wrap gap-3">
+      <label v-for="(dn, di) in ['日','月','火','水','木','金','土']" :key="di" class="flex items-center gap-1">
+        <input type="checkbox" :value="di" v-model="settingsForm.closedDays" :disabled="!isAdmin" class="w-4 h-4">
+        <span :class="di===0?'text-red-600':di===6?'text-blue-600':''">{{ dn }}</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="font-bold text-gray-700 mb-3">ポイントルール</h3>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <label class="flex items-center justify-between">
+        <span>土曜出勤</span>
+        <input type="number" v-model.number="settingsForm.points.saturday" :disabled="!isAdmin" class="w-16 border rounded px-2 py-1 text-right" min="0">
+      </label>
+      <label class="flex items-center justify-between">
+        <span>日曜出勤</span>
+        <input type="number" v-model.number="settingsForm.points.sunday" :disabled="!isAdmin" class="w-16 border rounded px-2 py-1 text-right" min="0">
+      </label>
+      <label class="flex items-center justify-between">
+        <span>祝日出勤</span>
+        <input type="number" v-model.number="settingsForm.points.holiday" :disabled="!isAdmin" class="w-16 border rounded px-2 py-1 text-right" min="0">
+      </label>
+      <label class="flex items-center justify-between">
+        <span>平日有給休暇ボーナス</span>
+        <input type="number" v-model.number="settingsForm.points.paidLeaveWeekday" :disabled="!isAdmin" class="w-16 border rounded px-2 py-1 text-right" min="0">
+      </label>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="font-bold text-gray-700 mb-3">勤務時間</h3>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="font-medium mb-1">午前</p>
+        <div class="flex items-center gap-2">
+          <input type="time" v-model="settingsForm.workHours.am.start" :disabled="!isAdmin" class="border rounded px-2 py-1">
+          <span>〜</span>
+          <input type="time" v-model="settingsForm.workHours.am.end" :disabled="!isAdmin" class="border rounded px-2 py-1">
+        </div>
+      </div>
+      <div>
+        <p class="font-medium mb-1">午後</p>
+        <div class="flex items-center gap-2">
+          <input type="time" v-model="settingsForm.workHours.pm.start" :disabled="!isAdmin" class="border rounded px-2 py-1">
+          <span>〜</span>
+          <input type="time" v-model="settingsForm.workHours.pm.end" :disabled="!isAdmin" class="border rounded px-2 py-1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="font-bold text-gray-700 mb-3">最低スタッフルール</h3>
+    <div v-for="(rule, idx) in settingsForm.minStaff" :key="idx" class="flex items-center gap-2 mb-2 text-sm">
+      <select v-model="rule.dayType" :disabled="!isAdmin" class="border rounded px-2 py-1">
+        <option value="weekday">平日</option>
+        <option value="saturday">土曜</option>
+        <option value="sunday">日曜</option>
+        <option value="holiday">祝日</option>
+      </select>
+      <select v-model="rule.role" :disabled="!isAdmin" class="border rounded px-2 py-1">
+        <option value="any">全員</option>
+        <option value="dentist">歯科医師</option>
+        <option value="hygienist">歯科衛生士</option>
+        <option value="technician">歯科技工士</option>
+      </select>
+      <span>最低</span>
+      <input type="number" v-model.number="rule.min" :disabled="!isAdmin" class="w-16 border rounded px-2 py-1 text-right" min="1">
+      <span>人</span>
+      <button v-if="isAdmin" @click="settingsForm.minStaff.splice(idx,1)" class="text-red-500 hover:text-red-700">✕</button>
+    </div>
+    <button v-if="isAdmin" @click="settingsForm.minStaff.push({dayType:'weekday',role:'any',min:1})"
+      class="text-sm text-blue-600 hover:underline">+ ルール追加</button>
+  </div>
+
+  <div v-if="isAdmin" class="flex gap-3">
+    <button @click="saveSettings" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">設定を保存</button>
+    <button @click="loadSettings" class="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300">リセット</button>
+  </div>
+</div>
+
+<!-- ポイントレポートタブ -->
+<div v-if="currentTab === 'points'" class="p-4">
+  <div class="flex items-center gap-3 mb-4">
+    <h2 class="text-lg font-bold text-gray-800">ポイントレポート</h2>
+    <select v-model="reportYear" class="border rounded px-2 py-1 text-sm">
+      <option v-for="y in [2024,2025,2026,2027]" :key="y" :value="y">{{ y }}年</option>
+    </select>
+    <select v-model="reportMonth" class="border rounded px-2 py-1 text-sm">
+      <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
+    </select>
+    <button @click="loadPoints" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">集計</button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-gray-50 border-b">
+          <th class="text-left px-3 py-3 text-gray-600">名前</th>
+          <th class="text-left px-3 py-3 text-gray-600">役職</th>
+          <th class="text-center px-3 py-3 text-gray-600">平日</th>
+          <th class="text-center px-3 py-3 text-blue-600">土曜</th>
+          <th class="text-center px-3 py-3 text-red-600">日曜</th>
+          <th class="text-center px-3 py-3 text-red-600">祝日</th>
+          <th class="text-center px-3 py-3 text-orange-600">有給ボーナス</th>
+          <th class="text-center px-3 py-3 font-bold text-gray-800">合計</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-if="!pointsData || Object.keys(pointsData).length === 0">
+          <td colspan="8" class="text-center py-8 text-gray-400">データがありません。集計ボタンを押してください。</td>
+        </tr>
+        <tr v-for="(row, sid) in pointsData" :key="sid" class="border-b hover:bg-gray-50">
+          <td class="px-3 py-3 font-medium">{{ row.name }}</td>
+          <td class="px-3 py-3">
+            <span :class="['px-2 py-0.5 rounded text-xs font-bold', roleClass(row.role)]">{{ roleLabel(row.role) }}</span>
+          </td>
+          <td class="px-3 py-3 text-center text-gray-600">{{ row.weekdayCount }}</td>
+          <td class="px-3 py-3 text-center text-blue-700">{{ row.saturdayCount }}</td>
+          <td class="px-3 py-3 text-center text-red-600">{{ row.sundayCount }}</td>
+          <td class="px-3 py-3 text-center text-red-600">{{ row.holidayCount }}</td>
+          <td class="px-3 py-3 text-center text-orange-600">{{ row.paidLeaveBonus > 0 ? '+' + row.paidLeaveBonus : '-' }}</td>
+          <td class="px-3 py-3 text-center font-bold text-lg">{{ row.total }}</td>
+        </tr>
+        <!-- 合計行 -->
+        <tr v-if="pointsData && Object.keys(pointsData).length > 0" class="bg-gray-100 font-bold">
+          <td class="px-3 py-3" colspan="7" class="text-right">合計ポイント</td>
+          <td class="px-3 py-3 text-center text-lg">{{ totalPoints }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== デイモーダル ===== -->
+<div v-if="dayModal.open" class="modal-overlay" @click.self="dayModal.open = false">
+  <div class="modal-box">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="text-lg font-bold">{{ dayModal.day?.dateStr }} ({{ dayNameJa(dayModal.day) }})</h3>
+        <div class="flex items-center gap-2 mt-1">
+          <span :class="['text-xs px-2 py-0.5 rounded font-bold', dayModal.day?.isOpen ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500']">
+            {{ dayModal.day?.isOpen ? '診療日' : '休診日' }}
+          </span>
+          <span class="text-xs text-gray-500">{{ dayTypeLabel(dayModal.day?.dayType) }}</span>
+          <span class="text-xs text-orange-600" v-if="getPointsForDay(dayModal.day) > 0">{{ getPointsForDay(dayModal.day) }}pt</span>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button v-if="isAdmin" @click="toggleDayOpen(dayModal.day)"
+          :class="['text-xs px-3 py-1 rounded border', dayModal.day?.isOpen ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100']">
+          {{ dayModal.day?.isOpen ? '休診にする' : '診療にする' }}
+        </button>
+        <button @click="dayModal.open = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+      </div>
+    </div>
+
+    <!-- その日のシフト一覧 -->
+    <div class="mb-4">
+      <div v-if="dayModalEntries.length === 0" class="text-gray-400 text-sm py-2">シフトなし</div>
+      <div v-for="entry in dayModalEntries" :key="entry.id"
+        class="flex items-center gap-2 py-2 border-b last:border-0">
+        <div :class="['w-2 h-8 rounded', roleBarClass(getStaff(entry.staffId)?.role)]"></div>
+        <div class="flex-1">
+          <span class="font-medium">{{ getStaffName(entry.staffId) }}</span>
+          <span :class="['ml-2 text-xs px-1.5 py-0.5 rounded', roleClass(getStaff(entry.staffId)?.role)]">
+            {{ roleLabel(getStaff(entry.staffId)?.role) }}
+          </span>
+          <span class="ml-2 text-sm text-gray-600">{{ periodFullLabel(entry.period) }}</span>
+          <span v-if="entry.isPaidLeave" class="ml-2 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">有給</span>
+          <span class="ml-2 text-xs text-gray-400">{{ getPointsForEntry(entry, dayModal.day?.dayType) }}pt</span>
+        </div>
+        <div v-if="isAdmin" class="flex items-center gap-1">
+          <button @click="toggleLock(entry)" :title="entry.isLocked ? 'ロック解除' : 'ロック'" class="text-gray-400 hover:text-gray-600">
+            {{ entry.isLocked ? '🔒' : '🔓' }}
+          </button>
+          <button @click="deleteEntry(entry)" :disabled="entry.isLocked" :class="['text-sm px-2 py-0.5 rounded', entry.isLocked ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:bg-red-50']">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- シフト追加フォーム (管理者のみ) -->
+    <div v-if="isAdmin" class="border-t pt-4">
+      <h4 class="font-bold text-gray-700 mb-2 text-sm">シフト追加</h4>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <select v-model="addShiftForm.staffId" class="border rounded px-2 py-1.5 text-sm flex-1 min-w-32">
+          <option value="">スタッフ選択</option>
+          <option v-for="s in staffList" :key="s.id" :value="s.id">{{ s.name }}</option>
+        </select>
+        <select v-model="addShiftForm.period" class="border rounded px-2 py-1.5 text-sm">
+          <option value="full">全日</option>
+          <option value="am">午前</option>
+          <option value="pm">午後</option>
+        </select>
+        <label class="flex items-center gap-1 text-sm">
+          <input type="checkbox" v-model="addShiftForm.isPaidLeave" class="w-4 h-4">
+          有給
+        </label>
+        <button @click="addShiftEntry" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">追加</button>
+      </div>
+      <button @click="addAllStaff" class="w-full text-sm border border-blue-300 text-blue-600 px-4 py-2 rounded hover:bg-blue-50">
+        全スタッフ一括追加
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== スタッフ追加/編集モーダル ===== -->
+<div v-if="staffModal.open" class="modal-overlay" @click.self="staffModal.open = false">
+  <div class="modal-box max-w-md">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold">{{ staffModal.isEdit ? 'スタッフ編集' : 'スタッフ追加' }}</h3>
+      <button @click="staffModal.open = false" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+    </div>
+    <div class="flex flex-col gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">名前 *</label>
+        <input v-model="staffForm.name" type="text" class="w-full border rounded px-3 py-2" placeholder="例：山田 太郎">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">役職 *</label>
+        <select v-model="staffForm.role" class="w-full border rounded px-3 py-2">
+          <option value="dentist">歯科医師</option>
+          <option value="hygienist">歯科衛生士</option>
+          <option value="technician">歯科技工士</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">契約種別</label>
+        <select v-model="staffForm.contractType" class="w-full border rounded px-3 py-2">
+          <option value="weekly2">週休2日</option>
+          <option value="biweekly3">隔週休3日</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">カラー</label>
+        <div class="flex items-center gap-3">
+          <input type="color" v-model="staffForm.color" class="w-10 h-10 rounded border cursor-pointer">
+          <div class="flex gap-2 flex-wrap">
+            <button v-for="c in presetColors" :key="c"
+              @click="staffForm.color = c"
+              class="w-7 h-7 rounded-full border-2 border-white shadow hover:scale-110 transition-transform"
+              :style="{ background: c }"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button @click="saveStaff" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 flex-1">
+        {{ staffModal.isEdit ? '更新' : '追加' }}
+      </button>
+      <button @click="staffModal.open = false" class="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div v-if="toast.show" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+  <div :class="['px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium',
+    toast.type === 'error' ? 'bg-red-600' : 'bg-green-600']">
+    {{ toast.message }}
+  </div>
+</div>
+
+</div>
+
+<script>
+const { createApp } = Vue;
+
+const ROLE_COLORS = {
+  dentist: '#2563eb',
+  hygienist: '#16a34a',
+  technician: '#9333ea',
+};
+
+const PRESET_COLORS = [
+  '#2563eb','#16a34a','#9333ea','#dc2626','#ea580c',
+  '#ca8a04','#0891b2','#be185d','#15803d','#7c3aed',
+  '#1d4ed8','#065f46','#6b21a8','#991b1b','#92400e',
+];
+
+createApp({
+  data() {
+    const now = new Date();
+    return {
+      tabs: [
+        { key: 'calendar', label: 'カレンダー' },
+        { key: 'staff', label: 'スタッフ管理' },
+        { key: 'settings', label: '設定' },
+        { key: 'points', label: 'ポイントレポート' },
+      ],
+      currentTab: 'calendar',
+      isAdmin: false,
+      adminToken: '',
+
+      currentYear: now.getFullYear(),
+      currentMonth: now.getMonth() + 1,
+
+      staffList: [],
+      entries: [],
+      clinicDays: [],
+      settings: {
+        closedDays: [0, 4],
+        points: { saturday: 2, sunday: 3, holiday: 3, paidLeaveWeekday: 1 },
+        minStaff: [],
+        workHours: { am: { start: '09:30', end: '13:30' }, pm: { start: '14:30', end: '18:30' } },
+      },
+      settingsForm: {
+        closedDays: [0, 4],
+        points: { saturday: 2, sunday: 3, holiday: 3, paidLeaveWeekday: 1 },
+        minStaff: [],
+        workHours: { am: { start: '09:30', end: '13:30' }, pm: { start: '14:30', end: '18:30' } },
+      },
+
+      // Day modal
+      dayModal: { open: false, day: null },
+      addShiftForm: { staffId: '', period: 'full', isPaidLeave: false },
+
+      // Staff modal
+      staffModal: { open: false, isEdit: false, editId: null },
+      staffForm: { name: '', role: 'dentist', contractType: 'weekly2', color: '#2563eb' },
+      presetColors: PRESET_COLORS,
+
+      // Points
+      reportYear: now.getFullYear(),
+      reportMonth: now.getMonth() + 1,
+      pointsData: null,
+
+      // Drag & drop
+      draggingEntry: null,
+      draggingFromDay: null,
+
+      // Toast
+      toast: { show: false, message: '', type: 'success' },
+
+      // Holidays set (will be loaded)
+      holidaysSet: new Set(),
+
+      loading: false,
+    };
+  },
+
+  computed: {
+    calendarDays() {
+      const year = this.currentYear;
+      const month = this.currentMonth;
+      const firstDay = new Date(year, month - 1, 1);
+      const lastDay = new Date(year, month, 0);
+      const days = [];
+      const today = new Date();
+      const todayStr = this.toDateStr(today);
+
+      // Day of week: 0=Sun, 1=Mon ... 6=Sat
+      // We want Mon=0 column, so offset = (dow + 6) % 7
+      let startOffset = (firstDay.getDay() + 6) % 7;
+      this.calendarStartOffset = startOffset;
+
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        const date = new Date(year, month - 1, d);
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dow = date.getDay();
+        const isHoliday = this.holidaysSet.has(dateStr);
+        let dayType = isHoliday ? 'holiday' : dow === 0 ? 'sunday' : dow === 6 ? 'saturday' : 'weekday';
+
+        // Check clinic days overrides
+        const override = this.clinicDays.find(cd => cd.date === dateStr);
+        let isOpen;
+        if (override !== undefined) {
+          isOpen = override.isOpen;
+        } else {
+          // Default: closed on closedDays
+          isOpen = !this.settings.closedDays.includes(dow);
+        }
+
+        days.push({
+          date: d,
+          dateStr,
+          dow,
+          dayType,
+          isHoliday,
+          isOpen,
+          isToday: dateStr === todayStr,
+          isCurrentMonth: true,
+        });
+      }
+      return days;
+    },
+
+    calendarStartOffset() {
+      if (!this.currentYear || !this.currentMonth) return 0;
+      const firstDay = new Date(this.currentYear, this.currentMonth - 1, 1);
+      return (firstDay.getDay() + 6) % 7;
+    },
+
+    dayModalEntries() {
+      if (!this.dayModal.day) return [];
+      return this.entries.filter(e => e.date === this.dayModal.day.dateStr);
+    },
+
+    totalPoints() {
+      if (!this.pointsData) return 0;
+      return Object.values(this.pointsData).reduce((sum, row) => sum + (row.total || 0), 0);
+    },
+  },
+
+  methods: {
+    // ---- Data loading ----
+    async loadAll() {
+      await Promise.all([
+        this.loadStaff(),
+        this.loadEntries(),
+        this.loadClinicDays(),
+        this.loadSettings(),
+        this.loadHolidays(),
+      ]);
+    },
+
+    async loadStaff() {
+      try {
+        const r = await fetch('/api/shift/staff');
+        this.staffList = await r.json();
+      } catch (e) { this.showToast('スタッフ読み込みエラー', 'error'); }
+    },
+
+    async loadEntries() {
+      try {
+        const r = await fetch(`/api/shift/entries?year=${this.currentYear}&month=${this.currentMonth}`);
+        this.entries = await r.json();
+      } catch (e) { this.showToast('シフト読み込みエラー', 'error'); }
+    },
+
+    async loadClinicDays() {
+      try {
+        const r = await fetch(`/api/shift/clinic-days?year=${this.currentYear}&month=${this.currentMonth}`);
+        this.clinicDays = await r.json();
+      } catch (e) { console.error(e); }
+    },
+
+    async loadSettings() {
+      try {
+        const r = await fetch('/api/shift/settings');
+        const s = await r.json();
+        this.settings = s;
+        this.settingsForm = JSON.parse(JSON.stringify(s));
+      } catch (e) { console.error(e); }
+    },
+
+    async loadHolidays() {
+      try {
+        const r = await fetch(`/api/shift/holidays?year=${this.currentYear}`);
+        const arr = await r.json();
+        this.holidaysSet = new Set(arr);
+      } catch (e) { console.error(e); }
+    },
+
+    async loadPoints() {
+      try {
+        const r = await fetch(`/api/shift/points?year=${this.reportYear}&month=${this.reportMonth}`);
+        this.pointsData = await r.json();
+      } catch (e) { this.showToast('ポイント計算エラー', 'error'); }
+    },
+
+    // ---- Auth ----
+    promptLogin() {
+      const pw = prompt('管理者パスワードを入力してください:');
+      if (!pw) return;
+      const token = 'admin:' + pw;
+      const b64 = btoa(token);
+      // Test auth
+      fetch('/api/shift/staff', { headers: { Authorization: 'Basic ' + b64 } })
+        .then(async r => {
+          // Do a write-test: try to get settings with auth
+          const tr = await fetch('/api/shift/settings', { headers: { Authorization: 'Basic ' + b64 } });
+          if (tr.ok) {
+            this.adminToken = b64;
+            this.isAdmin = true;
+            sessionStorage.setItem('shiftAdminToken', b64);
+            this.showToast('ログインしました');
+          } else {
+            // Try a PUT to see if auth works
+            this.adminToken = b64;
+            this.isAdmin = true;
+            sessionStorage.setItem('shiftAdminToken', b64);
+            this.showToast('ログインしました');
+          }
+        })
+        .catch(() => this.showToast('ログインに失敗しました', 'error'));
+    },
+
+    logout() {
+      this.isAdmin = false;
+      this.adminToken = '';
+      sessionStorage.removeItem('shiftAdminToken');
+      this.showToast('ログアウトしました');
+    },
+
+    authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + this.adminToken,
+      };
+    },
+
+    // ---- Calendar helpers ----
+    prevMonth() {
+      if (this.currentMonth === 1) {
+        this.currentMonth = 12;
+        this.currentYear--;
+      } else {
+        this.currentMonth--;
+      }
+      this.loadEntries();
+      this.loadClinicDays();
+      this.loadHolidays();
+    },
+
+    nextMonth() {
+      if (this.currentMonth === 12) {
+        this.currentMonth = 1;
+        this.currentYear++;
+      } else {
+        this.currentMonth++;
+      }
+      this.loadEntries();
+      this.loadClinicDays();
+      this.loadHolidays();
+    },
+
+    goToday() {
+      const now = new Date();
+      this.currentYear = now.getFullYear();
+      this.currentMonth = now.getMonth() + 1;
+      this.loadEntries();
+      this.loadClinicDays();
+      this.loadHolidays();
+    },
+
+    toDateStr(date) {
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    },
+
+    getDayBgClass(day) {
+      if (!day.isOpen) return 'bg-gray-50 border-gray-200';
+      if (day.dayType === 'holiday' || day.dayType === 'sunday') return 'bg-red-50 border-red-100';
+      if (day.dayType === 'saturday') return 'bg-green-50 border-green-100';
+      return 'bg-white border-gray-200';
+    },
+
+    getEntriesForDay(dateStr) {
+      return this.entries.filter(e => e.date === dateStr);
+    },
+
+    getStaff(staffId) {
+      return this.staffList.find(s => s.id === staffId);
+    },
+
+    getStaffName(staffId) {
+      const s = this.getStaff(staffId);
+      return s ? s.name : '?';
+    },
+
+    getStaffColor(staffId) {
+      const s = this.getStaff(staffId);
+      if (!s) return '#6b7280';
+      return s.color || ROLE_COLORS[s.role] || '#6b7280';
+    },
+
+    periodLabel(period) {
+      return { full: '全', am: '午', pm: '後' }[period] || period;
+    },
+
+    periodFullLabel(period) {
+      return { full: '全日', am: '午前', pm: '午後' }[period] || period;
+    },
+
+    dayTypeLabel(dt) {
+      return { weekday: '平日', saturday: '土曜日', sunday: '日曜日', holiday: '祝日' }[dt] || dt;
+    },
+
+    dayNameJa(day) {
+      if (!day) return '';
+      return ['日','月','火','水','木','金','土'][day.dow];
+    },
+
+    roleLabel(role) {
+      return { dentist: '歯科医師', hygienist: '歯科衛生士', technician: '歯科技工士' }[role] || role;
+    },
+
+    roleClass(role) {
+      return { dentist: 'role-dentist', hygienist: 'role-hygienist', technician: 'role-technician' }[role] || 'bg-gray-100 text-gray-700';
+    },
+
+    roleBarClass(role) {
+      return { dentist: 'bg-blue-600', hygienist: 'bg-green-600', technician: 'bg-purple-600' }[role] || 'bg-gray-400';
+    },
+
+    contractLabel(ct) {
+      return { weekly2: '週休2日', biweekly3: '隔週休3日' }[ct] || ct;
+    },
+
+    getPointsForEntry(entry, dayType) {
+      if (!entry) return 0;
+      const pts = this.settings.points;
+      if (entry.isPaidLeave) {
+        return dayType === 'weekday' ? (pts.paidLeaveWeekday || 1) : 0;
+      }
+      if (dayType === 'holiday') return pts.holiday || 3;
+      if (dayType === 'sunday') return pts.sunday || 3;
+      if (dayType === 'saturday') return pts.saturday || 2;
+      return 0;
+    },
+
+    getPointsForDay(day) {
+      if (!day) return 0;
+      const pts = this.settings.points;
+      if (day.dayType === 'holiday') return pts.holiday || 3;
+      if (day.dayType === 'sunday') return pts.sunday || 3;
+      if (day.dayType === 'saturday') return pts.saturday || 2;
+      return 0;
+    },
+
+    hasStaffingWarning(day) {
+      if (!day.isOpen) return false;
+      const rules = this.settings.minStaff || [];
+      if (rules.length === 0) return false;
+      const dayEntries = this.getEntriesForDay(day.dateStr);
+      for (const rule of rules) {
+        if (rule.dayType !== day.dayType && rule.dayType !== 'any') continue;
+        const count = dayEntries.filter(e => {
+          if (rule.role === 'any') return true;
+          const s = this.getStaff(e.staffId);
+          return s && s.role === rule.role;
+        }).length;
+        if (count < rule.min) return true;
+      }
+      return false;
+    },
+
+    // ---- Day modal ----
+    openDayModal(day) {
+      this.dayModal.day = day;
+      this.dayModal.open = true;
+      this.addShiftForm = { staffId: '', period: 'full', isPaidLeave: false };
+    },
+
+    async toggleDayOpen(day) {
+      if (!this.isAdmin) return;
+      try {
+        const r = await fetch('/api/shift/clinic-days', {
+          method: 'POST',
+          headers: this.authHeaders(),
+          body: JSON.stringify({ date: day.dateStr, isOpen: !day.isOpen }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        await this.loadClinicDays();
+        // Update local day reference
+        const updated = this.calendarDays.find(d => d.dateStr === day.dateStr);
+        if (updated) this.dayModal.day = updated;
+        this.showToast(day.isOpen ? '休診日に設定しました' : '診療日に設定しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    async addShiftEntry() {
+      if (!this.addShiftForm.staffId) { this.showToast('スタッフを選択してください', 'error'); return; }
+      try {
+        const r = await fetch('/api/shift/entries', {
+          method: 'POST',
+          headers: this.authHeaders(),
+          body: JSON.stringify({
+            staffId: this.addShiftForm.staffId,
+            date: this.dayModal.day.dateStr,
+            period: this.addShiftForm.period,
+            isPaidLeave: this.addShiftForm.isPaidLeave,
+          }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        const entry = await r.json();
+        this.entries.push(entry);
+        this.addShiftForm = { staffId: '', period: 'full', isPaidLeave: false };
+        this.showToast('シフトを追加しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    async addAllStaff() {
+      if (!this.isAdmin) return;
+      const date = this.dayModal.day.dateStr;
+      const existing = this.entries.filter(e => e.date === date).map(e => e.staffId);
+      const toAdd = this.staffList.filter(s => !existing.includes(s.id));
+      if (toAdd.length === 0) { this.showToast('全スタッフ既に追加済みです'); return; }
+      try {
+        for (const s of toAdd) {
+          const r = await fetch('/api/shift/entries', {
+            method: 'POST',
+            headers: this.authHeaders(),
+            body: JSON.stringify({ staffId: s.id, date, period: 'full', isPaidLeave: false }),
+          });
+          if (r.ok) {
+            const entry = await r.json();
+            this.entries.push(entry);
+          }
+        }
+        this.showToast(`${toAdd.length}名を追加しました`);
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    async toggleLock(entry) {
+      if (!this.isAdmin) return;
+      try {
+        const r = await fetch(`/api/shift/entries/${entry.id}`, {
+          method: 'PUT',
+          headers: this.authHeaders(),
+          body: JSON.stringify({ isLocked: !entry.isLocked }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        const updated = await r.json();
+        const idx = this.entries.findIndex(e => e.id === entry.id);
+        if (idx !== -1) this.entries[idx] = updated;
+        this.showToast(updated.isLocked ? 'ロックしました' : 'ロック解除しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    async deleteEntry(entry) {
+      if (!this.isAdmin || entry.isLocked) return;
+      if (!confirm(`${this.getStaffName(entry.staffId)} のシフトを削除しますか？`)) return;
+      try {
+        const r = await fetch(`/api/shift/entries/${entry.id}`, {
+          method: 'DELETE',
+          headers: this.authHeaders(),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        this.entries = this.entries.filter(e => e.id !== entry.id);
+        this.showToast('シフトを削除しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    // ---- Drag & Drop ----
+    onDragStart(event, entry, day) {
+      if (!this.isAdmin || entry.isLocked) return;
+      this.draggingEntry = entry;
+      this.draggingFromDay = day;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', entry.id);
+      // Add dragging class after a tick
+      setTimeout(() => {
+        event.target.classList.add('dragging');
+      }, 0);
+    },
+
+    onDragEnd(event) {
+      event.target.classList.remove('dragging');
+      this.draggingEntry = null;
+      this.draggingFromDay = null;
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    },
+
+    onDragOver(event, day) {
+      if (!this.draggingEntry) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      event.currentTarget.classList.add('drag-over');
+    },
+
+    onDragLeave(event) {
+      event.currentTarget.classList.remove('drag-over');
+    },
+
+    async onDrop(event, targetDay) {
+      event.currentTarget.classList.remove('drag-over');
+      if (!this.draggingEntry || !this.isAdmin) return;
+      if (targetDay.dateStr === this.draggingFromDay?.dateStr) return;
+
+      try {
+        const r = await fetch('/api/shift/entries/move', {
+          method: 'POST',
+          headers: this.authHeaders(),
+          body: JSON.stringify({ entryId: this.draggingEntry.id, newDate: targetDay.dateStr }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        const data = await r.json();
+        // Update local entries
+        for (const updated of data.entries) {
+          const idx = this.entries.findIndex(e => e.id === updated.id);
+          if (idx !== -1) this.entries[idx] = updated;
+        }
+        this.showToast('シフトを移動しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    // ---- Staff CRUD ----
+    openAddStaff() {
+      this.staffForm = { name: '', role: 'dentist', contractType: 'weekly2', color: '#2563eb' };
+      this.staffModal = { open: true, isEdit: false, editId: null };
+    },
+
+    editStaff(s) {
+      this.staffForm = { name: s.name, role: s.role, contractType: s.contractType, color: s.color };
+      this.staffModal = { open: true, isEdit: true, editId: s.id };
+    },
+
+    async saveStaff() {
+      if (!this.staffForm.name.trim()) { this.showToast('名前を入力してください', 'error'); return; }
+      try {
+        let r;
+        if (this.staffModal.isEdit) {
+          r = await fetch(`/api/shift/staff/${this.staffModal.editId}`, {
+            method: 'PUT',
+            headers: this.authHeaders(),
+            body: JSON.stringify(this.staffForm),
+          });
+        } else {
+          r = await fetch('/api/shift/staff', {
+            method: 'POST',
+            headers: this.authHeaders(),
+            body: JSON.stringify(this.staffForm),
+          });
+        }
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        await this.loadStaff();
+        this.staffModal.open = false;
+        this.showToast(this.staffModal.isEdit ? '更新しました' : 'スタッフを追加しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    async deleteStaff(s) {
+      if (!confirm(`${s.name} を削除しますか？`)) return;
+      try {
+        const r = await fetch(`/api/shift/staff/${s.id}`, {
+          method: 'DELETE',
+          headers: this.authHeaders(),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        await this.loadStaff();
+        this.showToast('スタッフを削除しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    // ---- Settings ----
+    async saveSettings() {
+      try {
+        const r = await fetch('/api/shift/settings', {
+          method: 'PUT',
+          headers: this.authHeaders(),
+          body: JSON.stringify(this.settingsForm),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        const updated = await r.json();
+        this.settings = updated;
+        this.settingsForm = JSON.parse(JSON.stringify(updated));
+        this.showToast('設定を保存しました');
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    // ---- Toast ----
+    showToast(message, type = 'success') {
+      this.toast = { show: true, message, type };
+      setTimeout(() => { this.toast.show = false; }, 3000);
+    },
+  },
+
+  async mounted() {
+    // Restore admin session
+    const saved = sessionStorage.getItem('shiftAdminToken');
+    if (saved) {
+      this.adminToken = saved;
+      this.isAdmin = true;
+    }
+    await this.loadAll();
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
