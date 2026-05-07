@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const axios = require('axios');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 
@@ -14,8 +14,7 @@ const STRANSA_WEBHOOK_URL = process.env.STRANSA_WEBHOOK_URL;
 const QUESTIONNAIRE_URL = process.env.QUESTIONNAIRE_URL;
 const TEST_MODE = process.env.TEST_MODE === 'true';
 const MAIL_TO = process.env.MAIL_TO;
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const PRINTNODE_API_KEY = process.env.PRINTNODE_API_KEY;
 const PRINTNODE_PRINTER_ID = process.env.PRINTNODE_PRINTER_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
@@ -345,10 +344,7 @@ function scheduleText(d) {
 }
 
 async function sendFormEmail(d) {
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
-  });
+  const resend = new Resend(RESEND_API_KEY);
 
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
   const isChild = d.type === 'child';
@@ -443,8 +439,8 @@ ${scheduleText(d)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━`.trim();
   }
 
-  await transporter.sendMail({
-    from: `"のびのび歯科 問診表" <${GMAIL_USER}>`,
+  await resend.emails.send({
+    from: 'のびのび歯科 問診表 <onboarding@resend.dev>',
     to: MAIL_TO,
     subject: `【問診表・${typeLabel}】${d.name} 様（${now}）`,
     text,
@@ -560,7 +556,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`サーバー起動: port=${PORT}`);
   console.log(`テストモード: ${TEST_MODE}`);
-  console.log(`メール送信先: ${MAIL_TO || '未設定'}`);
+  console.log(`メール送信先: ${MAIL_TO || '未設定'}`)
+  console.log(`Resend APIキー: ${RESEND_API_KEY ? '設定済み' : '未設定'}`);
   console.log(`印刷先プリンターID: ${PRINTNODE_PRINTER_ID || '未設定'}`);
   console.log(`PrintNode APIキー: ${PRINTNODE_API_KEY ? PRINTNODE_API_KEY.slice(0,6) + '...' : '未設定'}`);
 });
