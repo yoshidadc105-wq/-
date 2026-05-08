@@ -57,6 +57,7 @@
     <button @click="nextMonth" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 text-lg">›</button>
     <button @click="goToday" class="px-3 py-1 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 hover:bg-blue-100">今月</button>
     <button @click="loadAll" class="px-3 py-1 bg-gray-100 border rounded text-sm text-gray-600 hover:bg-gray-200">更新</button>
+    <button v-if="isAdmin" @click="showAutoGenModal=true" class="px-3 py-1 bg-green-600 text-white border rounded text-sm hover:bg-green-700">✨ 自動生成</button>
   </div>
 
   <!-- 曜日ヘッダー -->
@@ -424,6 +425,34 @@
   </div>
 </div>
 
+<!-- 自動生成モーダル -->
+<div v-if="showAutoGenModal" class="modal-overlay" @click.self="showAutoGenModal=false">
+  <div class="modal-box max-w-md">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold">✨ シフト自動生成</h3>
+      <button @click="showAutoGenModal=false" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+    </div>
+    <div class="text-sm text-gray-600 space-y-2 mb-5">
+      <p><strong>{{ currentYear }}年{{ currentMonth }}月</strong> のシフトを自動生成します。</p>
+      <ul class="list-disc list-inside space-y-1 text-gray-500">
+        <li>全スタッフを開院日に割り当てます</li>
+        <li>週休2日の方：毎日出勤（休診日は自動スキップ）</li>
+        <li>隔週休3日の方：1週おきに1日の追加休みを付与</li>
+        <li>休みの曜日が偏らないよう自動でローテーション</li>
+        <li>🔒 ロック済みのシフトは保持されます</li>
+      </ul>
+      <p class="text-orange-600 font-medium">⚠️ この月の既存シフト（ロック以外）は上書きされます。</p>
+    </div>
+    <div class="flex gap-3">
+      <button @click="autoGenerate" :disabled="autoGenerating"
+        class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium">
+        {{ autoGenerating ? '生成中...' : '生成する' }}
+      </button>
+      <button @click="showAutoGenModal=false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">キャンセル</button>
+    </div>
+  </div>
+</div>
+
 <!-- トースト通知 -->
 <div v-if="toast.show" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
   <div :class="['px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium',
@@ -495,6 +524,10 @@ createApp({
       reportYear: now.getFullYear(),
       reportMonth: now.getMonth() + 1,
       pointsData: null,
+
+      // Auto generate
+      showAutoGenModal: false,
+      autoGenerating: false,
 
       // Drag & drop
       draggingEntry: null,
@@ -1017,6 +1050,31 @@ createApp({
         this.showToast('スタッフを削除しました');
       } catch (e) {
         this.showToast(e.message || 'エラーが発生しました', 'error');
+      }
+    },
+
+    // ---- Auto generate ----
+    async autoGenerate() {
+      this.autoGenerating = true;
+      try {
+        const r = await fetch('/api/shift/auto-generate', {
+          method: 'POST',
+          headers: this.authHeaders(),
+          body: JSON.stringify({ year: this.currentYear, month: this.currentMonth }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
+        const data = await r.json();
+        this.showAutoGenModal = false;
+        await this.loadEntries();
+        if (data.warnings && data.warnings.length > 0) {
+          this.showToast(`生成完了（${data.generated}件）。最低人数不足の日があります`, 'error');
+        } else {
+          this.showToast(`${data.generated}件のシフトを生成しました`);
+        }
+      } catch (e) {
+        this.showToast(e.message || 'エラーが発生しました', 'error');
+      } finally {
+        this.autoGenerating = false;
       }
     },
 

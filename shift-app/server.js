@@ -215,6 +215,171 @@ app.put('/api/shift/settings', requireAdmin, (req, res) => {
   res.json(updated);
 });
 
+// ---- Auto-generate shifts ----
+app.post('/api/shift/auto-generate', requireAdmin, (req, res) => {
+  const { year, month } = req.body;
+  if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
+
+  const yr = parseInt(year);
+  const mo = parseInt(month);
+  const prefix = `${yr}-${String(mo).padStart(2, '0')}`;
+
+  const staff = load(STAFF_FILE, []);
+  const settings = loadSettings();
+  let allEntries = load(ENTRIES_FILE, []);
+  const clinicDaysOverrides = load(CLINIC_DAYS_FILE, []);
+
+  // ロックされたシフト以外を削除
+  allEntries = allEntries.filter(e => !e.date?.startsWith(prefix) || e.isLocked);
+
+  // ロック済みの日付（上書き不可）
+  const lockedKeys = new Set(
+    allEntries.filter(e => e.date?.startsWith(prefix) && e.isLocked)
+      .map(e => `${e.staffId}:${e.date}`)
+  );
+
+  // この月の開院日を取得
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const openDays = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(yr, mo - 1, d).getDay();
+    const override = clinicDaysOverrides.find(cd => cd.date === dateStr);
+    const isOpen = override !== undefined ? override.isOpen : !settings.closedDays.includes(dow);
+    if (isOpen) {
+      const firstDow = new Date(yr, mo - 1, 1).getDay();
+      const weekNum = Math.floor((d - 1 + ((firstDow + 6) % 7)) / 7);
+      openDays.push({ dateStr, dow, weekNum });
+    }
+  }
+
+  // 週ごとにグループ化
+  const weekGroups = {};
+  openDays.forEach(day => {
+    if (!weekGroups[day.weekNum]) weekGroups[day.weekNum] = [];
+    weekGroups[day.weekNum].push(day);
+  });
+  const weeks = Object.keys(weekGroups).map(Number).sort();
+
+  // スタッフIDからroleへのmap
+  const staffMap = {};
+  staff.forEach(s => { staffMap[s.id] = s; });
+
+  // 最低人数チェック用：日付→スタッフリスト（生成中に更新）
+  const dayAssignments = {};
+  openDays.forEach(d => { dayAssignments[d.dateStr] = []; });
+
+  // まず全スタッフを全開院日に割り当て（仮）
+  staff.forEach(s => {
+    openDays.forEach(day => {
+      if (!lockedKeys.has(`${s.id}:${day.dateStr}`)) {
+        dayAssignments[day.dateStr].push(s.id);
+      }
+    });
+  });
+
+  // 隔週休3日スタッフの休みを決定
+  const daysOffMap = {}; // staffId → Set of dateStr
+  staff.forEach((s, staffIdx) => {
+    daysOffMap[s.id] = new Set();
+    if (s.contractType !== 'biweekly3') return;
+
+    // 休み週はスタッフごとにずらす（staffIdxの偶奇で交互）
+    const offWeekStart = staffIdx % 2;
+    weeks.forEach((w, wi) => {
+      if (wi % 2 !== offWeekStart) return;
+
+      const weekDays = weekGroups[w] || [];
+      // 候補日：土曜以外を優先、曜日ローテーション（staffIdx + wi でずらす）
+      const candidates = [...weekDays]
+        .filter(day => !lockedKeys.has(`${s.id}:${day.dateStr}`))
+        .sort((a, b) => {
+          // 土曜は最後に
+          if (a.dow === 6 && b.dow !== 6) return 1;
+          if (b.dow === 6 && a.dow !== 6) return -1;
+          return 0;
+        });
+
+      if (candidates.length === 0) return;
+
+      // (staffIdx + wi) で曜日をローテーション
+      const rotated = [
+        ...candidates.slice((staffIdx + wi) % candidates.length),
+        ...candidates.slice(0, (staffIdx + wi) % candidates.length),
+      ];
+
+      // 最低人数を守れる日を探す
+      for (const day of rotated) {
+        const dt = getDayType(day.dateStr);
+        const rules = settings.minStaff || [];
+        let canRemove = true;
+
+        for (const rule of rules) {
+          if (rule.dayType !== dt && rule.dayType !== 'any') continue;
+          const assigned = dayAssignments[day.dateStr] || [];
+          const currentCount = assigned.filter(sid => {
+            const sm = staffMap[sid];
+            return sm && (rule.role === 'any' || sm.role === rule.role);
+          }).length;
+          const willReduce = rule.role === 'any' || (staffMap[s.id]?.role === rule.role);
+          if (willReduce && currentCount - 1 < rule.min) {
+            canRemove = false;
+            break;
+          }
+        }
+
+        if (canRemove) {
+          daysOffMap[s.id].add(day.dateStr);
+          // 割り当てから除去
+          dayAssignments[day.dateStr] = (dayAssignments[day.dateStr] || []).filter(id => id !== s.id);
+          break;
+        }
+      }
+    });
+  });
+
+  // エントリーを生成
+  const newEntries = [];
+  staff.forEach(s => {
+    openDays.forEach(day => {
+      if (daysOffMap[s.id]?.has(day.dateStr)) return;
+      if (lockedKeys.has(`${s.id}:${day.dateStr}`)) return;
+      newEntries.push({
+        id: crypto.randomUUID(),
+        staffId: s.id,
+        date: day.dateStr,
+        period: 'full',
+        isPaidLeave: false,
+        isLocked: false,
+        note: '自動生成',
+        createdAt: new Date().toISOString(),
+      });
+    });
+  });
+
+  // 最低人数の警告チェック
+  const warnings = [];
+  openDays.forEach(day => {
+    const dt = getDayType(day.dateStr);
+    const assigned = dayAssignments[day.dateStr] || [];
+    (settings.minStaff || []).forEach(rule => {
+      if (rule.dayType !== dt && rule.dayType !== 'any') return;
+      const count = assigned.filter(sid => {
+        const sm = staffMap[sid];
+        return sm && (rule.role === 'any' || sm.role === rule.role);
+      }).length;
+      if (count < rule.min) {
+        warnings.push(`${day.dateStr}：${rule.role} が ${rule.min}名必要ですが${count}名です`);
+      }
+    });
+  });
+
+  allEntries = [...allEntries, ...newEntries];
+  save(ENTRIES_FILE, allEntries);
+
+  res.json({ ok: true, generated: newEntries.length, warnings });
+});
+
 // ---- Holidays ----
 app.get('/api/shift/holidays', (req, res) => {
   const { year } = req.query;
