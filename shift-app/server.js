@@ -15,6 +15,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+pool.on('error', (err) => {
+  console.error('Pool error:', err.message);
 });
 
 async function initDB() {
@@ -28,21 +35,37 @@ async function initDB() {
 }
 
 async function dbLoad(key, defaultVal) {
-  try {
-    const r = await pool.query('SELECT value FROM app_data WHERE key=$1', [key]);
-    return r.rows.length > 0 ? r.rows[0].value : defaultVal;
-  } catch (e) {
-    console.error('DB load error:', e.message);
-    return defaultVal;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await pool.query('SELECT value FROM app_data WHERE key=$1', [key]);
+      const result = r.rows.length > 0 ? r.rows[0].value : defaultVal;
+      if (attempt > 1) console.log(`DB load OK on attempt ${attempt} (${key})`);
+      return result;
+    } catch (e) {
+      console.error(`DB load error attempt ${attempt} (${key}):`, e.message);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
   }
+  console.error(`DB load failed after 3 attempts (${key}), returning default`);
+  return defaultVal;
 }
 
 async function dbSave(key, data) {
-  await pool.query(
-    `INSERT INTO app_data(key,value,updated_at) VALUES($1,$2::jsonb,NOW())
-     ON CONFLICT(key) DO UPDATE SET value=$2::jsonb, updated_at=NOW()`,
-    [key, JSON.stringify(data)]
-  );
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await pool.query(
+        `INSERT INTO app_data(key,value,updated_at) VALUES($1,$2::jsonb,NOW())
+         ON CONFLICT(key) DO UPDATE SET value=$2::jsonb, updated_at=NOW()`,
+        [key, JSON.stringify(data)]
+      );
+      if (attempt > 1) console.log(`DB save OK on attempt ${attempt} (${key})`);
+      return;
+    } catch (e) {
+      console.error(`DB save error attempt ${attempt} (${key}):`, e.message);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+      else throw new Error(`DB save failed (${key}): ${e.message}`);
+    }
+  }
 }
 
 // ---- Japanese national holidays ----
@@ -100,140 +123,209 @@ function requireAdmin(req, res, next) {
 
 // ---- Staff ----
 app.get('/api/shift/staff', async (req, res) => {
-  res.json(await dbLoad('staff', []));
+  try {
+    const staff = await dbLoad('staff', []);
+    console.log(`GET /api/shift/staff → ${staff.length}件`);
+    res.json(staff);
+  } catch (e) {
+    console.error('GET staff error:', e.message);
+    res.status(500).json({ error: 'データ取得に失敗しました' });
+  }
 });
 
 app.post('/api/shift/staff', requireAdmin, async (req, res) => {
-  const { name, role, contractType, color } = req.body;
-  if (!name || !role) return res.status(400).json({ error: '名前と役職は必須です' });
-  const staff = await dbLoad('staff', []);
-  const member = { id: crypto.randomUUID(), name, role, contractType: contractType || 'weekly2', color: color || '#2563eb', createdAt: new Date().toISOString() };
-  staff.push(member);
-  await dbSave('staff', staff);
-  res.status(201).json(member);
+  try {
+    const { name, role, contractType, color } = req.body;
+    if (!name || !role) return res.status(400).json({ error: '名前と役職は必須です' });
+    const staff = await dbLoad('staff', []);
+    const member = { id: crypto.randomUUID(), name, role, contractType: contractType || 'weekly2', color: color || '#2563eb', createdAt: new Date().toISOString() };
+    staff.push(member);
+    await dbSave('staff', staff);
+    console.log(`スタッフ追加: ${name} (合計${staff.length}件)`);
+    res.status(201).json(member);
+  } catch (e) {
+    console.error('POST staff error:', e.message);
+    res.status(500).json({ error: 'スタッフ保存に失敗しました: ' + e.message });
+  }
 });
 
 app.put('/api/shift/staff/:id', requireAdmin, async (req, res) => {
-  const staff = await dbLoad('staff', []);
-  const idx = staff.findIndex(s => s.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'スタッフが見つかりません' });
-  const { name, role, contractType, color } = req.body;
-  if (name !== undefined) staff[idx].name = name;
-  if (role !== undefined) staff[idx].role = role;
-  if (contractType !== undefined) staff[idx].contractType = contractType;
-  if (color !== undefined) staff[idx].color = color;
-  await dbSave('staff', staff);
-  res.json(staff[idx]);
+  try {
+    const staff = await dbLoad('staff', []);
+    const idx = staff.findIndex(s => s.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'スタッフが見つかりません' });
+    const { name, role, contractType, color } = req.body;
+    if (name !== undefined) staff[idx].name = name;
+    if (role !== undefined) staff[idx].role = role;
+    if (contractType !== undefined) staff[idx].contractType = contractType;
+    if (color !== undefined) staff[idx].color = color;
+    await dbSave('staff', staff);
+    res.json(staff[idx]);
+  } catch (e) {
+    console.error('PUT staff error:', e.message);
+    res.status(500).json({ error: 'スタッフ更新に失敗しました: ' + e.message });
+  }
 });
 
 app.delete('/api/shift/staff/:id', requireAdmin, async (req, res) => {
-  const staff = await dbLoad('staff', []);
-  const idx = staff.findIndex(s => s.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'スタッフが見つかりません' });
-  staff.splice(idx, 1);
-  await dbSave('staff', staff);
-  res.json({ ok: true });
+  try {
+    const staff = await dbLoad('staff', []);
+    const idx = staff.findIndex(s => s.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'スタッフが見つかりません' });
+    staff.splice(idx, 1);
+    await dbSave('staff', staff);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE staff error:', e.message);
+    res.status(500).json({ error: 'スタッフ削除に失敗しました: ' + e.message });
+  }
 });
 
 // ---- Entries ----
 app.get('/api/shift/entries', async (req, res) => {
-  const { year, month } = req.query;
-  let entries = await dbLoad('entries', []);
-  if (year && month) {
-    const prefix = `${year}-${String(month).padStart(2, '0')}`;
-    entries = entries.filter(e => e.date?.startsWith(prefix));
+  try {
+    const { year, month } = req.query;
+    let entries = await dbLoad('entries', []);
+    if (year && month) {
+      const prefix = `${year}-${String(month).padStart(2, '0')}`;
+      entries = entries.filter(e => e.date?.startsWith(prefix));
+    }
+    res.json(entries);
+  } catch (e) {
+    console.error('GET entries error:', e.message);
+    res.status(500).json({ error: 'データ取得に失敗しました' });
   }
-  res.json(entries);
 });
 
 app.post('/api/shift/entries', requireAdmin, async (req, res) => {
-  const { staffId, date, period, isPaidLeave, isLocked, note } = req.body;
-  if (!staffId || !date || !period) return res.status(400).json({ error: 'staffId, date, periodは必須です' });
-  const entries = await dbLoad('entries', []);
-  const entry = { id: crypto.randomUUID(), staffId, date, period, isPaidLeave: !!isPaidLeave, isLocked: !!isLocked, note: note || '', createdAt: new Date().toISOString() };
-  entries.push(entry);
-  await dbSave('entries', entries);
-  res.status(201).json(entry);
+  try {
+    const { staffId, date, period, isPaidLeave, isLocked, note } = req.body;
+    if (!staffId || !date || !period) return res.status(400).json({ error: 'staffId, date, periodは必須です' });
+    const entries = await dbLoad('entries', []);
+    const entry = { id: crypto.randomUUID(), staffId, date, period, isPaidLeave: !!isPaidLeave, isLocked: !!isLocked, note: note || '', createdAt: new Date().toISOString() };
+    entries.push(entry);
+    await dbSave('entries', entries);
+    res.status(201).json(entry);
+  } catch (e) {
+    console.error('POST entries error:', e.message);
+    res.status(500).json({ error: 'シフト保存に失敗しました: ' + e.message });
+  }
 });
 
 app.put('/api/shift/entries/:id', requireAdmin, async (req, res) => {
-  const entries = await dbLoad('entries', []);
-  const idx = entries.findIndex(e => e.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'エントリーが見つかりません' });
-  ['staffId','date','period','isPaidLeave','isLocked','note'].forEach(f => {
-    if (req.body[f] !== undefined) entries[idx][f] = req.body[f];
-  });
-  await dbSave('entries', entries);
-  res.json(entries[idx]);
+  try {
+    const entries = await dbLoad('entries', []);
+    const idx = entries.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'エントリーが見つかりません' });
+    ['staffId','date','period','isPaidLeave','isLocked','note'].forEach(f => {
+      if (req.body[f] !== undefined) entries[idx][f] = req.body[f];
+    });
+    await dbSave('entries', entries);
+    res.json(entries[idx]);
+  } catch (e) {
+    console.error('PUT entries error:', e.message);
+    res.status(500).json({ error: 'シフト更新に失敗しました: ' + e.message });
+  }
 });
 
 app.delete('/api/shift/entries/:id', requireAdmin, async (req, res) => {
-  const entries = await dbLoad('entries', []);
-  const idx = entries.findIndex(e => e.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'エントリーが見つかりません' });
-  if (entries[idx].isLocked) return res.status(403).json({ error: 'ロックされたシフトは削除できません' });
-  entries.splice(idx, 1);
-  await dbSave('entries', entries);
-  res.json({ ok: true });
+  try {
+    const entries = await dbLoad('entries', []);
+    const idx = entries.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'エントリーが見つかりません' });
+    if (entries[idx].isLocked) return res.status(403).json({ error: 'ロックされたシフトは削除できません' });
+    entries.splice(idx, 1);
+    await dbSave('entries', entries);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE entries error:', e.message);
+    res.status(500).json({ error: 'シフト削除に失敗しました: ' + e.message });
+  }
 });
 
 app.post('/api/shift/entries/move', requireAdmin, async (req, res) => {
-  const { entryId, newDate } = req.body;
-  if (!entryId || !newDate) return res.status(400).json({ error: 'entryIdとnewDateは必須です' });
-  const entries = await dbLoad('entries', []);
-  const idx = entries.findIndex(e => e.id === entryId);
-  if (idx === -1) return res.status(404).json({ error: 'エントリーが見つかりません' });
-  if (entries[idx].isLocked) return res.status(403).json({ error: 'ロックされたシフトは移動できません' });
-  const moving = entries[idx];
-  const conflictIdx = entries.findIndex(e => e.id !== entryId && e.staffId === moving.staffId && e.date === newDate);
-  const oldDate = moving.date;
-  entries[idx].date = newDate;
-  if (conflictIdx !== -1) entries[conflictIdx].date = oldDate;
-  await dbSave('entries', entries);
-  const result = [entries[idx]];
-  if (conflictIdx !== -1) result.push(entries[conflictIdx]);
-  res.json({ ok: true, entries: result });
+  try {
+    const { entryId, newDate } = req.body;
+    if (!entryId || !newDate) return res.status(400).json({ error: 'entryIdとnewDateは必須です' });
+    const entries = await dbLoad('entries', []);
+    const idx = entries.findIndex(e => e.id === entryId);
+    if (idx === -1) return res.status(404).json({ error: 'エントリーが見つかりません' });
+    if (entries[idx].isLocked) return res.status(403).json({ error: 'ロックされたシフトは移動できません' });
+    const moving = entries[idx];
+    const conflictIdx = entries.findIndex(e => e.id !== entryId && e.staffId === moving.staffId && e.date === newDate);
+    const oldDate = moving.date;
+    entries[idx].date = newDate;
+    if (conflictIdx !== -1) entries[conflictIdx].date = oldDate;
+    await dbSave('entries', entries);
+    const result = [entries[idx]];
+    if (conflictIdx !== -1) result.push(entries[conflictIdx]);
+    res.json({ ok: true, entries: result });
+  } catch (e) {
+    console.error('POST entries/move error:', e.message);
+    res.status(500).json({ error: 'シフト移動に失敗しました: ' + e.message });
+  }
 });
 
 // ---- Clinic days ----
 app.get('/api/shift/clinic-days', async (req, res) => {
-  const { year, month } = req.query;
-  let days = await dbLoad('clinic_days', []);
-  if (year && month) {
-    const prefix = `${year}-${String(month).padStart(2, '0')}`;
-    days = days.filter(d => d.date?.startsWith(prefix));
+  try {
+    const { year, month } = req.query;
+    let days = await dbLoad('clinic_days', []);
+    if (year && month) {
+      const prefix = `${year}-${String(month).padStart(2, '0')}`;
+      days = days.filter(d => d.date?.startsWith(prefix));
+    }
+    res.json(days);
+  } catch (e) {
+    console.error('GET clinic-days error:', e.message);
+    res.status(500).json({ error: 'データ取得に失敗しました' });
   }
-  res.json(days);
 });
 
 app.post('/api/shift/clinic-days', requireAdmin, async (req, res) => {
-  const { date, isOpen, note } = req.body;
-  if (!date || isOpen === undefined) return res.status(400).json({ error: 'dateとisOpenは必須です' });
-  const days = await dbLoad('clinic_days', []);
-  const idx = days.findIndex(d => d.date === date);
-  const record = { date, isOpen: !!isOpen, note: note || '', updatedAt: new Date().toISOString() };
-  if (idx !== -1) days[idx] = record; else days.push(record);
-  await dbSave('clinic_days', days);
-  res.json(record);
+  try {
+    const { date, isOpen, note } = req.body;
+    if (!date || isOpen === undefined) return res.status(400).json({ error: 'dateとisOpenは必須です' });
+    const days = await dbLoad('clinic_days', []);
+    const idx = days.findIndex(d => d.date === date);
+    const record = { date, isOpen: !!isOpen, note: note || '', updatedAt: new Date().toISOString() };
+    if (idx !== -1) days[idx] = record; else days.push(record);
+    await dbSave('clinic_days', days);
+    res.json(record);
+  } catch (e) {
+    console.error('POST clinic-days error:', e.message);
+    res.status(500).json({ error: '診療日保存に失敗しました: ' + e.message });
+  }
 });
 
 // ---- Settings ----
 app.get('/api/shift/settings', async (req, res) => {
-  res.json(await loadSettings());
+  try {
+    res.json(await loadSettings());
+  } catch (e) {
+    console.error('GET settings error:', e.message);
+    res.status(500).json({ error: '設定取得に失敗しました' });
+  }
 });
 
 app.put('/api/shift/settings', requireAdmin, async (req, res) => {
-  const current = await loadSettings();
-  const updated = {
-    ...current, ...req.body,
-    points: { ...current.points, ...(req.body.points || {}) },
-    workHours: {
-      am: { ...current.workHours.am, ...(req.body.workHours?.am || {}) },
-      pm: { ...current.workHours.pm, ...(req.body.workHours?.pm || {}) },
-    },
-  };
-  await dbSave('settings', updated);
-  res.json(updated);
+  try {
+    const current = await loadSettings();
+    const updated = {
+      ...current, ...req.body,
+      points: { ...current.points, ...(req.body.points || {}) },
+      workHours: {
+        am: { ...current.workHours.am, ...(req.body.workHours?.am || {}) },
+        pm: { ...current.workHours.pm, ...(req.body.workHours?.pm || {}) },
+      },
+    };
+    await dbSave('settings', updated);
+    console.log('設定保存:', JSON.stringify(updated.closedDays));
+    res.json(updated);
+  } catch (e) {
+    console.error('PUT settings error:', e.message);
+    res.status(500).json({ error: '設定保存に失敗しました: ' + e.message });
+  }
 });
 
 // ---- Holidays ----
@@ -244,185 +336,241 @@ app.get('/api/shift/holidays', (req, res) => {
 
 // ---- Points ----
 app.get('/api/shift/points', async (req, res) => {
-  const { year, month } = req.query;
-  if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
-  const prefix = `${year}-${String(month).padStart(2, '0')}`;
-  const [allEntries, staff, settings] = await Promise.all([
-    dbLoad('entries', []),
-    dbLoad('staff', []),
-    loadSettings(),
-  ]);
-  const entries = allEntries.filter(e => e.date?.startsWith(prefix));
-  const pts = settings.points;
-  const result = {};
-  staff.forEach(s => {
-    result[s.id] = { name: s.name, role: s.role, contractType: s.contractType, details: [], total: 0, weekdayCount: 0, saturdayCount: 0, sundayCount: 0, holidayCount: 0, paidLeaveBonus: 0 };
-  });
-  entries.forEach(entry => {
-    const row = result[entry.staffId];
-    if (!row) return;
-    const dt = getDayType(entry.date);
-    let p = 0, reason = '';
-    if (entry.isPaidLeave) {
-      if (dt === 'weekday') { p = pts.paidLeaveWeekday || 1; reason = '平日有給 +1pt'; }
-      else reason = '有給休暇';
-    } else {
-      if (dt === 'saturday') { p = pts.saturday || 2; reason = '土曜出勤'; row.saturdayCount++; }
-      else if (dt === 'sunday') { p = pts.sunday || 3; reason = '日曜出勤'; row.sundayCount++; }
-      else if (dt === 'holiday') { p = pts.holiday || 3; reason = '祝日出勤'; row.holidayCount++; }
-      else { reason = '平日出勤'; row.weekdayCount++; }
-    }
-    row.details.push({ date: entry.date, period: entry.period, dayType: dt, pts: p, reason, isPaidLeave: entry.isPaidLeave });
-    row.total += p;
-    if (entry.isPaidLeave && dt === 'weekday') row.paidLeaveBonus += p;
-  });
-  res.json(result);
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    const [allEntries, staff, settings] = await Promise.all([
+      dbLoad('entries', []),
+      dbLoad('staff', []),
+      loadSettings(),
+    ]);
+    const entries = allEntries.filter(e => e.date?.startsWith(prefix));
+    const pts = settings.points;
+    const result = {};
+    staff.forEach(s => {
+      result[s.id] = { name: s.name, role: s.role, contractType: s.contractType, details: [], total: 0, weekdayCount: 0, saturdayCount: 0, sundayCount: 0, holidayCount: 0, paidLeaveBonus: 0 };
+    });
+    entries.forEach(entry => {
+      const row = result[entry.staffId];
+      if (!row) return;
+      const dt = getDayType(entry.date);
+      let p = 0, reason = '';
+      if (entry.isPaidLeave) {
+        if (dt === 'weekday') { p = pts.paidLeaveWeekday || 1; reason = '平日有給 +1pt'; }
+        else reason = '有給休暇';
+      } else {
+        if (dt === 'saturday') { p = pts.saturday || 2; reason = '土曜出勤'; row.saturdayCount++; }
+        else if (dt === 'sunday') { p = pts.sunday || 3; reason = '日曜出勤'; row.sundayCount++; }
+        else if (dt === 'holiday') { p = pts.holiday || 3; reason = '祝日出勤'; row.holidayCount++; }
+        else { reason = '平日出勤'; row.weekdayCount++; }
+      }
+      row.details.push({ date: entry.date, period: entry.period, dayType: dt, pts: p, reason, isPaidLeave: entry.isPaidLeave });
+      row.total += p;
+      if (entry.isPaidLeave && dt === 'weekday') row.paidLeaveBonus += p;
+    });
+    res.json(result);
+  } catch (e) {
+    console.error('GET points error:', e.message);
+    res.status(500).json({ error: 'ポイント取得に失敗しました' });
+  }
 });
 
 // ---- Auto-generate shifts ----
 app.post('/api/shift/auto-generate', requireAdmin, async (req, res) => {
-  const { year, month } = req.body;
-  if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
-  const yr = parseInt(year);
-  const mo = parseInt(month);
-  const prefix = `${yr}-${String(mo).padStart(2, '0')}`;
+  try {
+    const { year, month } = req.body;
+    if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
+    const yr = parseInt(year);
+    const mo = parseInt(month);
+    const prefix = `${yr}-${String(mo).padStart(2, '0')}`;
 
-  const [staff, settings, allEntries, clinicDaysOverrides] = await Promise.all([
-    dbLoad('staff', []),
-    loadSettings(),
-    dbLoad('entries', []),
-    dbLoad('clinic_days', []),
-  ]);
+    const [staff, settings, allEntries, clinicDaysOverrides] = await Promise.all([
+      dbLoad('staff', []),
+      loadSettings(),
+      dbLoad('entries', []),
+      dbLoad('clinic_days', []),
+    ]);
 
-  // ロック済み以外の今月分を削除
-  let entries = allEntries.filter(e => !e.date?.startsWith(prefix) || e.isLocked);
-  const lockedKeys = new Set(
-    entries.filter(e => e.date?.startsWith(prefix) && e.isLocked).map(e => `${e.staffId}:${e.date}`)
-  );
+    console.log(`自動生成開始: ${prefix}, スタッフ${staff.length}人, 休診日: [${settings.closedDays}]`);
 
-  // 全日付を取得（開院・休診両方）
-  const daysInMonth = new Date(yr, mo, 0).getDate();
-  const allDays = [];
-  const firstDow = new Date(yr, mo - 1, 1).getDay();
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dow = new Date(yr, mo - 1, d).getDay();
-    const override = clinicDaysOverrides.find(cd => cd.date === dateStr);
-    const isOpen = override !== undefined ? override.isOpen : !settings.closedDays.includes(dow);
-    const weekNum = Math.floor((d - 1 + ((firstDow + 6) % 7)) / 7);
-    allDays.push({ dateStr, dow, weekNum, isOpen });
-  }
+    if (staff.length === 0) {
+      return res.status(400).json({ error: 'スタッフが登録されていません。先にスタッフを登録してください。' });
+    }
 
-  // 週ごとにグループ化（全日付）
-  const weekGroups = {};
-  allDays.forEach(day => {
-    if (!weekGroups[day.weekNum]) weekGroups[day.weekNum] = [];
-    weekGroups[day.weekNum].push(day);
-  });
-  const weeks = Object.keys(weekGroups).map(Number).sort();
+    // ロック済み以外の今月分を削除
+    let entries = allEntries.filter(e => !e.date?.startsWith(prefix) || e.isLocked);
+    const lockedKeys = new Set(
+      entries.filter(e => e.date?.startsWith(prefix) && e.isLocked).map(e => `${e.staffId}:${e.date}`)
+    );
 
-  const staffMap = {};
-  staff.forEach(s => { staffMap[s.id] = s; });
+    // 全日付を取得
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const allDays = [];
+    const firstDow = new Date(yr, mo - 1, 1).getDay();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(yr, mo - 1, d).getDay();
+      const override = clinicDaysOverrides.find(cd => cd.date === dateStr);
+      const isOpen = override !== undefined ? override.isOpen : !settings.closedDays.includes(dow);
+      const weekNum = Math.floor((d - 1 + ((firstDow + 6) % 7)) / 7);
+      allDays.push({ dateStr, dow, weekNum, isOpen });
+    }
 
-  // 開院日ごとの出勤者リスト（最低人数チェック用）
-  const dayAssignments = {};
-  allDays.filter(d => d.isOpen).forEach(d => {
-    dayAssignments[d.dateStr] = staff.map(s => s.id).filter(id => !lockedKeys.has(`${id}:${d.dateStr}`));
-  });
+    const openDays = allDays.filter(d => d.isOpen);
+    console.log(`開院日数: ${openDays.length}日`);
 
-  // スタッフごとの休み日を決定
-  const daysOffMap = {};
-  staff.forEach((s, staffIdx) => {
-    daysOffMap[s.id] = new Set();
-
-    weeks.forEach((w, wi) => {
-      const weekDays = weekGroups[w];
-      const closedCount = weekDays.filter(d => !d.isOpen).length;
-      const openDaysInWeek = weekDays.filter(d => d.isOpen);
-
-      // 契約に基づく必要休日数
-      let contractDaysOff;
-      if (s.contractType === 'weekly2') {
-        contractDaysOff = 2;
-      } else {
-        // 隔週休3日：スタッフごとにずらして交互に2日・3日
-        contractDaysOff = wi % 2 === staffIdx % 2 ? 3 : 2;
-      }
-
-      // 休診日が既に満たしている分を差し引く
-      const extraDaysOff = Math.max(0, contractDaysOff - closedCount);
-      if (extraDaysOff === 0) return;
-
-      // 候補：土曜以外を優先、(staffIdx×3 + wi×2)でローテーション
-      const candidates = [...openDaysInWeek]
-        .filter(day => !lockedKeys.has(`${s.id}:${day.dateStr}`))
-        .sort((a, b) => (a.dow === 6 ? 1 : 0) - (b.dow === 6 ? 1 : 0));
-
-      if (candidates.length === 0) return;
-      const offset = (staffIdx * 3 + wi * 2) % candidates.length;
-      const rotated = [...candidates.slice(offset), ...candidates.slice(0, offset)];
-
-      let assigned = 0;
-      for (const day of rotated) {
-        if (assigned >= extraDaysOff) break;
-        // 最低人数チェック
-        const dt = getDayType(day.dateStr);
-        let canRemove = true;
-        for (const rule of (settings.minStaff || [])) {
-          if (rule.dayType !== dt && rule.dayType !== 'any') continue;
-          const currentCount = (dayAssignments[day.dateStr] || []).filter(sid => {
-            const sm = staffMap[sid];
-            return sm && (rule.role === 'any' || sm.role === rule.role);
-          }).length;
-          const willReduce = rule.role === 'any' || staffMap[s.id]?.role === rule.role;
-          if (willReduce && currentCount - 1 < rule.min) { canRemove = false; break; }
-        }
-        if (canRemove) {
-          daysOffMap[s.id].add(day.dateStr);
-          dayAssignments[day.dateStr] = (dayAssignments[day.dateStr] || []).filter(id => id !== s.id);
-          assigned++;
-        }
-      }
+    // 週ごとにグループ化（全日付）
+    const weekGroups = {};
+    allDays.forEach(day => {
+      if (!weekGroups[day.weekNum]) weekGroups[day.weekNum] = [];
+      weekGroups[day.weekNum].push(day);
     });
-  });
+    const weeks = Object.keys(weekGroups).map(Number).sort();
 
-  // エントリーを生成
-  const newEntries = [];
-  staff.forEach(s => {
-    allDays.filter(d => d.isOpen).forEach(day => {
-      if (daysOffMap[s.id]?.has(day.dateStr)) return;
-      if (lockedKeys.has(`${s.id}:${day.dateStr}`)) return;
-      newEntries.push({
-        id: crypto.randomUUID(),
-        staffId: s.id,
-        date: day.dateStr,
-        period: 'full',
-        isPaidLeave: false,
-        isLocked: false,
-        note: '自動生成',
-        createdAt: new Date().toISOString(),
+    const staffMap = {};
+    staff.forEach(s => { staffMap[s.id] = s; });
+
+    // 開院日ごとの出勤者リスト（最低人数チェック用）
+    const dayAssignments = {};
+    openDays.forEach(d => {
+      dayAssignments[d.dateStr] = staff.map(s => s.id).filter(id => !lockedKeys.has(`${id}:${d.dateStr}`));
+    });
+
+    // スタッフごとの休み日を決定
+    const daysOffMap = {};
+    staff.forEach((s, staffIdx) => {
+      daysOffMap[s.id] = new Set();
+      let totalDaysOff = 0;
+
+      weeks.forEach((w, wi) => {
+        const weekDays = weekGroups[w];
+        const closedCount = weekDays.filter(d => !d.isOpen).length;
+        const openDaysInWeek = weekDays.filter(d => d.isOpen);
+
+        if (openDaysInWeek.length === 0) return;
+
+        // 契約に基づく週あたり必要休日数
+        let contractDaysOff;
+        if (s.contractType === 'weekly2') {
+          contractDaysOff = 2;
+        } else {
+          // 隔週休3日：スタッフごとにずらして交互
+          contractDaysOff = (wi + staffIdx) % 2 === 0 ? 3 : 2;
+        }
+
+        // 休診日が既に満たしている分を差し引く
+        const extraDaysOff = Math.max(0, contractDaysOff - closedCount);
+
+        console.log(`  ${s.name} 週${wi}(${openDaysInWeek.length}開院日, 休診${closedCount}日): 契約${contractDaysOff}日→追加休み${extraDaysOff}日`);
+
+        if (extraDaysOff === 0) return;
+
+        // 候補：土曜以外を優先してローテーション
+        const candidates = [...openDaysInWeek]
+          .filter(day => !lockedKeys.has(`${s.id}:${day.dateStr}`))
+          .sort((a, b) => (a.dow === 6 ? 1 : 0) - (b.dow === 6 ? 1 : 0));
+
+        if (candidates.length <= extraDaysOff) {
+          // 候補数が必要休日数以下なら全部休みにはできないので縮小
+          // (最低1日は出勤する)
+          const maxOff = Math.max(0, candidates.length - 1);
+          if (maxOff === 0) return;
+        }
+
+        const maxAssign = Math.min(extraDaysOff, Math.max(0, candidates.length - 1));
+        if (maxAssign === 0) return;
+
+        const offset = (staffIdx * 3 + wi * 2) % candidates.length;
+        const rotated = [...candidates.slice(offset), ...candidates.slice(0, offset)];
+
+        let assigned = 0;
+        for (const day of rotated) {
+          if (assigned >= maxAssign) break;
+          let canRemove = true;
+          for (const rule of (settings.minStaff || [])) {
+            if (rule.dayType !== getDayType(day.dateStr) && rule.dayType !== 'any') continue;
+            const currentCount = (dayAssignments[day.dateStr] || []).filter(sid => {
+              const sm = staffMap[sid];
+              return sm && (rule.role === 'any' || sm.role === rule.role);
+            }).length;
+            const willReduce = rule.role === 'any' || staffMap[s.id]?.role === rule.role;
+            if (willReduce && currentCount - 1 < rule.min) { canRemove = false; break; }
+          }
+          if (canRemove) {
+            daysOffMap[s.id].add(day.dateStr);
+            dayAssignments[day.dateStr] = (dayAssignments[day.dateStr] || []).filter(id => id !== s.id);
+            assigned++;
+            totalDaysOff++;
+          }
+        }
+      });
+
+      console.log(`  ${s.name}: 休み${totalDaysOff}日割り当て`);
+    });
+
+    // エントリーを生成
+    const newEntries = [];
+    staff.forEach(s => {
+      openDays.forEach(day => {
+        if (daysOffMap[s.id]?.has(day.dateStr)) return;
+        if (lockedKeys.has(`${s.id}:${day.dateStr}`)) return;
+        newEntries.push({
+          id: crypto.randomUUID(),
+          staffId: s.id,
+          date: day.dateStr,
+          period: 'full',
+          isPaidLeave: false,
+          isLocked: false,
+          note: '自動生成',
+          createdAt: new Date().toISOString(),
+        });
       });
     });
-  });
 
-  // 最低人数の警告
-  const warnings = [];
-  allDays.filter(d => d.isOpen).forEach(day => {
-    const dt = getDayType(day.dateStr);
-    const assigned = dayAssignments[day.dateStr] || [];
-    (settings.minStaff || []).forEach(rule => {
-      if (rule.dayType !== dt && rule.dayType !== 'any') return;
-      const count = assigned.filter(sid => {
-        const sm = staffMap[sid];
-        return sm && (rule.role === 'any' || sm.role === rule.role);
-      }).length;
-      if (count < rule.min) warnings.push(`${day.dateStr}：${rule.role} が ${rule.min}名必要ですが${count}名です`);
+    // 最低人数の警告
+    const warnings = [];
+    openDays.forEach(day => {
+      const dt = getDayType(day.dateStr);
+      const assigned = dayAssignments[day.dateStr] || [];
+      (settings.minStaff || []).forEach(rule => {
+        if (rule.dayType !== dt && rule.dayType !== 'any') return;
+        const count = assigned.filter(sid => {
+          const sm = staffMap[sid];
+          return sm && (rule.role === 'any' || sm.role === rule.role);
+        }).length;
+        if (count < rule.min) warnings.push(`${day.dateStr}：${rule.role} が ${rule.min}名必要ですが${count}名です`);
+      });
     });
-  });
 
-  entries = [...entries, ...newEntries];
-  await dbSave('entries', entries);
-  res.json({ ok: true, generated: newEntries.length, warnings });
+    entries = [...entries, ...newEntries];
+    await dbSave('entries', entries);
+    console.log(`自動生成完了: ${newEntries.length}件`);
+    res.json({ ok: true, generated: newEntries.length, warnings });
+  } catch (e) {
+    console.error('POST auto-generate error:', e.message);
+    res.status(500).json({ error: '自動生成に失敗しました: ' + e.message });
+  }
+});
+
+// ---- Debug endpoint ----
+app.get('/api/shift/debug', requireAdmin, async (req, res) => {
+  try {
+    const [staff, settings, entries] = await Promise.all([
+      dbLoad('staff', null),
+      dbLoad('settings', null),
+      dbLoad('entries', null),
+    ]);
+    res.json({
+      staffCount: Array.isArray(staff) ? staff.length : 'load failed',
+      staffRaw: staff,
+      settingsClosedDays: settings?.closedDays ?? 'load failed',
+      entriesCount: Array.isArray(entries) ? entries.length : 'load failed',
+      dbUrl: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:([^@]+)@/, ':***@') : 'not set',
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ---- Health check ----
