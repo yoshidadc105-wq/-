@@ -34,13 +34,13 @@ async function initDB() {
   `);
 }
 
-async function dbLoad(key, defaultVal) {
+// GET用: DB障害時はデフォルト値を返す（表示が空になるだけで安全）
+async function dbLoadSafe(key, defaultVal) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const r = await pool.query('SELECT value FROM app_data WHERE key=$1', [key]);
-      const result = r.rows.length > 0 ? r.rows[0].value : defaultVal;
       if (attempt > 1) console.log(`DB load OK on attempt ${attempt} (${key})`);
-      return result;
+      return r.rows.length > 0 ? r.rows[0].value : defaultVal;
     } catch (e) {
       console.error(`DB load error attempt ${attempt} (${key}):`, e.message);
       if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
@@ -48,6 +48,24 @@ async function dbLoad(key, defaultVal) {
   }
   console.error(`DB load failed after 3 attempts (${key}), returning default`);
   return defaultVal;
+}
+
+// 書き込み用: DB障害時は例外をスロー（空データで上書きするのを防ぐ）
+async function dbLoad(key, defaultVal) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await pool.query('SELECT value FROM app_data WHERE key=$1', [key]);
+      if (attempt > 1) console.log(`DB load OK on attempt ${attempt} (${key})`);
+      return r.rows.length > 0 ? r.rows[0].value : defaultVal;
+    } catch (e) {
+      console.error(`DB load error attempt ${attempt} (${key}):`, e.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      } else {
+        throw new Error(`DBに接続できません。しばらく待ってから再試行してください。(${e.message})`);
+      }
+    }
+  }
 }
 
 async function dbSave(key, data) {
@@ -99,8 +117,9 @@ const DEFAULT_SETTINGS = {
   workHours: { am: { start: '09:30', end: '13:30' }, pm: { start: '14:30', end: '18:30' } },
 };
 
-async function loadSettings() {
-  const s = await dbLoad('settings', {});
+async function loadSettings(safe = false) {
+  const loader = safe ? dbLoadSafe : dbLoad;
+  const s = await loader('settings', {});
   return {
     ...DEFAULT_SETTINGS, ...s,
     points: { ...DEFAULT_SETTINGS.points, ...(s.points || {}) },
@@ -123,14 +142,9 @@ function requireAdmin(req, res, next) {
 
 // ---- Staff ----
 app.get('/api/shift/staff', async (req, res) => {
-  try {
-    const staff = await dbLoad('staff', []);
-    console.log(`GET /api/shift/staff → ${staff.length}件`);
-    res.json(staff);
-  } catch (e) {
-    console.error('GET staff error:', e.message);
-    res.status(500).json({ error: 'データ取得に失敗しました' });
-  }
+  const staff = await dbLoadSafe('staff', []);
+  console.log(`GET /api/shift/staff → ${staff.length}件`);
+  res.json(staff);
 });
 
 app.post('/api/shift/staff', requireAdmin, async (req, res) => {
@@ -183,18 +197,13 @@ app.delete('/api/shift/staff/:id', requireAdmin, async (req, res) => {
 
 // ---- Entries ----
 app.get('/api/shift/entries', async (req, res) => {
-  try {
-    const { year, month } = req.query;
-    let entries = await dbLoad('entries', []);
-    if (year && month) {
-      const prefix = `${year}-${String(month).padStart(2, '0')}`;
-      entries = entries.filter(e => e.date?.startsWith(prefix));
-    }
-    res.json(entries);
-  } catch (e) {
-    console.error('GET entries error:', e.message);
-    res.status(500).json({ error: 'データ取得に失敗しました' });
+  const { year, month } = req.query;
+  let entries = await dbLoadSafe('entries', []);
+  if (year && month) {
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    entries = entries.filter(e => e.date?.startsWith(prefix));
   }
+  res.json(entries);
 });
 
 app.post('/api/shift/entries', requireAdmin, async (req, res) => {
@@ -268,18 +277,13 @@ app.post('/api/shift/entries/move', requireAdmin, async (req, res) => {
 
 // ---- Clinic days ----
 app.get('/api/shift/clinic-days', async (req, res) => {
-  try {
-    const { year, month } = req.query;
-    let days = await dbLoad('clinic_days', []);
-    if (year && month) {
-      const prefix = `${year}-${String(month).padStart(2, '0')}`;
-      days = days.filter(d => d.date?.startsWith(prefix));
-    }
-    res.json(days);
-  } catch (e) {
-    console.error('GET clinic-days error:', e.message);
-    res.status(500).json({ error: 'データ取得に失敗しました' });
+  const { year, month } = req.query;
+  let days = await dbLoadSafe('clinic_days', []);
+  if (year && month) {
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    days = days.filter(d => d.date?.startsWith(prefix));
   }
+  res.json(days);
 });
 
 app.post('/api/shift/clinic-days', requireAdmin, async (req, res) => {
@@ -300,12 +304,7 @@ app.post('/api/shift/clinic-days', requireAdmin, async (req, res) => {
 
 // ---- Settings ----
 app.get('/api/shift/settings', async (req, res) => {
-  try {
-    res.json(await loadSettings());
-  } catch (e) {
-    console.error('GET settings error:', e.message);
-    res.status(500).json({ error: '設定取得に失敗しました' });
-  }
+  res.json(await loadSettings(true)); // safe=true: DB障害時もデフォルト設定を返す
 });
 
 app.put('/api/shift/settings', requireAdmin, async (req, res) => {
@@ -341,9 +340,9 @@ app.get('/api/shift/points', async (req, res) => {
     if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
     const [allEntries, staff, settings] = await Promise.all([
-      dbLoad('entries', []),
-      dbLoad('staff', []),
-      loadSettings(),
+      dbLoadSafe('entries', []),
+      dbLoadSafe('staff', []),
+      loadSettings(true),
     ]);
     const entries = allEntries.filter(e => e.date?.startsWith(prefix));
     const pts = settings.points;
