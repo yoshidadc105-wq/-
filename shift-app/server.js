@@ -1,4 +1,8 @@
 'use strict';
+// Render free tierはIPv6非対応のためIPv4を優先する
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require('express');
 const { Pool } = require('pg');
 const crypto = require('crypto');
