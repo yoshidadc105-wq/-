@@ -252,16 +252,19 @@
 
 <!-- ポイントレポートタブ -->
 <div v-if="currentTab === 'points'" class="p-4">
-  <div class="flex items-center gap-3 mb-4">
+  <div class="flex flex-wrap items-center gap-3 mb-2">
     <h2 class="text-lg font-bold text-gray-800">ポイントレポート</h2>
     <select v-model="reportYear" class="border rounded px-2 py-1 text-sm">
       <option v-for="y in [2024,2025,2026,2027]" :key="y" :value="y">{{ y }}年</option>
     </select>
     <select v-model="reportMonth" class="border rounded px-2 py-1 text-sm">
-      <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
+      <option v-for="m in 12" :key="m" :value="m">{{ m }}月期</option>
     </select>
     <button @click="loadPoints" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">集計</button>
   </div>
+  <p class="text-xs text-gray-500 mb-4">
+    集計期間：{{ reportMonth }}月11日 〜 {{ reportMonth === 12 ? reportYear + 1 : reportYear }}年{{ reportMonth === 12 ? 1 : reportMonth + 1 }}月10日
+  </p>
 
   <div class="bg-white rounded-lg shadow overflow-x-auto">
     <table class="w-full text-sm">
@@ -269,12 +272,12 @@
         <tr class="bg-gray-50 border-b">
           <th class="text-left px-3 py-3 text-gray-600">名前</th>
           <th class="text-left px-3 py-3 text-gray-600">役職</th>
+          <th class="text-center px-3 py-3 font-bold text-gray-800">勤務日数</th>
           <th class="text-center px-3 py-3 text-gray-600">平日</th>
           <th class="text-center px-3 py-3 text-blue-600">土曜</th>
-          <th class="text-center px-3 py-3 text-red-600">日曜</th>
-          <th class="text-center px-3 py-3 text-red-600">祝日</th>
+          <th class="text-center px-3 py-3 text-red-600">日祝</th>
           <th class="text-center px-3 py-3 text-orange-600">有給ボーナス</th>
-          <th class="text-center px-3 py-3 font-bold text-gray-800">合計</th>
+          <th class="text-center px-3 py-3 font-bold text-gray-800">合計pt</th>
         </tr>
       </thead>
       <tbody>
@@ -286,16 +289,15 @@
           <td class="px-3 py-3">
             <span :class="['px-2 py-0.5 rounded text-xs font-bold', roleClass(row.role)]">{{ roleLabel(row.role) }}</span>
           </td>
+          <td class="px-3 py-3 text-center font-bold text-gray-800">{{ row.workingDays }}日</td>
           <td class="px-3 py-3 text-center text-gray-600">{{ row.weekdayCount }}</td>
           <td class="px-3 py-3 text-center text-blue-700">{{ row.saturdayCount }}</td>
-          <td class="px-3 py-3 text-center text-red-600">{{ row.sundayCount }}</td>
-          <td class="px-3 py-3 text-center text-red-600">{{ row.holidayCount }}</td>
+          <td class="px-3 py-3 text-center text-red-600">{{ (row.sundayCount || 0) + (row.holidayCount || 0) }}</td>
           <td class="px-3 py-3 text-center text-orange-600">{{ row.paidLeaveBonus > 0 ? '+' + row.paidLeaveBonus : '-' }}</td>
           <td class="px-3 py-3 text-center font-bold text-lg">{{ row.total }}</td>
         </tr>
-        <!-- 合計行 -->
         <tr v-if="pointsData && Object.keys(pointsData).length > 0" class="bg-gray-100 font-bold">
-          <td class="px-3 py-3" colspan="7" class="text-right">合計ポイント</td>
+          <td class="px-3 py-3 text-right" colspan="7">合計ポイント</td>
           <td class="px-3 py-3 text-center text-lg">{{ totalPoints }}</td>
         </tr>
       </tbody>

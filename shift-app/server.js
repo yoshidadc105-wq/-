@@ -338,21 +338,36 @@ app.get('/api/shift/holidays', (req, res) => {
 });
 
 // ---- Points ----
+// year/monthは締め期間の開始月 (例: 5月 = 5/11〜6/10)
 app.get('/api/shift/points', async (req, res) => {
   try {
     const { year, month } = req.query;
     if (!year || !month) return res.status(400).json({ error: 'yearとmonthは必須です' });
-    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    const yr = parseInt(year);
+    const mo = parseInt(month);
+
+    // 締め期間: M/11 〜 (M+1)/10
+    const startDate = `${yr}-${String(mo).padStart(2, '0')}-11`;
+    const endMo = mo === 12 ? 1 : mo + 1;
+    const endYr = mo === 12 ? yr + 1 : yr;
+    const endDate = `${endYr}-${String(endMo).padStart(2, '0')}-10`;
+
     const [allEntries, staff, settings] = await Promise.all([
       dbLoadSafe('entries', []),
       dbLoadSafe('staff', []),
       loadSettings(true),
     ]);
-    const entries = allEntries.filter(e => e.date?.startsWith(prefix));
+    const entries = allEntries.filter(e => e.date >= startDate && e.date <= endDate);
     const pts = settings.points;
     const result = {};
     staff.forEach(s => {
-      result[s.id] = { name: s.name, role: s.role, contractType: s.contractType, details: [], total: 0, weekdayCount: 0, saturdayCount: 0, sundayCount: 0, holidayCount: 0, paidLeaveBonus: 0 };
+      result[s.id] = {
+        name: s.name, role: s.role, contractType: s.contractType,
+        details: [], total: 0,
+        workingDays: 0,
+        weekdayCount: 0, saturdayCount: 0, sundayCount: 0, holidayCount: 0, paidLeaveBonus: 0,
+        periodStart: startDate, periodEnd: endDate,
+      };
     });
     entries.forEach(entry => {
       const row = result[entry.staffId];
@@ -363,6 +378,7 @@ app.get('/api/shift/points', async (req, res) => {
         if (dt === 'weekday') { p = pts.paidLeaveWeekday || 1; reason = '平日有給 +1pt'; }
         else reason = '有給休暇';
       } else {
+        row.workingDays++;
         if (dt === 'saturday') { p = pts.saturday || 2; reason = '土曜出勤'; row.saturdayCount++; }
         else if (dt === 'sunday') { p = pts.sunday || 3; reason = '日曜出勤'; row.sundayCount++; }
         else if (dt === 'holiday') { p = pts.holiday || 3; reason = '祝日出勤'; row.holidayCount++; }
