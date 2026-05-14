@@ -18,6 +18,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const PRINTNODE_API_KEY = process.env.PRINTNODE_API_KEY;
 const PRINTNODE_PRINTER_ID = process.env.PRINTNODE_PRINTER_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'quiz-admin';
 
 // ---- 簡易DB（JSONファイル）----
 
@@ -578,7 +579,7 @@ function checkApiAuth(req, res) {
   const decoded = Buffer.from(auth.slice(6), 'base64').toString();
   const colonIdx = decoded.indexOf(':');
   const pass = colonIdx >= 0 ? decoded.slice(colonIdx + 1) : '';
-  if (pass !== ADMIN_PASSWORD) {
+  if (pass !== QUIZ_ADMIN_PASSWORD) {
     res.status(401).json({ error: 'wrong password' });
     return false;
   }
