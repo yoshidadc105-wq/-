@@ -51,8 +51,7 @@
 
   <!-- 種別タブ（新規作成時のみ表示） -->
   <div id="typeTabs" class="tabs">
-    <div class="tab active" onclick="switchType('rich_text', this)">📝 テキストで作成</div>
-    <div class="tab" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
+    <div class="tab active" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
     <div class="tab" onclick="switchType('steps', this)">📋 ステップで作成</div>
   </div>
 
@@ -139,7 +138,7 @@
 <script>
 let currentUser = null;
 let editId = null;
-let currentType = 'rich_text';
+let currentType = 'pdf';
 let editManual = null;
 let quill = null;
 
