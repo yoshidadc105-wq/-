@@ -10,11 +10,11 @@ router.post('/login', (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'ユーザー名とパスワードを入力してください' });
+    return res.status(400).json({ error: 'メールアドレスとパスワードを入力してください' });
   }
 
   const db = getDb();
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1').get(username);
+  const user = db.prepare('SELECT * FROM users WHERE (email = ? OR username = ?) AND is_active = 1').get(username, username);
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'ユーザー名またはパスワードが正しくありません' });
@@ -48,10 +48,13 @@ router.post('/logout', (req, res) => {
 
 // 現在のログインユーザー情報取得
 router.get('/me', requireLogin, (req, res) => {
+  const db = getDb();
+  const user = db.prepare('SELECT id, username, display_name, email, role FROM users WHERE id = ?').get(req.session.userId);
   res.json({
     id: req.session.userId,
     username: req.session.username,
     displayName: req.session.displayName,
+    email: user ? user.email : '',
     role: req.session.role
   });
 });

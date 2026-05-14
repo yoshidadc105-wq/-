@@ -67,15 +67,9 @@ async function init() {
   const user = await loadCurrentUser();
   if (!user) return;
   initNavbar(user);
-  const res = await fetch('/api/auth/me');
-  const me = await res.json();
+  const me = await fetch('/api/auth/me').then(r => r.json());
   document.getElementById('displayName').value = me.displayName || '';
-  const profileRes = await fetch('/api/admin/users');
-  if (profileRes.ok) {
-    const users = await profileRes.json();
-    const myUser = users.find(u => u.id === me.id);
-    if (myUser) document.getElementById('email').value = myUser.email || '';
-  }
+  document.getElementById('email').value = me.email || '';
 }
 
 async function updateProfile() {

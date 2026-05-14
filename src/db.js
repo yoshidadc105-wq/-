@@ -56,6 +56,7 @@ function initializeDb() {
     db.exec('ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL');
   } catch (e) { /* すでに存在する場合は無視 */ }
 
+
   // グループテーブル（スタッフの部署・役割グループ）
   db.exec(`
     CREATE TABLE IF NOT EXISTS groups_table (
