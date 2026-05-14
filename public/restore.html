@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>データ復元 - マニュアルシステム</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="/" class="navbar-brand">マニュアルシステム</a>
+</nav>
+<div class="container" style="max-width:600px; margin-top:40px;">
+  <h1 style="font-size:20px; font-weight:700; margin-bottom:24px;">データ復元</h1>
+
+  <div class="card mb-3">
+    <div class="card-header"><span class="card-title">① データベース復元</span></div>
+    <div class="card-body">
+      <p class="text-sm text-muted mb-2">ローカルの <code>manual_system.db</code> ファイルをアップロード</p>
+      <input type="file" id="dbFile" accept=".db" class="form-control mb-2">
+      <button onclick="uploadDb()" class="btn btn-primary">アップロード</button>
+      <div id="dbResult" class="mt-2"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">② PDFファイル復元</span></div>
+    <div class="card-body">
+      <p class="text-sm text-muted mb-2">ローカルの <code>uploads</code> フォルダをZIP圧縮してアップロード</p>
+      <input type="file" id="uploadsFile" accept=".zip" class="form-control mb-2">
+      <button onclick="uploadUploads()" class="btn btn-primary">アップロード</button>
+      <div id="uploadsResult" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function uploadDb() {
+  const file = document.getElementById('dbFile').files[0];
+  if (!file) { alert('ファイルを選択してください'); return; }
+  const form = new FormData();
+  form.append('db', file);
+  const res = document.getElementById('dbResult');
+  res.textContent = 'アップロード中...';
+  try {
+    const r = await fetch('/api/restore/db', { method: 'POST', body: form });
+    const d = await r.json();
+    res.textContent = d.message || d.error;
+    res.style.color = r.ok ? 'var(--success)' : 'var(--danger)';
+  } catch(e) { res.textContent = 'エラーが発生しました'; res.style.color = 'var(--danger)'; }
+}
+
+async function uploadUploads() {
+  const file = document.getElementById('uploadsFile').files[0];
+  if (!file) { alert('ファイルを選択してください'); return; }
+  const form = new FormData();
+  form.append('uploads', file);
+  const res = document.getElementById('uploadsResult');
+  res.textContent = 'アップロード中（大きいファイルは時間がかかります）...';
+  try {
+    const r = await fetch('/api/restore/uploads', { method: 'POST', body: form });
+    const d = await r.json();
+    res.textContent = d.message || d.error;
+    res.style.color = r.ok ? 'var(--success)' : 'var(--danger)';
+  } catch(e) { res.textContent = 'エラーが発生しました'; res.style.color = 'var(--danger)'; }
+}
+</script>
+</body>
+</html>

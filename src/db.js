@@ -336,4 +336,10 @@ function initializeDb() {
   console.log('データベースを初期化しました');
 }
 
-module.exports = { getDb, initializeDb };
+function resetDb() {
+  if (db) { try { db.close(); } catch(e) {} db = null; }
+}
+
+function getDataDir() { return DATA_DIR; }
+
+module.exports = { getDb, initializeDb, resetDb, getDataDir };
