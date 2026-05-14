@@ -549,6 +549,174 @@ async function printQuestionnaire(d) {
   }
 }
 
+// ===== クイズシステム =====
+
+const QUIZ_FILE = path.join(__dirname, 'data', 'quizzes.json');
+const QUIZ_SUBS_FILE = path.join(__dirname, 'data', 'quiz-subs.json');
+
+function loadQuizzes() {
+  try { return JSON.parse(fs.readFileSync(QUIZ_FILE, 'utf8')); } catch { return []; }
+}
+function saveQuizzes(d) {
+  fs.mkdirSync(path.dirname(QUIZ_FILE), { recursive: true });
+  fs.writeFileSync(QUIZ_FILE, JSON.stringify(d, null, 2));
+}
+function loadQuizSubs() {
+  try { return JSON.parse(fs.readFileSync(QUIZ_SUBS_FILE, 'utf8')); } catch { return []; }
+}
+function saveQuizSubs(d) {
+  fs.mkdirSync(path.dirname(QUIZ_SUBS_FILE), { recursive: true });
+  fs.writeFileSync(QUIZ_SUBS_FILE, JSON.stringify(d, null, 2));
+}
+
+function checkApiAuth(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.status(401).json({ error: 'unauthorized' });
+    return false;
+  }
+  const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+  const colonIdx = decoded.indexOf(':');
+  const pass = colonIdx >= 0 ? decoded.slice(colonIdx + 1) : '';
+  if (pass !== ADMIN_PASSWORD) {
+    res.status(401).json({ error: 'wrong password' });
+    return false;
+  }
+  return true;
+}
+
+// スタッフ向け: 問題一覧（答えなし）
+app.get('/api/quizzes', (req, res) => {
+  const list = loadQuizzes().map(({ id, type, title, question, options, explanation, createdAt }) => ({
+    id, type, title, question, options, explanation, createdAt,
+  }));
+  res.json(list);
+});
+
+// 管理者向け: 問題一覧（答えあり）
+app.get('/api/quizzes/admin', (req, res) => {
+  if (!checkApiAuth(req, res)) return;
+  res.json(loadQuizzes());
+});
+
+// 管理者向け: 問題作成
+app.post('/api/quizzes', (req, res) => {
+  if (!checkApiAuth(req, res)) return;
+  const { type, title, question, options, answer, explanation } = req.body;
+  if (!type || !title || !question) return res.status(400).json({ error: '必須項目が不足しています' });
+  const quiz = {
+    id: crypto.randomUUID(),
+    type,
+    title: title.trim(),
+    question: question.trim(),
+    options: Array.isArray(options) ? options : [],
+    answer: answer ?? '',
+    explanation: (explanation || '').trim(),
+    createdAt: new Date().toISOString(),
+  };
+  const all = loadQuizzes();
+  all.unshift(quiz);
+  saveQuizzes(all);
+  res.json(quiz);
+});
+
+// 管理者向け: 問題更新
+app.put('/api/quizzes/:id', (req, res) => {
+  if (!checkApiAuth(req, res)) return;
+  const all = loadQuizzes();
+  const i = all.findIndex(q => q.id === req.params.id);
+  if (i < 0) return res.status(404).json({ error: '見つかりません' });
+  const { type, title, question, options, answer, explanation } = req.body;
+  all[i] = {
+    ...all[i], type,
+    title: title.trim(), question: question.trim(),
+    options: Array.isArray(options) ? options : [],
+    answer: answer ?? '',
+    explanation: (explanation || '').trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  saveQuizzes(all);
+  res.json(all[i]);
+});
+
+// 管理者向け: 問題削除
+app.delete('/api/quizzes/:id', (req, res) => {
+  if (!checkApiAuth(req, res)) return;
+  saveQuizzes(loadQuizzes().filter(q => q.id !== req.params.id));
+  res.json({ ok: true });
+});
+
+// スタッフ向け: 回答送信
+app.post('/api/quizzes/:id/submit', (req, res) => {
+  const quiz = loadQuizzes().find(q => q.id === req.params.id);
+  if (!quiz) return res.status(404).json({ error: '問題が見つかりません' });
+
+  const { staffName, userAnswer } = req.body;
+  if (!staffName) return res.status(400).json({ error: 'スタッフ名が必要です' });
+
+  let isCorrect = null;
+
+  if (quiz.type === 'fill') {
+    const correct = Array.isArray(quiz.answer) ? quiz.answer : [quiz.answer];
+    const user = Array.isArray(userAnswer) ? userAnswer : [userAnswer];
+    isCorrect = correct.length === user.length &&
+      correct.every((a, i) => a.trim().toLowerCase() === (user[i] || '').trim().toLowerCase());
+  } else if (quiz.type === 'sort') {
+    const correct = Array.isArray(quiz.options) ? quiz.options : [];
+    const user = Array.isArray(userAnswer) ? userAnswer : [];
+    isCorrect = correct.length === user.length && correct.every((a, i) => a === user[i]);
+  } else if (quiz.type === 'choice') {
+    isCorrect = String(quiz.answer).trim() === String(userAnswer).trim();
+  } else if (quiz.type === 'truefalse') {
+    isCorrect = String(quiz.answer) === String(userAnswer);
+  } else if (quiz.type === 'manual') {
+    isCorrect = null;
+  }
+
+  const sub = {
+    id: crypto.randomUUID(),
+    quizId: quiz.id,
+    quizTitle: quiz.title,
+    quizType: quiz.type,
+    question: quiz.question,
+    staffName: staffName.trim(),
+    userAnswer,
+    correctAnswer: quiz.type !== 'manual' ? quiz.answer : undefined,
+    isCorrect,
+    explanation: quiz.explanation,
+    adminNote: '',
+    submittedAt: new Date().toISOString(),
+  };
+
+  const subs = loadQuizSubs();
+  subs.unshift(sub);
+  saveQuizSubs(subs);
+
+  res.json({
+    isCorrect,
+    explanation: quiz.explanation,
+    correctAnswer: quiz.type !== 'manual' ? quiz.answer : undefined,
+  });
+});
+
+// 管理者向け: 回答一覧
+app.get('/api/quiz-subs', (req, res) => {
+  if (!checkApiAuth(req, res)) return;
+  res.json(loadQuizSubs());
+});
+
+// 管理者向け: マニュアル問題の採点・メモ
+app.patch('/api/quiz-subs/:id', (req, res) => {
+  if (!checkApiAuth(req, res)) return;
+  const subs = loadQuizSubs();
+  const sub = subs.find(s => s.id === req.params.id);
+  if (!sub) return res.status(404).json({ error: '見つかりません' });
+  if (req.body.isCorrect !== undefined) sub.isCorrect = req.body.isCorrect;
+  if (req.body.adminNote !== undefined) sub.adminNote = req.body.adminNote;
+  saveQuizSubs(subs);
+  res.json(sub);
+});
+
 // 死活確認用
 app.get('/health', (_req, res) => res.send('OK'));
 
