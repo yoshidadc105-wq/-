@@ -18,16 +18,29 @@ router.get('/users', requireAdmin, (req, res) => {
 
 // ユーザー作成
 router.post('/users', requireAdmin, (req, res) => {
-  const { username, display_name, email, password, role } = req.body;
+  let { username, display_name, email, password, role } = req.body;
 
-  if (!username || !display_name || !email || !password) {
-    return res.status(400).json({ error: 'ユーザー名・表示名・メール・パスワードは必須です' });
+  if (!display_name || !email || !password) {
+    return res.status(400).json({ error: '表示名・メール・パスワードは必須です' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
   }
 
   const db = getDb();
+
+  // ユーザー名が未指定の場合はメールアドレスから自動生成
+  if (!username) {
+    const base = email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || 'user';
+    let candidate = base;
+    let suffix = 1;
+    while (db.prepare('SELECT id FROM users WHERE username = ?').get(candidate)) {
+      candidate = base + suffix;
+      suffix++;
+    }
+    username = candidate;
+  }
+
   const hash = bcrypt.hashSync(password, 10);
   try {
     const result = db.prepare(`
@@ -37,7 +50,7 @@ router.post('/users', requireAdmin, (req, res) => {
     res.status(201).json({ id: result.lastInsertRowid, message: 'ユーザーを作成しました' });
   } catch (e) {
     if (e.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: 'そのユーザー名またはメールアドレスはすでに使用されています' });
+      return res.status(400).json({ error: 'そのメールアドレスはすでに使用されています' });
     }
     throw e;
   }
