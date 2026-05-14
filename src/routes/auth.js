@@ -56,6 +56,18 @@ router.get('/me', requireLogin, (req, res) => {
   });
 });
 
+// プロフィール更新（表示名・メールアドレス）
+router.put('/profile', requireLogin, (req, res) => {
+  const { display_name, email } = req.body;
+  if (!display_name || !email) return res.status(400).json({ error: '表示名とメールアドレスを入力してください' });
+
+  const db = getDb();
+  db.prepare('UPDATE users SET display_name = ?, email = ? WHERE id = ?')
+    .run(display_name, email, req.session.userId);
+  req.session.displayName = display_name;
+  res.json({ message: 'プロフィールを更新しました' });
+});
+
 // パスワード変更
 router.post('/change-password', requireLogin, (req, res) => {
   const { currentPassword, newPassword } = req.body;

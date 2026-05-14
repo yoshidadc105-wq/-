@@ -26,6 +26,21 @@
 
   <div id="alert" class="hidden"></div>
 
+  <div class="card mb-2">
+    <div class="card-header"><span class="card-title">プロフィール編集</span></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label class="form-label">表示名</label>
+        <input type="text" id="displayName" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="email" id="email" class="form-control">
+      </div>
+      <button onclick="updateProfile()" class="btn btn-primary">更新する</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header"><span class="card-title">パスワード変更</span></div>
     <div class="card-body">
@@ -52,6 +67,33 @@ async function init() {
   const user = await loadCurrentUser();
   if (!user) return;
   initNavbar(user);
+  const res = await fetch('/api/auth/me');
+  const me = await res.json();
+  document.getElementById('displayName').value = me.displayName || '';
+  const profileRes = await fetch('/api/admin/users');
+  if (profileRes.ok) {
+    const users = await profileRes.json();
+    const myUser = users.find(u => u.id === me.id);
+    if (myUser) document.getElementById('email').value = myUser.email || '';
+  }
+}
+
+async function updateProfile() {
+  const display_name = document.getElementById('displayName').value.trim();
+  const email = document.getElementById('email').value.trim();
+  if (!display_name || !email) { showAlert('alert', '表示名とメールアドレスを入力してください', 'error'); return; }
+  const res = await fetch('/api/auth/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_name, email })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    showAlert('alert', 'プロフィールを更新しました', 'success');
+    document.getElementById('navUserName').textContent = display_name;
+  } else {
+    showAlert('alert', data.error || '更新に失敗しました', 'error');
+  }
 }
 
 async function changePassword() {

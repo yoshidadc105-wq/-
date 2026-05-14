@@ -22,7 +22,9 @@ const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemDa
 const uploadDir = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-const sessionDir = path.join(__dirname, 'sessions');
+const sessionDir = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'sessions')
+  : path.join(__dirname, 'sessions');
 if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
 
 // ミドルウェア
