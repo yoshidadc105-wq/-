@@ -16,8 +16,8 @@ const progressRoutes = require('./src/routes/progress');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// データはユーザーフォルダに保存（ZIPを再展開してもデータが消えない）
-const DATA_DIR = path.join(os.homedir(), 'ManualSystemData');
+// データ保存先：Render環境変数 DATA_DIR > ユーザーフォルダ
+const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemData');
 const uploadDir = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 

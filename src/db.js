@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// データはユーザーフォルダに保存（ZIPを再展開してもデータが消えない）
-const DATA_DIR = path.join(os.homedir(), 'ManualSystemData');
+// データ保存先：Render環境変数 DATA_DIR > ユーザーフォルダ
+const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemData');
 const DB_PATH = path.join(DATA_DIR, 'manual_system.db');
 
 let db;
