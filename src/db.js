@@ -165,6 +165,14 @@ function initializeDb() {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('quiz_mode', '0')").run();
+
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_manuals_category ON manuals(category_id);
     CREATE INDEX IF NOT EXISTS idx_manuals_deleted ON manuals(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_view_history_user ON view_history(user_id);

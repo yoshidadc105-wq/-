@@ -1,6 +1,6 @@
 // 共通ユーティリティ
 
-// 現在のユーザー情報をロード
+// 現在のユーザー情報をロード（クイズモードチェック込み）
 async function loadCurrentUser() {
   try {
     const res = await fetch('/api/auth/me');
@@ -8,11 +8,37 @@ async function loadCurrentUser() {
       window.location.href = '/login.html';
       return null;
     }
-    return await res.json();
+    const user = await res.json();
+
+    // 管理者以外はクイズモードをチェック
+    if (user.role !== 'admin') {
+      const qRes = await fetch('/api/settings/quiz-mode');
+      if (qRes.ok) {
+        const { quiz_mode } = await qRes.json();
+        if (quiz_mode) {
+          showQuizModeBlock();
+          return null;
+        }
+      }
+    }
+
+    return user;
   } catch {
     window.location.href = '/login.html';
     return null;
   }
+}
+
+function showQuizModeBlock() {
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;">
+      <div style="text-align:center;padding:48px 32px;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:400px;">
+        <div style="font-size:64px;margin-bottom:16px;">📝</div>
+        <h1 style="font-size:22px;font-weight:700;color:#1a1a1a;margin-bottom:12px;">クイズ実施中</h1>
+        <p style="color:#666;line-height:1.6;">現在クイズが実施されているため<br>マニュアルにアクセスできません。<br>クイズ終了後に再度アクセスしてください。</p>
+      </div>
+    </div>
+  `;
 }
 
 // ナビバーを初期化
