@@ -718,6 +718,317 @@ app.patch('/api/quiz-subs/:id', (req, res) => {
   res.json(sub);
 });
 
+// ===== 360度評価システム =====
+
+const FEEDBACK_FILE = path.join(__dirname, 'data', 'feedback.json');
+const FEEDBACK_ADMIN_PASSWORD = process.env.FEEDBACK_ADMIN_PASSWORD || ADMIN_PASSWORD;
+
+function loadFeedback() {
+  try { return JSON.parse(fs.readFileSync(FEEDBACK_FILE, 'utf8')); } catch { return []; }
+}
+function saveFeedback(records) {
+  fs.mkdirSync(path.dirname(FEEDBACK_FILE), { recursive: true });
+  fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(records, null, 2));
+}
+
+function checkFeedbackAuth(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="FeedbackAdmin"');
+    res.status(401).send('認証が必要です');
+    return false;
+  }
+  const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+  const colonIdx = decoded.indexOf(':');
+  const pass = colonIdx >= 0 ? decoded.slice(colonIdx + 1) : '';
+  if (pass !== FEEDBACK_ADMIN_PASSWORD) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="FeedbackAdmin"');
+    res.status(401).send('パスワードが違います');
+    return false;
+  }
+  return true;
+}
+
+// フィードバック受信
+app.post('/feedback/submit', (req, res) => {
+  const d = req.body;
+  if (!d || !d.respondent || !d.s1 || !d.s2 || !d.s3 || !d.s4) {
+    return res.status(400).json({ error: 'invalid data' });
+  }
+
+  const record = {
+    id: crypto.randomUUID(),
+    submittedAt: new Date().toISOString(),
+    target: (d.target || '').trim(),
+    respondent: d.respondent.trim(),
+    s1: {
+      q1: parseInt(d.s1.q1) || 0,
+      q2: parseInt(d.s1.q2) || 0,
+      q3: parseInt(d.s1.q3) || 0,
+      good: (d.s1.good || '').trim(),
+      improve: (d.s1.improve || '').trim(),
+    },
+    s2: {
+      q1: parseInt(d.s2.q1) || 0,
+      q2: parseInt(d.s2.q2) || 0,
+      q3: parseInt(d.s2.q3) || 0,
+      good: (d.s2.good || '').trim(),
+      improve: (d.s2.improve || '').trim(),
+    },
+    s3: {
+      q1: parseInt(d.s3.q1) || 0,
+      q2: parseInt(d.s3.q2) || 0,
+      q3: parseInt(d.s3.q3) || 0,
+      good: (d.s3.good || '').trim(),
+      improve: (d.s3.improve || '').trim(),
+    },
+    s4: {
+      q1: parseInt(d.s4.q1) || 0,
+      q2: parseInt(d.s4.q2) || 0,
+      good: (d.s4.good || '').trim(),
+      improve: (d.s4.improve || '').trim(),
+    },
+  };
+
+  const records = loadFeedback();
+  records.unshift(record);
+  saveFeedback(records);
+
+  console.log(`360度評価受信: target="${record.target}" respondent="${record.respondent}"`);
+  res.json({ ok: true });
+});
+
+// 管理者向けAPI: 全データ取得
+app.get('/api/feedback', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  res.json(loadFeedback());
+});
+
+// 管理者向け: HTML結果ページ
+app.get('/feedback/admin', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+
+  const all = loadFeedback();
+
+  // ターゲット別に集計
+  const targets = {};
+  for (const r of all) {
+    const key = r.target || '（未指定）';
+    if (!targets[key]) targets[key] = [];
+    targets[key].push(r);
+  }
+
+  function avg(arr) {
+    if (!arr.length) return 0;
+    return (arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(2);
+  }
+
+  function starBar(score) {
+    const pct = (parseFloat(score) / 5) * 100;
+    return `<div style="display:inline-flex;align-items:center;gap:8px">
+      <div style="width:120px;height:10px;background:#e8e0f5;border-radius:5px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:#673ab7;border-radius:5px"></div>
+      </div>
+      <span style="font-size:13px;font-weight:bold;color:#673ab7">${score}</span>
+    </div>`;
+  }
+
+  let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>360度評価 管理画面</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #ede7f6; color: #333; font-size: 14px; }
+.top-bar { height: 8px; background: #673ab7; }
+header { background: #673ab7; color: #fff; padding: 16px 24px; }
+header h1 { font-size: 18px; font-weight: bold; }
+header p { font-size: 12px; opacity: .8; margin-top: 2px; }
+.container { max-width: 960px; margin: 24px auto; padding: 0 16px 60px; }
+.target-block { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 32px; overflow: hidden; }
+.target-header { background: #512da8; color: #fff; padding: 14px 20px; font-size: 16px; font-weight: bold; }
+.target-body { padding: 20px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.summary-card { background: #f3e5f5; border-radius: 8px; padding: 14px 16px; }
+.summary-card .sc-label { font-size: 12px; color: #7b1fa2; margin-bottom: 6px; }
+.summary-card .sc-title { font-size: 13px; color: #333; margin-bottom: 8px; font-weight: 500; }
+.section-title { font-size: 14px; font-weight: bold; color: #512da8; border-left: 4px solid #673ab7; padding-left: 10px; margin: 20px 0 12px; }
+.responses-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+.responses-table th { background: #ede7f6; padding: 8px 12px; text-align: left; color: #512da8; border-bottom: 2px solid #ce93d8; }
+.responses-table td { padding: 8px 12px; border-bottom: 1px solid #f3e5f5; vertical-align: top; }
+.responses-table tr:hover td { background: #faf5ff; }
+.text-block { margin-bottom: 16px; }
+.text-block .tb-label { font-size: 12px; color: #7b1fa2; font-weight: bold; margin-bottom: 6px; }
+.text-entry { background: #faf5ff; border-left: 3px solid #ce93d8; padding: 8px 12px; margin-bottom: 6px; border-radius: 0 4px 4px 0; font-size: 13px; color: #444; }
+.text-entry .te-who { font-size: 11px; color: #9e9e9e; margin-top: 4px; }
+.empty { color: #9e9e9e; text-align: center; padding: 40px; }
+.count-badge { background: #ce93d8; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<header>
+  <h1>360度評価 管理画面</h1>
+  <p>合計 ${all.length} 件の回答</p>
+</header>
+<div class="container">`;
+
+  if (all.length === 0) {
+    html += `<p class="empty">まだ回答はありません</p>`;
+  } else {
+    for (const [targetName, records] of Object.entries(targets)) {
+      const n = records.length;
+      const s1q1avg = avg(records.map(r => r.s1.q1));
+      const s1q2avg = avg(records.map(r => r.s1.q2));
+      const s1q3avg = avg(records.map(r => r.s1.q3));
+      const s2q1avg = avg(records.map(r => r.s2.q1));
+      const s2q2avg = avg(records.map(r => r.s2.q2));
+      const s2q3avg = avg(records.map(r => r.s2.q3));
+      const s3q1avg = avg(records.map(r => r.s3.q1));
+      const s3q2avg = avg(records.map(r => r.s3.q2));
+      const s3q3avg = avg(records.map(r => r.s3.q3));
+      const s4q1avg = avg(records.map(r => r.s4.q1));
+      const s4q2avg = avg(records.map(r => r.s4.q2));
+
+      html += `
+<div class="target-block">
+  <div class="target-header">${escHtml(targetName)}さん <span class="count-badge">${n}件</span></div>
+  <div class="target-body">
+    <div class="section-title">スコア集計</div>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="sc-label">①姿勢 / 明るい存在</div>
+        <div class="sc-title">自分を明るくする存在である</div>
+        ${starBar(s1q1avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">①姿勢 / 前向きな言葉</div>
+        <div class="sc-title">前向きな言葉や態度で接してくれる</div>
+        ${starBar(s1q2avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">①姿勢 / 安定した状態</div>
+        <div class="sc-title">安定した状態で仕事に取り組んでいる</div>
+        ${starBar(s1q3avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">②患者さんへの姿勢 / 提案</div>
+        <div class="sc-title">患者さんの将来を考えた提案をしている</div>
+        ${starBar(s2q1avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">②患者さんへの姿勢 / 説明</div>
+        <div class="sc-title">分かりやすい説明をしている</div>
+        ${starBar(s2q2avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">②患者さんへの姿勢 / また来たい</div>
+        <div class="sc-title">「また来たい」と思われる関わり</div>
+        ${starBar(s2q3avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">③成長 / 質問</div>
+        <div class="sc-title">分からないことをよく質問している</div>
+        ${starBar(s3q1avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">③成長 / 挑戦</div>
+        <div class="sc-title">新しいことに前向きに挑戦している</div>
+        ${starBar(s3q2avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">③成長 / 報告</div>
+        <div class="sc-title">報告をすぐに行っている</div>
+        ${starBar(s3q3avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">④チーム力 / 言動の影響</div>
+        <div class="sc-title">言動がチームに与える影響を理解している</div>
+        ${starBar(s4q1avg)}
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">④チーム力 / 未来づくり</div>
+        <div class="sc-title">医院の未来づくりに主体的に関わっている</div>
+        ${starBar(s4q2avg)}
+      </div>
+    </div>
+
+    <div class="section-title">個別スコア一覧</div>
+    <table class="responses-table">
+      <thead>
+        <tr>
+          <th>回答者</th><th>受信日時</th>
+          <th>①-1</th><th>①-2</th><th>①-3</th>
+          <th>②-1</th><th>②-2</th><th>②-3</th>
+          <th>③-1</th><th>③-2</th><th>③-3</th>
+          <th>④-1</th><th>④-2</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${records.map(r => {
+          const dt = new Date(r.submittedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+          return `<tr>
+            <td><strong>${escHtml(r.respondent)}</strong></td>
+            <td>${escHtml(dt)}</td>
+            <td>${r.s1.q1}</td><td>${r.s1.q2}</td><td>${r.s1.q3}</td>
+            <td>${r.s2.q1}</td><td>${r.s2.q2}</td><td>${r.s2.q3}</td>
+            <td>${r.s3.q1}</td><td>${r.s3.q2}</td><td>${r.s3.q3}</td>
+            <td>${r.s4.q1}</td><td>${r.s4.q2}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+
+    <div class="section-title">コメント: ①姿勢</div>
+    <div class="text-block">
+      <div class="tb-label">できている点</div>
+      ${records.filter(r => r.s1.good).map(r => `<div class="text-entry">${escHtml(r.s1.good)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+    <div class="text-block">
+      <div class="tb-label">改善点</div>
+      ${records.filter(r => r.s1.improve).map(r => `<div class="text-entry">${escHtml(r.s1.improve)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+
+    <div class="section-title">コメント: ②患者さんへの姿勢</div>
+    <div class="text-block">
+      <div class="tb-label">できている点</div>
+      ${records.filter(r => r.s2.good).map(r => `<div class="text-entry">${escHtml(r.s2.good)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+    <div class="text-block">
+      <div class="tb-label">改善点</div>
+      ${records.filter(r => r.s2.improve).map(r => `<div class="text-entry">${escHtml(r.s2.improve)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+
+    <div class="section-title">コメント: ③成長</div>
+    <div class="text-block">
+      <div class="tb-label">できている点</div>
+      ${records.filter(r => r.s3.good).map(r => `<div class="text-entry">${escHtml(r.s3.good)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+    <div class="text-block">
+      <div class="tb-label">改善点</div>
+      ${records.filter(r => r.s3.improve).map(r => `<div class="text-entry">${escHtml(r.s3.improve)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+
+    <div class="section-title">コメント: ④チーム力</div>
+    <div class="text-block">
+      <div class="tb-label">できている点</div>
+      ${records.filter(r => r.s4.good).map(r => `<div class="text-entry">${escHtml(r.s4.good)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+    <div class="text-block">
+      <div class="tb-label">改善点</div>
+      ${records.filter(r => r.s4.improve).map(r => `<div class="text-entry">${escHtml(r.s4.improve)}<div class="te-who">${escHtml(r.respondent)}</div></div>`).join('') || '<div class="text-entry" style="color:#9e9e9e">（なし）</div>'}
+    </div>
+  </div>
+</div>`;
+    }
+  }
+
+  html += `</div></body></html>`;
+  res.send(html);
+});
+
 // 死活確認用
 app.get('/health', (_req, res) => res.send('OK'));
 
