@@ -718,6 +718,43 @@ app.patch('/api/quiz-subs/:id', (req, res) => {
   res.json(sub);
 });
 
+// ===== 360度評価 対象者管理 =====
+
+const TARGETS_FILE = path.join(__dirname, 'data', 'targets.json');
+
+function loadTargets() {
+  try { return JSON.parse(fs.readFileSync(TARGETS_FILE, 'utf8')); } catch { return []; }
+}
+function saveTargets(records) {
+  fs.mkdirSync(path.dirname(TARGETS_FILE), { recursive: true });
+  fs.writeFileSync(TARGETS_FILE, JSON.stringify(records, null, 2));
+}
+
+// 公開: 対象者一覧（名前のみ）
+app.get('/api/targets', (req, res) => {
+  res.json(loadTargets().map(({ id, name }) => ({ id, name })));
+});
+
+// 管理者: 対象者追加
+app.post('/api/targets', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: '名前が必要です' });
+  const targets = loadTargets();
+  if (targets.some(t => t.name === name)) return res.status(409).json({ error: 'すでに登録されています' });
+  const target = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString() };
+  targets.push(target);
+  saveTargets(targets);
+  res.json(target);
+});
+
+// 管理者: 対象者削除
+app.delete('/api/targets/:id', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  saveTargets(loadTargets().filter(t => t.id !== req.params.id));
+  res.json({ ok: true });
+});
+
 // ===== 360度評価システム =====
 
 const FEEDBACK_FILE = path.join(__dirname, 'data', 'feedback.json');
@@ -813,11 +850,11 @@ app.get('/feedback/admin', (req, res) => {
   const all = loadFeedback();
 
   // ターゲット別に集計
-  const targets = {};
+  const byTarget = {};
   for (const r of all) {
     const key = r.target || '（未指定）';
-    if (!targets[key]) targets[key] = [];
-    targets[key].push(r);
+    if (!byTarget[key]) byTarget[key] = [];
+    byTarget[key].push(r);
   }
 
   function avg(arr) {
@@ -869,6 +906,19 @@ header nav a:hover { color:#fff; }
 .text-entry .te-who { font-size: 11px; color: #9e9e9e; margin-top: 4px; }
 .empty { color: #9e9e9e; text-align: center; padding: 40px; }
 .count-badge { background: #ce93d8; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin-left: 8px; }
+.target-mgmt-card { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.1); margin-bottom:24px; overflow:hidden; }
+.target-mgmt-header { background:#4a148c; color:#fff; padding:12px 20px; font-size:15px; font-weight:bold; }
+.target-mgmt-body { padding:16px 20px; }
+.target-list { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; min-height:30px; }
+.target-item { display:flex; align-items:center; gap:8px; background:#f3e5f5; border-radius:20px; padding:5px 14px; font-size:14px; }
+.target-del-btn { background:none; border:none; color:#9c27b0; cursor:pointer; font-size:12px; padding:0; }
+.target-del-btn:hover { color:#6a0080; text-decoration:underline; }
+.target-add-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.target-input { border:1px solid #ce93d8; border-radius:6px; padding:7px 12px; font-size:14px; font-family:inherit; outline:none; width:200px; }
+.target-input:focus { border-color:#673ab7; }
+.target-add-btn { background:#673ab7; color:#fff; border:none; border-radius:6px; padding:7px 18px; font-size:14px; cursor:pointer; }
+.target-add-btn:hover { background:#512da8; }
+.target-msg { font-size:12px; }
 .fb-section { margin-top:20px; border-top:2px dashed #ce93d8; padding-top:16px; }
 .fb-section-title { font-size:13px; font-weight:bold; color:#512da8; margin-bottom:8px; }
 .fb-textarea { width:100%; min-height:80px; border:1px solid #ce93d8; border-radius:6px; padding:10px 12px; font-size:13px; font-family:inherit; resize:vertical; outline:none; margin-bottom:8px; }
@@ -911,10 +961,33 @@ async function saveComment(id) {
 </header>
 <div class="container">`;
 
-  if (all.length === 0) {
-    html += `<p class="empty">まだ回答はありません</p>`;
-  } else {
-    for (const [targetName, records] of Object.entries(targets)) {
+  // 対象者管理パネル
+  const targets = loadTargets();
+  html += `
+<div class="target-mgmt-card">
+  <div class="target-mgmt-header">対象者管理</div>
+  <div class="target-mgmt-body">
+    <div class="target-list" id="target-list">
+      ${targets.length === 0
+        ? '<p style="color:#9e9e9e;font-size:13px">まだ登録されていません</p>'
+        : targets.map(t => `
+          <div class="target-item" id="ti-${t.id}">
+            <span>${escHtml(t.name)}</span>
+            <button type="button" class="target-del-btn" onclick="deletTarget('${t.id}')">削除</button>
+          </div>`).join('')}
+    </div>
+    <div class="target-add-row">
+      <input type="text" id="new-target-name" placeholder="名前を入力（例：原田）" class="target-input" />
+      <button type="button" class="target-add-btn" onclick="addTarget()">追加</button>
+      <span class="target-msg" id="target-msg"></span>
+    </div>
+  </div>
+</div>`;
+
+  html += all.length === 0 ? `<p class="empty" style="background:#fff;border-radius:8px;padding:40px;text-align:center;color:#9e9e9e">まだ回答はありません</p>` : '';
+
+  if (all.length > 0) {
+    for (const [targetName, records] of Object.entries(byTarget)) {
       const n = records.length;
       const s1q1avg = avg(records.map(r => r.s1.q1));
       const s1q2avg = avg(records.map(r => r.s1.q2));
@@ -1074,7 +1147,42 @@ async function saveComment(id) {
     }
   }
 
-  html += `</div></body></html>`;
+  html += `</div>
+<script>
+async function addTarget() {
+  const inp = document.getElementById('new-target-name');
+  const msg = document.getElementById('target-msg');
+  const name = inp.value.trim();
+  if (!name) { msg.style.color='#c62828'; msg.textContent='名前を入力してください'; return; }
+  try {
+    const res = await fetch('/api/targets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (res.status === 409) { msg.style.color='#c62828'; msg.textContent='すでに登録されています'; return; }
+    if (!res.ok) throw new Error();
+    msg.style.color = '#2e7d32';
+    msg.textContent = '✅ 追加しました';
+    inp.value = '';
+    setTimeout(() => location.reload(), 800);
+  } catch {
+    msg.style.color = '#c62828';
+    msg.textContent = '❌ 追加に失敗しました';
+  }
+}
+async function deletTarget(id) {
+  if (!confirm('この対象者を削除しますか？')) return;
+  try {
+    const res = await fetch('/api/targets/' + id, { method: 'DELETE' });
+    if (!res.ok) throw new Error();
+    location.reload();
+  } catch {
+    alert('削除に失敗しました');
+  }
+}
+<\/script>
+</body></html>`;
   res.send(html);
 });
 

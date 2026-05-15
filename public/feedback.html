@@ -14,17 +14,8 @@
       line-height: 1.6;
       padding-bottom: 60px;
     }
-
-    .top-bar {
-      height: 10px;
-      background: #673ab7;
-    }
-
-    .container {
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 24px 16px;
-    }
+    .top-bar { height: 10px; background: #673ab7; }
+    .container { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
 
     /* Header card */
     .header-card {
@@ -35,32 +26,17 @@
       margin-bottom: 16px;
       border-top: 8px solid #673ab7;
     }
-    .header-card-body {
-      padding: 24px 24px 20px;
-    }
-    .header-card h1 {
-      font-size: 26px;
-      font-weight: 400;
-      color: #202124;
-      margin-bottom: 12px;
-    }
-    .header-desc {
-      font-size: 14px;
-      color: #444;
-      white-space: pre-line;
-    }
-    .header-required-note {
-      font-size: 13px;
-      color: #d93025;
-      margin-top: 12px;
-    }
+    .header-card-body { padding: 24px 24px 20px; }
+    .header-card h1 { font-size: 26px; font-weight: 400; color: #202124; margin-bottom: 12px; }
+    .header-desc { font-size: 14px; color: #444; white-space: pre-line; }
+    .header-required-note { font-size: 13px; color: #d93025; margin-top: 12px; }
 
     /* Section cards */
     .section-card {
       background: #fff;
       border-radius: 8px;
       box-shadow: 0 1px 3px rgba(0,0,0,.12);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       overflow: hidden;
     }
     .section-header {
@@ -84,10 +60,28 @@
       color: #202124;
       margin-bottom: 14px;
     }
-    .question-label .required-star {
-      color: #d93025;
-      margin-left: 4px;
+    .question-label .required-star { color: #d93025; margin-left: 4px; }
+
+    /* Select dropdown */
+    .styled-select {
+      width: 100%;
+      border: none;
+      border-bottom: 2px solid #9aa0a6;
+      outline: none;
+      font-size: 15px;
+      font-family: inherit;
+      padding: 6px 0;
+      color: #202124;
+      background: transparent;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23673ab7' d='M0 0l6 8 6-8z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 4px center;
+      padding-right: 24px;
     }
+    .styled-select:focus { border-bottom-color: #673ab7; }
 
     /* Short text input */
     .short-text {
@@ -123,11 +117,6 @@
     .long-text::placeholder { color: #9aa0a6; }
 
     /* Star rating */
-    .star-row {
-      display: flex;
-      align-items: center;
-      gap: 0;
-    }
     .star-labels {
       display: flex;
       justify-content: space-between;
@@ -139,10 +128,7 @@
       text-align: center;
       flex: 1;
     }
-    .star-group {
-      display: flex;
-      gap: 4px;
-    }
+    .star-group { display: flex; gap: 4px; }
     .star-btn {
       background: none;
       border: none;
@@ -153,26 +139,9 @@
       line-height: 1;
       transition: color .15s;
     }
-    .star-btn:hover,
-    .star-btn.filled {
-      color: #ea4335;
-    }
+    .star-btn:hover, .star-btn.filled { color: #ea4335; }
 
-    /* Section navigation notice */
-    .section-nav {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.12);
-      margin-bottom: 16px;
-      padding: 14px 20px;
-      font-size: 13px;
-      color: #5f6368;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Submit button */
+    /* Submit */
     .submit-area {
       display: flex;
       justify-content: space-between;
@@ -203,22 +172,15 @@
     .clear-link:hover { text-decoration: underline; }
 
     /* Error */
-    .field-error {
-      display: none;
-      color: #d93025;
-      font-size: 12px;
-      margin-top: 6px;
-    }
-    .question-card.has-error {
-      border: 1px solid #d93025;
-    }
+    .field-error { display: none; color: #d93025; font-size: 12px; margin-top: 6px; }
+    .question-card.has-error { border: 1px solid #d93025; }
+
+    /* Loading / Error state */
+    .loading-msg { text-align:center; padding:40px; color:#673ab7; font-size:14px; }
+    .error-msg { text-align:center; padding:40px; color:#d93025; font-size:14px; background:#fff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.12); }
 
     /* Success */
-    #success-screen {
-      display: none;
-      text-align: center;
-      padding: 60px 20px;
-    }
+    #success-screen { display: none; text-align: center; padding: 60px 20px; }
     .success-card {
       background: #fff;
       border-radius: 8px;
@@ -239,8 +201,12 @@
 <body>
 <div class="top-bar"></div>
 
-<div class="container">
+<div class="container" id="root">
+  <div class="loading-msg">読み込み中...</div>
+</div>
 
+<script>
+  const FORM_HTML = `
   <!-- Success screen -->
   <div id="success-screen">
     <div class="success-card">
@@ -257,14 +223,24 @@
     <div class="header-card">
       <div class="header-card-body">
         <h1>360度評価</h1>
-        <div class="header-desc" id="form-desc"></div>
+        <div class="header-desc">各項目を1〜5で選択してください。
+1=ほとんど見られない　2=時々ある　3=標準レベル　4=よく見られる　5=常にできている（周囲に良い影響を与えている）</div>
         <div class="header-required-note">* 必須</div>
       </div>
     </div>
 
+    <!-- 評価対象者 -->
+    <div class="question-card" id="card-target">
+      <div class="question-label">評価する相手を選んでください <span class="required-star">*</span></div>
+      <select class="styled-select" id="target-select">
+        <option value="">-- 選択してください --</option>
+      </select>
+      <div class="field-error" id="err-target">評価する相手を選択してください</div>
+    </div>
+
     <!-- 回答者 -->
     <div class="question-card" id="card-respondent">
-      <div class="question-label">回答者 <span class="required-star">*</span></div>
+      <div class="question-label">回答者（あなたの名前）<span class="required-star">*</span></div>
       <input type="text" class="short-text" id="respondent" placeholder="短文回答" autocomplete="name" />
       <div class="field-error" id="err-respondent">この項目は必須です</div>
     </div>
@@ -277,11 +253,8 @@
     <div class="question-card" id="card-s1q1">
       <div class="question-label">自分を明るくする存在である <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s1q1">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -296,11 +269,8 @@
     <div class="question-card" id="card-s1q2">
       <div class="question-label">自分に対して前向きな言葉や態度で接してくれる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s1q2">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -315,11 +285,8 @@
     <div class="question-card" id="card-s1q3">
       <div class="question-label">体調管理を含め、安定した状態で仕事に取り組んでいるようにみえる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s1q3">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -351,11 +318,8 @@
     <div class="question-card" id="card-s2q1">
       <div class="question-label">患者さんの将来を考えた提案をしているようにみえる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s2q1">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -370,11 +334,8 @@
     <div class="question-card" id="card-s2q2">
       <div class="question-label">不安を和らげる分かりやすい説明をしているようにみえる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s2q2">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -389,11 +350,8 @@
     <div class="question-card" id="card-s2q3">
       <div class="question-label">「また来たい」と思ってもらえる関わりをしているようにみえる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s2q3">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -425,11 +383,8 @@
     <div class="question-card" id="card-s3q1">
       <div class="question-label">分からないことを明確にするためによく質問をしているようにみえる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s3q1">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -444,11 +399,8 @@
     <div class="question-card" id="card-s3q2">
       <div class="question-label">新しいことに前向きに挑戦しているようにみえる <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s3q2">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -463,11 +415,8 @@
     <div class="question-card" id="card-s3q3">
       <div class="question-label">報告をすぐに行っている <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s3q3">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -499,11 +448,8 @@
     <div class="question-card" id="card-s4q1">
       <div class="question-label">自分の言動がチームに影響することを理解して行動している <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s4q1">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -518,11 +464,8 @@
     <div class="question-card" id="card-s4q2">
       <div class="question-label">医院の未来づくりに主体的に関わっている <span class="required-star">*</span></div>
       <div class="star-labels">
-        <span class="star-label-item">1</span>
-        <span class="star-label-item">2</span>
-        <span class="star-label-item">3</span>
-        <span class="star-label-item">4</span>
-        <span class="star-label-item">5</span>
+        <span class="star-label-item">1</span><span class="star-label-item">2</span>
+        <span class="star-label-item">3</span><span class="star-label-item">4</span><span class="star-label-item">5</span>
       </div>
       <div class="star-group" data-field="s4q2">
         <button type="button" class="star-btn" data-value="1">☆</button>
@@ -552,164 +495,189 @@
       <a class="clear-link" href="javascript:void(0)" onclick="clearForm()">フォームをクリア</a>
     </div>
 
-  </form>
-</div>
+  </form>`;
 
-<script>
-  // --- Target name from query string or default ---
-  const params = new URLSearchParams(location.search);
-  const targetName = params.get('target') || '';
-  const descEl = document.getElementById('form-desc');
-  if (targetName) {
-    descEl.textContent = `${targetName}さんについて\n各項目を1〜5で選択してください。\n1=ほとんど見られない　2=時々ある　3=標準レベル　4=よく見られる　5=常にできている（周囲に良い影響を与えている）`;
-  } else {
-    descEl.textContent = `各項目を1〜5で選択してください。\n1=ほとんど見られない　2=時々ある　3=標準レベル　4=よく見られる　5=常にできている（周囲に良い影響を与えている）`;
+  async function init() {
+    const root = document.getElementById('root');
+    let targets = [];
+    try {
+      const res = await fetch('/api/targets');
+      if (!res.ok) throw new Error();
+      targets = await res.json();
+    } catch {
+      root.innerHTML = '<div class="error-msg">対象者リストの読み込みに失敗しました。<br>管理者にご連絡ください。</div>';
+      return;
+    }
+
+    if (targets.length === 0) {
+      root.innerHTML = '<div class="error-msg">評価対象者が登録されていません。<br>管理者に対象者の登録を依頼してください。</div>';
+      return;
+    }
+
+    root.innerHTML = FORM_HTML;
+
+    // Populate target dropdown
+    const sel = document.getElementById('target-select');
+    targets.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+
+    initForm();
   }
 
-  // --- Star ratings ---
-  const ratings = {};
-  document.querySelectorAll('.star-group').forEach(group => {
-    const field = group.dataset.field;
-    ratings[field] = 0;
-    const btns = group.querySelectorAll('.star-btn');
-
-    btns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = parseInt(btn.dataset.value);
-        ratings[field] = val;
-        btns.forEach(b => {
-          b.textContent = parseInt(b.dataset.value) <= val ? '★' : '☆';
-          b.classList.toggle('filled', parseInt(b.dataset.value) <= val);
+  function initForm() {
+    const ratings = {};
+    document.querySelectorAll('.star-group').forEach(group => {
+      const field = group.dataset.field;
+      ratings[field] = 0;
+      const btns = group.querySelectorAll('.star-btn');
+      btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = parseInt(btn.dataset.value);
+          ratings[field] = val;
+          btns.forEach(b => {
+            b.textContent = parseInt(b.dataset.value) <= val ? '★' : '☆';
+            b.classList.toggle('filled', parseInt(b.dataset.value) <= val);
+          });
+          document.getElementById('err-' + field).style.display = 'none';
+          document.getElementById('card-' + field).classList.remove('has-error');
         });
-        const errEl = document.getElementById('err-' + field);
-        const cardEl = document.getElementById('card-' + field);
+      });
+    });
+
+    document.querySelectorAll('.long-text').forEach(ta => {
+      ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+      ta.addEventListener('focus', () => {
+        const errEl = document.getElementById('err-' + ta.id);
+        const cardEl = document.getElementById('card-' + ta.id);
         if (errEl) errEl.style.display = 'none';
         if (cardEl) cardEl.classList.remove('has-error');
       });
     });
-  });
 
-  // Auto-grow textareas
-  document.querySelectorAll('.long-text').forEach(ta => {
-    ta.addEventListener('input', () => {
-      ta.style.height = 'auto';
-      ta.style.height = ta.scrollHeight + 'px';
-    });
-    ta.addEventListener('focus', () => {
-      const errEl = document.getElementById('err-' + ta.id);
-      const cardEl = document.getElementById('card-' + ta.id);
-      if (errEl) errEl.style.display = 'none';
-      if (cardEl) cardEl.classList.remove('has-error');
-    });
-  });
-  document.getElementById('respondent').addEventListener('focus', () => {
-    document.getElementById('err-respondent').style.display = 'none';
-    document.getElementById('card-respondent').classList.remove('has-error');
-  });
-
-  function clearForm() {
-    if (!confirm('入力内容をすべてクリアしますか？')) return;
-    document.getElementById('respondent').value = '';
-    document.querySelectorAll('.long-text').forEach(ta => { ta.value = ''; ta.style.height = ''; });
-    document.querySelectorAll('.star-group').forEach(group => {
-      const field = group.dataset.field;
-      ratings[field] = 0;
-      group.querySelectorAll('.star-btn').forEach(b => { b.textContent = '☆'; b.classList.remove('filled'); });
-    });
-    document.querySelectorAll('.field-error').forEach(e => e.style.display = 'none');
-    document.querySelectorAll('.question-card').forEach(c => c.classList.remove('has-error'));
-  }
-
-  function validate() {
-    let firstError = null;
-    let valid = true;
-
-    const requiredTexts = ['respondent', 's1text1', 's1text2', 's2text1', 's2text2', 's3text1', 's3text2', 's4text1', 's4text2'];
-    requiredTexts.forEach(id => {
-      const el = document.getElementById(id);
-      const errEl = document.getElementById('err-' + id);
-      const cardEl = document.getElementById('card-' + id);
-      const val = (el.value || '').trim();
-      if (!val) {
-        errEl.style.display = 'block';
-        cardEl.classList.add('has-error');
-        if (!firstError) firstError = cardEl;
-        valid = false;
-      }
+    document.getElementById('respondent').addEventListener('focus', () => {
+      document.getElementById('err-respondent').style.display = 'none';
+      document.getElementById('card-respondent').classList.remove('has-error');
     });
 
-    const requiredRatings = ['s1q1', 's1q2', 's1q3', 's2q1', 's2q2', 's2q3', 's3q1', 's3q2', 's3q3', 's4q1', 's4q2'];
-    requiredRatings.forEach(field => {
-      if (!ratings[field]) {
-        const errEl = document.getElementById('err-' + field);
-        const cardEl = document.getElementById('card-' + field);
-        errEl.style.display = 'block';
-        cardEl.classList.add('has-error');
-        if (!firstError) firstError = cardEl;
-        valid = false;
-      }
+    document.getElementById('target-select').addEventListener('change', () => {
+      document.getElementById('err-target').style.display = 'none';
+      document.getElementById('card-target').classList.remove('has-error');
     });
 
-    if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return valid;
-  }
-
-  document.getElementById('feedback-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    const btn = document.getElementById('submit-btn');
-    btn.disabled = true;
-    btn.textContent = '送信中...';
-
-    const data = {
-      target: targetName,
-      respondent: document.getElementById('respondent').value.trim(),
-      s1: {
-        q1: ratings['s1q1'],
-        q2: ratings['s1q2'],
-        q3: ratings['s1q3'],
-        good: document.getElementById('s1text1').value.trim(),
-        improve: document.getElementById('s1text2').value.trim(),
-      },
-      s2: {
-        q1: ratings['s2q1'],
-        q2: ratings['s2q2'],
-        q3: ratings['s2q3'],
-        good: document.getElementById('s2text1').value.trim(),
-        improve: document.getElementById('s2text2').value.trim(),
-      },
-      s3: {
-        q1: ratings['s3q1'],
-        q2: ratings['s3q2'],
-        q3: ratings['s3q3'],
-        good: document.getElementById('s3text1').value.trim(),
-        improve: document.getElementById('s3text2').value.trim(),
-      },
-      s4: {
-        q1: ratings['s4q1'],
-        q2: ratings['s4q2'],
-        good: document.getElementById('s4text1').value.trim(),
-        improve: document.getElementById('s4text2').value.trim(),
-      },
+    window.clearForm = function() {
+      if (!confirm('入力内容をすべてクリアしますか？')) return;
+      document.getElementById('respondent').value = '';
+      document.getElementById('target-select').value = '';
+      document.querySelectorAll('.long-text').forEach(ta => { ta.value = ''; ta.style.height = ''; });
+      Object.keys(ratings).forEach(f => {
+        ratings[f] = 0;
+        document.querySelectorAll(`[data-field="${f}"] .star-btn`).forEach(b => { b.textContent = '☆'; b.classList.remove('filled'); });
+      });
+      document.querySelectorAll('.field-error').forEach(e => e.style.display = 'none');
+      document.querySelectorAll('.question-card').forEach(c => c.classList.remove('has-error'));
     };
 
-    try {
-      const res = await fetch('/feedback/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+    function validate() {
+      let firstError = null;
+      let valid = true;
+
+      const target = document.getElementById('target-select').value;
+      if (!target) {
+        document.getElementById('err-target').style.display = 'block';
+        document.getElementById('card-target').classList.add('has-error');
+        if (!firstError) firstError = document.getElementById('card-target');
+        valid = false;
+      }
+
+      const respondent = document.getElementById('respondent').value.trim();
+      if (!respondent) {
+        document.getElementById('err-respondent').style.display = 'block';
+        document.getElementById('card-respondent').classList.add('has-error');
+        if (!firstError) firstError = document.getElementById('card-respondent');
+        valid = false;
+      }
+
+      const requiredRatings = ['s1q1', 's1q2', 's1q3', 's2q1', 's2q2', 's2q3', 's3q1', 's3q2', 's3q3', 's4q1', 's4q2'];
+      requiredRatings.forEach(field => {
+        if (!ratings[field]) {
+          document.getElementById('err-' + field).style.display = 'block';
+          document.getElementById('card-' + field).classList.add('has-error');
+          if (!firstError) firstError = document.getElementById('card-' + field);
+          valid = false;
+        }
       });
-      if (!res.ok) throw new Error('server error');
-      document.getElementById('feedback-form').style.display = 'none';
-      document.getElementById('success-screen').style.display = 'block';
-      window.scrollTo(0, 0);
-    } catch {
-      alert('送信に失敗しました。時間をおいて再度お試しください。');
-      btn.disabled = false;
-      btn.textContent = '送信';
+
+      const requiredTexts = ['s1text1', 's1text2', 's2text1', 's2text2', 's3text1', 's3text2', 's4text1', 's4text2'];
+      requiredTexts.forEach(id => {
+        const el = document.getElementById(id);
+        if (!(el.value || '').trim()) {
+          document.getElementById('err-' + id).style.display = 'block';
+          document.getElementById('card-' + id).classList.add('has-error');
+          if (!firstError) firstError = document.getElementById('card-' + id);
+          valid = false;
+        }
+      });
+
+      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return valid;
     }
-  });
+
+    document.getElementById('feedback-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!validate()) return;
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = '送信中...';
+
+      const data = {
+        target: document.getElementById('target-select').value,
+        respondent: document.getElementById('respondent').value.trim(),
+        s1: {
+          q1: ratings['s1q1'], q2: ratings['s1q2'], q3: ratings['s1q3'],
+          good: document.getElementById('s1text1').value.trim(),
+          improve: document.getElementById('s1text2').value.trim(),
+        },
+        s2: {
+          q1: ratings['s2q1'], q2: ratings['s2q2'], q3: ratings['s2q3'],
+          good: document.getElementById('s2text1').value.trim(),
+          improve: document.getElementById('s2text2').value.trim(),
+        },
+        s3: {
+          q1: ratings['s3q1'], q2: ratings['s3q2'], q3: ratings['s3q3'],
+          good: document.getElementById('s3text1').value.trim(),
+          improve: document.getElementById('s3text2').value.trim(),
+        },
+        s4: {
+          q1: ratings['s4q1'], q2: ratings['s4q2'],
+          good: document.getElementById('s4text1').value.trim(),
+          improve: document.getElementById('s4text2').value.trim(),
+        },
+      };
+
+      try {
+        const res = await fetch('/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('server error');
+        document.getElementById('feedback-form').style.display = 'none';
+        document.getElementById('success-screen').style.display = 'block';
+        window.scrollTo(0, 0);
+      } catch {
+        alert('送信に失敗しました。時間をおいて再度お試しください。');
+        btn.disabled = false;
+        btn.textContent = '送信';
+      }
+    });
+  }
+
+  init();
 </script>
 </body>
 </html>
