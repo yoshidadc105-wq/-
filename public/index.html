@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>スタッフ評価</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Hiragino Kaku Gothic Pro", "Meiryo", sans-serif;
+      background: #ede7f6;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .top-bar { height: 10px; background: #673ab7; }
+    header {
+      background: #673ab7;
+      color: #fff;
+      padding: 24px 20px;
+      text-align: center;
+    }
+    header h1 { font-size: 22px; font-weight: 400; }
+    header p { font-size: 13px; opacity: .8; margin-top: 6px; }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 16px 60px;
+      width: 100%;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.1);
+      overflow: hidden;
+      margin-bottom: 16px;
+      text-decoration: none;
+      display: block;
+      transition: box-shadow .2s, transform .15s;
+      border-top: 6px solid #673ab7;
+    }
+    .card:hover {
+      box-shadow: 0 4px 16px rgba(103,58,183,.25);
+      transform: translateY(-2px);
+    }
+    .card-body { padding: 24px 24px 20px; }
+    .card-icon { font-size: 36px; margin-bottom: 12px; }
+    .card-title { font-size: 18px; font-weight: bold; color: #673ab7; margin-bottom: 8px; }
+    .card-desc { font-size: 13px; color: #555; line-height: 1.7; }
+    .card-arrow {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f3e5f5;
+      color: #673ab7;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    @media (max-width: 480px) {
+      .card-body { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="top-bar"></div>
+<header>
+  <h1>スタッフ評価フォーム</h1>
+  <p>回答するフォームを選んでください</p>
+</header>
+<div class="container">
+
+  <a class="card" href="/feedback.html">
+    <div class="card-body">
+      <div class="card-icon">⭐</div>
+      <div class="card-title">360度評価</div>
+      <div class="card-desc">
+        同僚のスタッフを評価します。<br>
+        各セクション1〜5のスター評価と自由記述で回答してください。
+      </div>
+    </div>
+    <div class="card-arrow">回答する →</div>
+  </a>
+
+  <a class="card" href="/self-assessment.html">
+    <div class="card-body">
+      <div class="card-icon">📋</div>
+      <div class="card-title">行動基準評価（自己評価）</div>
+      <div class="card-desc">
+        自分自身の行動を振り返ります。<br>
+        Yes / どちらでもない / まだできていない で回答してください。
+      </div>
+    </div>
+    <div class="card-arrow">回答する →</div>
+  </a>
+
+</div>
+</body>
+</html>
