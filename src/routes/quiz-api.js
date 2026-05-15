@@ -29,14 +29,15 @@ router.get('/manuals', (req, res) => {
   const manuals = db.prepare(`
     SELECT m.id, m.title, m.type,
       COALESCE(parent.name, c.name) as main_category,
-      c.name as sub_category,
-      COALESCE(parent.sort_order, c.sort_order, 9999) as main_order,
-      CASE WHEN parent.id IS NOT NULL THEN c.sort_order ELSE 0 END as sub_order
+      CASE WHEN parent.id IS NOT NULL THEN c.name ELSE NULL END as sub_category
     FROM manuals m
     LEFT JOIN categories c ON c.id = m.category_id
     LEFT JOIN categories parent ON parent.id = c.parent_id
     WHERE m.is_deleted = 0
-    ORDER BY main_order, sub_order, m.title
+    ORDER BY
+      COALESCE(parent.name, c.name, 'zzz'),
+      CASE WHEN parent.id IS NOT NULL THEN c.name ELSE '' END,
+      m.title
   `).all();
   res.json(manuals);
 });
