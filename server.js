@@ -761,6 +761,8 @@ app.post('/feedback/submit', (req, res) => {
     submittedAt: new Date().toISOString(),
     target: (d.target || '').trim(),
     respondent: d.respondent.trim(),
+    managerComment: '',
+    commentAt: null,
     s1: {
       q1: parseInt(d.s1.q1) || 0,
       q2: parseInt(d.s1.q2) || 0,
@@ -843,9 +845,11 @@ app.get('/feedback/admin', (req, res) => {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: sans-serif; background: #ede7f6; color: #333; font-size: 14px; }
 .top-bar { height: 8px; background: #673ab7; }
-header { background: #673ab7; color: #fff; padding: 16px 24px; }
+header { background: #673ab7; color: #fff; padding: 16px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
 header h1 { font-size: 18px; font-weight: bold; }
 header p { font-size: 12px; opacity: .8; margin-top: 2px; }
+header nav a { color:#e1bee7; font-size:13px; text-decoration:none; margin-left:16px; }
+header nav a:hover { color:#fff; }
 .container { max-width: 960px; margin: 24px auto; padding: 0 16px 60px; }
 .target-block { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 32px; overflow: hidden; }
 .target-header { background: #512da8; color: #fff; padding: 14px 20px; font-size: 16px; font-weight: bold; }
@@ -865,13 +869,45 @@ header p { font-size: 12px; opacity: .8; margin-top: 2px; }
 .text-entry .te-who { font-size: 11px; color: #9e9e9e; margin-top: 4px; }
 .empty { color: #9e9e9e; text-align: center; padding: 40px; }
 .count-badge { background: #ce93d8; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin-left: 8px; }
+.fb-section { margin-top:20px; border-top:2px dashed #ce93d8; padding-top:16px; }
+.fb-section-title { font-size:13px; font-weight:bold; color:#512da8; margin-bottom:8px; }
+.fb-textarea { width:100%; min-height:80px; border:1px solid #ce93d8; border-radius:6px; padding:10px 12px; font-size:13px; font-family:inherit; resize:vertical; outline:none; margin-bottom:8px; }
+.fb-textarea:focus { border-color:#673ab7; }
+.fb-save-btn { background:#673ab7; color:#fff; border:none; border-radius:4px; padding:7px 18px; font-size:13px; cursor:pointer; }
+.fb-save-btn:hover { background:#512da8; }
+.fb-saved-msg { font-size:12px; color:#2e7d32; margin-left:10px; }
 </style>
+<script>
+async function saveComment(id) {
+  const txt = document.getElementById('cmttxt-' + id).value.trim();
+  const msgEl = document.getElementById('cmtmsg-' + id);
+  try {
+    const res = await fetch('/api/feedback/' + id + '/comment', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment: txt }),
+    });
+    if (!res.ok) throw new Error();
+    msgEl.style.color = '#2e7d32';
+    msgEl.textContent = '✅ 保存しました';
+    setTimeout(() => { msgEl.textContent = ''; location.reload(); }, 1200);
+  } catch {
+    msgEl.style.color = '#c62828';
+    msgEl.textContent = '❌ 保存に失敗しました';
+  }
+}
+<\/script>
 </head>
 <body>
 <div class="top-bar"></div>
 <header>
-  <h1>360度評価 管理画面</h1>
-  <p>合計 ${all.length} 件の回答</p>
+  <div>
+    <h1>360度評価 管理画面</h1>
+    <p>合計 ${all.length} 件の回答</p>
+  </div>
+  <nav>
+    <a href="/self-assessment/admin">行動基準評価へ</a>
+  </nav>
 </header>
 <div class="container">`;
 
@@ -955,7 +991,7 @@ header p { font-size: 12px; opacity: .8; margin-top: 2px; }
       </div>
     </div>
 
-    <div class="section-title">個別スコア一覧</div>
+    <div class="section-title">個別スコア一覧 ＆ フィードバック</div>
     <table class="responses-table">
       <thead>
         <tr>
@@ -964,11 +1000,13 @@ header p { font-size: 12px; opacity: .8; margin-top: 2px; }
           <th>②-1</th><th>②-2</th><th>②-3</th>
           <th>③-1</th><th>③-2</th><th>③-3</th>
           <th>④-1</th><th>④-2</th>
+          <th>FB</th>
         </tr>
       </thead>
       <tbody>
         ${records.map(r => {
           const dt = new Date(r.submittedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+          const hasCmt = r.managerComment;
           return `<tr>
             <td><strong>${escHtml(r.respondent)}</strong></td>
             <td>${escHtml(dt)}</td>
@@ -976,6 +1014,17 @@ header p { font-size: 12px; opacity: .8; margin-top: 2px; }
             <td>${r.s2.q1}</td><td>${r.s2.q2}</td><td>${r.s2.q3}</td>
             <td>${r.s3.q1}</td><td>${r.s3.q2}</td><td>${r.s3.q3}</td>
             <td>${r.s4.q1}</td><td>${r.s4.q2}</td>
+            <td><span style="font-size:12px;color:${hasCmt ? '#2e7d32' : '#f57f17'}">${hasCmt ? '✅' : '未'}</span></td>
+          </tr>
+          <tr>
+            <td colspan="14" style="padding:0 12px 12px">
+              <div class="fb-section">
+                <div class="fb-section-title">マネージャーフィードバック（${escHtml(r.respondent)}）</div>
+                <textarea class="fb-textarea" id="cmttxt-${r.id}">${escHtml(r.managerComment || '')}</textarea>
+                <button type="button" class="fb-save-btn" onclick="saveComment('${r.id}')">保存する</button>
+                <span class="fb-saved-msg" id="cmtmsg-${r.id}"></span>
+              </div>
+            </td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -1027,6 +1076,271 @@ header p { font-size: 12px; opacity: .8; margin-top: 2px; }
 
   html += `</div></body></html>`;
   res.send(html);
+});
+
+// ===== 行動基準評価システム =====
+
+const SELF_ASSESSMENT_FILE = path.join(__dirname, 'data', 'self-assessment.json');
+
+function loadSelfAssessments() {
+  try { return JSON.parse(fs.readFileSync(SELF_ASSESSMENT_FILE, 'utf8')); } catch { return []; }
+}
+function saveSelfAssessments(records) {
+  fs.mkdirSync(path.dirname(SELF_ASSESSMENT_FILE), { recursive: true });
+  fs.writeFileSync(SELF_ASSESSMENT_FILE, JSON.stringify(records, null, 2));
+}
+
+// 行動基準評価 受信
+app.post('/self-assessment/submit', (req, res) => {
+  const d = req.body;
+  if (!d || !d.respondent || !d.s1 || !d.s2 || !d.s3 || !d.s4) {
+    return res.status(400).json({ error: 'invalid data' });
+  }
+
+  const record = {
+    id: crypto.randomUUID(),
+    submittedAt: new Date().toISOString(),
+    respondent: d.respondent.trim(),
+    managerFeedback: '',
+    feedbackAt: null,
+    s1: {
+      q1: d.s1.q1 || '',
+      q2: d.s1.q2 || '',
+      q3: d.s1.q3 || '',
+      good: (d.s1.good || '').trim(),
+      improve: (d.s1.improve || '').trim(),
+    },
+    s2: {
+      q1: d.s2.q1 || '',
+      q2: d.s2.q2 || '',
+      q3: d.s2.q3 || '',
+      good: (d.s2.good || '').trim(),
+      improve: (d.s2.improve || '').trim(),
+    },
+    s3: {
+      q1: d.s3.q1 || '',
+      q2: d.s3.q2 || '',
+      q3: d.s3.q3 || '',
+      good: (d.s3.good || '').trim(),
+      improve: (d.s3.improve || '').trim(),
+    },
+    s4: {
+      q1: d.s4.q1 || '',
+      q2: d.s4.q2 || '',
+      q3: d.s4.q3 || '',
+      good: (d.s4.good || '').trim(),
+      improve: (d.s4.improve || '').trim(),
+    },
+  };
+
+  const records = loadSelfAssessments();
+  records.unshift(record);
+  saveSelfAssessments(records);
+
+  console.log(`行動基準評価受信: respondent="${record.respondent}"`);
+  res.json({ ok: true });
+});
+
+// 管理者向けAPI: 全データ取得
+app.get('/api/self-assessments', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  res.json(loadSelfAssessments());
+});
+
+// 管理者向け: マネージャーフィードバック保存（行動基準評価）
+app.patch('/api/self-assessments/:id/feedback', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const records = loadSelfAssessments();
+  const record = records.find(r => r.id === req.params.id);
+  if (!record) return res.status(404).json({ error: '見つかりません' });
+  record.managerFeedback = (req.body.feedback || '').trim();
+  record.feedbackAt = new Date().toISOString();
+  saveSelfAssessments(records);
+  res.json({ ok: true });
+});
+
+// 管理者向け: マネージャーフィードバック保存（360度評価）
+app.patch('/api/feedback/:id/comment', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const records = loadFeedback();
+  const record = records.find(r => r.id === req.params.id);
+  if (!record) return res.status(404).json({ error: '見つかりません' });
+  record.managerComment = (req.body.comment || '').trim();
+  record.commentAt = new Date().toISOString();
+  saveFeedback(records);
+  res.json({ ok: true });
+});
+
+// 管理者向け: 行動基準評価 HTMLページ
+app.get('/self-assessment/admin', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+
+  const records = loadSelfAssessments();
+
+  const CHOICES = { 'Yes': '✅ Yes', 'どちらでもない': '🔶 どちらでもない', 'まだできていない': '🔴 まだできていない', '': '—' };
+
+  function choiceBadge(val) {
+    const map = {
+      'Yes': 'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7',
+      'どちらでもない': 'background:#fff8e1;color:#f57f17;border:1px solid #ffe082',
+      'まだできていない': 'background:#fce4ec;color:#c62828;border:1px solid #ef9a9a',
+    };
+    const style = map[val] || 'background:#f5f5f5;color:#666';
+    const label = CHOICES[val] || val || '—';
+    return `<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold;${style}">${escHtml(label)}</span>`;
+  }
+
+  const rows = records.map(r => {
+    const dt = new Date(r.submittedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const hasFb = r.managerFeedback;
+    const fbDt = r.feedbackAt ? new Date(r.feedbackAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '';
+    return `
+<div class="record-card" id="rec-${r.id}">
+  <div class="record-header">
+    <div>
+      <strong>${escHtml(r.respondent)}</strong>
+      <span class="dt">${escHtml(dt)}</span>
+    </div>
+    <span class="fb-badge ${hasFb ? 'fb-done' : 'fb-pending'}">${hasFb ? 'FB済' : '未フィードバック'}</span>
+  </div>
+  <div class="record-body">
+    <div class="section-block">
+      <div class="sb-title">①自分の姿勢</div>
+      <div class="q-row"><span class="q-label">院内を明るくする存在である</span>${choiceBadge(r.s1.q1)}</div>
+      <div class="q-row"><span class="q-label">前向きな言葉を選んでいる</span>${choiceBadge(r.s1.q2)}</div>
+      <div class="q-row"><span class="q-label">体調管理も仕事の一部だと思っている</span>${choiceBadge(r.s1.q3)}</div>
+      <div class="text-pair">
+        <div><span class="text-label">できている点</span><div class="text-val">${escHtml(r.s1.good) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+        <div><span class="text-label">改善点</span><div class="text-val">${escHtml(r.s1.improve) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="sb-title">②患者さんへの姿勢</div>
+      <div class="q-row"><span class="q-label">患者さんの未来を考えた提案をしている</span>${choiceBadge(r.s2.q1)}</div>
+      <div class="q-row"><span class="q-label">不安を安心に変える説明をしている</span>${choiceBadge(r.s2.q2)}</div>
+      <div class="q-row"><span class="q-label">「また来たい」と思ってもらえる関わり</span>${choiceBadge(r.s2.q3)}</div>
+      <div class="text-pair">
+        <div><span class="text-label">できている点</span><div class="text-val">${escHtml(r.s2.good) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+        <div><span class="text-label">改善点</span><div class="text-val">${escHtml(r.s2.improve) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="sb-title">③成長</div>
+      <div class="q-row"><span class="q-label">分からないことはその日のうちに確認している</span>${choiceBadge(r.s3.q1)}</div>
+      <div class="q-row"><span class="q-label">新しいことにチャレンジする環境を自分で作れている</span>${choiceBadge(r.s3.q2)}</div>
+      <div class="q-row"><span class="q-label">事前報告や、すぐ報告し、チームを守っている</span>${choiceBadge(r.s3.q3)}</div>
+      <div class="text-pair">
+        <div><span class="text-label">できている点</span><div class="text-val">${escHtml(r.s3.good) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+        <div><span class="text-label">改善点</span><div class="text-val">${escHtml(r.s3.improve) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="sb-title">④チーム力</div>
+      <div class="q-row"><span class="q-label">自分のエネルギーはチームに影響すると理解している</span>${choiceBadge(r.s4.q1)}</div>
+      <div class="q-row"><span class="q-label">どうすれば良くなるかを上司に伝えられている</span>${choiceBadge(r.s4.q2)}</div>
+      <div class="q-row"><span class="q-label">医院の未来を一緒に創っていると感じている</span>${choiceBadge(r.s4.q3)}</div>
+      <div class="text-pair">
+        <div><span class="text-label">できている点</span><div class="text-val">${escHtml(r.s4.good) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+        <div><span class="text-label">改善点</span><div class="text-val">${escHtml(r.s4.improve) || '<em style="color:#9e9e9e">なし</em>'}</div></div>
+      </div>
+    </div>
+
+    <!-- Manager feedback section -->
+    <div class="feedback-section">
+      <div class="fb-title">マネージャーフィードバック</div>
+      ${hasFb ? `<div class="fb-existing">${escHtml(r.managerFeedback)}<div class="fb-date">${escHtml(fbDt)} 記入</div></div>` : ''}
+      <textarea class="fb-textarea" id="fbtxt-${r.id}" placeholder="フィードバックを入力してください...">${escHtml(r.managerFeedback)}</textarea>
+      <button type="button" class="fb-save-btn" onclick="saveFeedback('${r.id}', 'self')">保存する</button>
+      <span class="fb-saved-msg" id="fbmsg-${r.id}"></span>
+    </div>
+  </div>
+</div>`;
+  }).join('');
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>行動基準評価 管理画面</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #ede7f6; color: #333; font-size: 14px; }
+.top-bar { height: 8px; background: #673ab7; }
+header { background: #673ab7; color: #fff; padding: 16px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+header h1 { font-size: 18px; font-weight: bold; }
+header p { font-size: 12px; opacity: .8; }
+header nav a { color:#e1bee7; font-size:13px; text-decoration:none; margin-left:16px; }
+header nav a:hover { color:#fff; }
+.container { max-width: 860px; margin: 24px auto; padding: 0 16px 60px; }
+.record-card { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.1); margin-bottom:20px; overflow:hidden; }
+.record-header { background:#f3e5f5; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.record-header strong { font-size:16px; color:#512da8; }
+.dt { font-size:12px; color:#888; margin-left:10px; }
+.fb-badge { font-size:12px; font-weight:bold; padding:3px 12px; border-radius:999px; }
+.fb-done { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
+.fb-pending { background:#fff8e1; color:#f57f17; border:1px solid #ffe082; }
+.record-body { padding:20px; }
+.section-block { margin-bottom:20px; border-left:4px solid #ce93d8; padding-left:12px; }
+.sb-title { font-size:13px; font-weight:bold; color:#673ab7; margin-bottom:10px; }
+.q-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid #f3e5f5; flex-wrap:wrap; }
+.q-label { font-size:13px; color:#444; flex:1; }
+.text-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px; }
+@media(max-width:600px) { .text-pair { grid-template-columns:1fr; } }
+.text-label { font-size:11px; color:#7b1fa2; font-weight:bold; display:block; margin-bottom:4px; }
+.text-val { font-size:13px; color:#444; background:#faf5ff; border-radius:4px; padding:8px 10px; line-height:1.6; white-space:pre-wrap; }
+.feedback-section { margin-top:20px; border-top:2px dashed #ce93d8; padding-top:16px; }
+.fb-title { font-size:13px; font-weight:bold; color:#673ab7; margin-bottom:8px; }
+.fb-existing { background:#f3e5f5; border-radius:6px; padding:10px 12px; margin-bottom:10px; font-size:13px; white-space:pre-wrap; }
+.fb-date { font-size:11px; color:#9e9e9e; margin-top:4px; }
+.fb-textarea { width:100%; min-height:100px; border:1px solid #ce93d8; border-radius:6px; padding:10px 12px; font-size:13px; font-family:inherit; resize:vertical; outline:none; }
+.fb-textarea:focus { border-color:#673ab7; }
+.fb-save-btn { margin-top:8px; background:#673ab7; color:#fff; border:none; border-radius:4px; padding:8px 20px; font-size:13px; cursor:pointer; }
+.fb-save-btn:hover { background:#512da8; }
+.fb-saved-msg { font-size:12px; color:#2e7d32; margin-left:10px; }
+.empty { color:#9e9e9e; text-align:center; padding:60px; background:#fff; border-radius:10px; }
+.count-badge { background:#ce93d8; color:#fff; border-radius:999px; padding:2px 10px; font-size:12px; margin-left:8px; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<header>
+  <div>
+    <h1>行動基準評価 管理画面</h1>
+    <p>合計 ${records.length} 件 ／ フィードバック済 ${records.filter(r => r.managerFeedback).length} 件</p>
+  </div>
+  <nav>
+    <a href="/feedback/admin">360度評価へ</a>
+  </nav>
+</header>
+<div class="container">
+  ${records.length === 0
+    ? '<div class="empty">まだ回答はありません</div>'
+    : rows}
+</div>
+<script>
+async function saveFeedback(id, type) {
+  const txt = document.getElementById('fbtxt-' + id).value.trim();
+  const msgEl = document.getElementById('fbmsg-' + id);
+  const url = type === 'self' ? '/api/self-assessments/' + id + '/feedback' : '/api/feedback/' + id + '/comment';
+  const body = type === 'self' ? { feedback: txt } : { comment: txt };
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error();
+    msgEl.textContent = '✅ 保存しました';
+    setTimeout(() => { msgEl.textContent = ''; location.reload(); }, 1200);
+  } catch {
+    msgEl.style.color = '#c62828';
+    msgEl.textContent = '❌ 保存に失敗しました';
+  }
+}
+<\/script>
+</body>
+</html>`);
 });
 
 // 死活確認用
