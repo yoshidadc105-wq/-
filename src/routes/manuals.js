@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { getDb } = require('../db');
-const { requireLogin } = require('../middleware/auth');
+const { requireLogin, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -216,7 +216,7 @@ router.put('/:id/pdf', requireLogin, upload.single('pdf'), (req, res) => {
 });
 
 // マニュアル削除（論理削除）
-router.delete('/:id', requireLogin, (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
