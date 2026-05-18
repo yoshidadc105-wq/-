@@ -12,12 +12,26 @@ async function getDb() {
   if (_mongoDb) return _mongoDb;
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error('MONGODB_URI is not set');
-  const client = new MongoClient(uri);
+  const client = new MongoClient(uri, {
+    serverSelectionTimeoutMS: 10000,
+    tls: true,
+    tlsAllowInvalidCertificates: false,
+  });
   await client.connect();
   _mongoDb = client.db('nobinobi');
   console.log('MongoDB接続成功');
   return _mongoDb;
 }
+
+// async routeエラーでサーバーがクラッシュしないようにする
+const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(err => {
+  console.error('Route error:', err.message);
+  if (!res.headersSent) res.status(500).send('サーバーエラーが発生しました。管理者に連絡してください。');
+});
+
+process.on('unhandledRejection', reason => {
+  console.error('UnhandledRejection:', reason);
+});
 
 const app = express();
 
