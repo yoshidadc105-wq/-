@@ -1456,7 +1456,7 @@ async function saveFeedback(id, type) {
 app.get('/staff-admin', (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
 
-  const feedbacks = loadFeedbackRecords();
+  const feedbacks = loadFeedback();
   const selfRecs = loadSelfAssessments();
   const targets = loadTargets();
 
