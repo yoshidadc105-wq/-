@@ -1453,7 +1453,7 @@ async function saveFeedback(id, type) {
 
 // ===== 統合管理画面 =====
 
-app.get('/admin', (req, res) => {
+app.get('/staff-admin', (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
 
   const feedbacks = loadFeedbackRecords();
