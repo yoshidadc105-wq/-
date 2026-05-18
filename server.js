@@ -6,7 +6,7 @@ const { Resend } = require('resend');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const { MongoClient } = require('mongodb');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
 let _mongoDb = null;
 async function getDb() {
@@ -1543,8 +1543,8 @@ app.put('/api/questions', async (req, res) => {
 
 app.post('/api/ai-feedback/:name', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEYが設定されていません' });
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'GROQ_API_KEYが設定されていません' });
 
   const name = decodeURIComponent(req.params.name);
   const db = await getDb();
@@ -1603,13 +1603,17 @@ app.post('/api/ai-feedback/:name', async (req, res) => {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const groq = new Groq({ apiKey });
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1200,
+    });
+    const text = completion.choices[0]?.message?.content || '';
     res.json({ feedback: text });
   } catch (e) {
-    console.error('Gemini error:', e.message);
+    console.error('Groq error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1869,7 +1873,7 @@ app.get('/staff-admin', async (req, res) => {
           <textarea class="fb-ta" id="cfbtxt-${encodeURIComponent(name)}" style="min-height:200px">${escHtml(fb.feedback || fbTemplate)}</textarea>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
             <button class="save-btn" onclick="saveCompFB('${encodeURIComponent(name)}')">保存</button>
-            ${process.env.GEMINI_API_KEY ? `<button class="ai-btn" onclick="genAI('${encodeURIComponent(name)}')">✨ AIで生成</button>` : '<span style="font-size:12px;color:#888">（GEMINI_API_KEYを設定するとAI生成が使えます）</span>'}
+            ${process.env.GROQ_API_KEY ? `<button class="ai-btn" onclick="genAI('${encodeURIComponent(name)}')">✨ AIで生成</button>` : '<span style="font-size:12px;color:#888">（GROQ_API_KEYを設定するとAI生成が使えます）</span>'}
             <span class="fb-msg" id="cfbmsg-${encodeURIComponent(name)}"></span>
           </div>
         </div>
