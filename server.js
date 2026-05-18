@@ -6,6 +6,7 @@ const { Resend } = require('resend');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const { MongoClient } = require('mongodb');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 let _mongoDb = null;
 async function getDb() {
@@ -1538,6 +1539,81 @@ app.put('/api/questions', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ===== AI フィードバック生成 =====
+
+app.post('/api/ai-feedback/:name', async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEYが設定されていません' });
+
+  const name = decodeURIComponent(req.params.name);
+  const db = await getDb();
+  const [feedbacks, selfRecs, questions] = await Promise.all([
+    db.collection('feedback').find({ target: name }).sort({ submittedAt: -1 }).toArray(),
+    db.collection('selfAssessments').find({ respondent: name }).sort({ submittedAt: -1 }).toArray(),
+    loadQuestions(),
+  ]);
+
+  function qLabel(type, secId, qId) {
+    const form = type === 'sa' ? questions.selfAssessment : questions.feedback360;
+    const sec = form.sections.find(s => s.id === secId);
+    const q = sec && sec.questions.find(qi => qi.id === qId);
+    return q ? q.text : '';
+  }
+
+  // プロンプト構築
+  let prompt = `あなたは歯科クリニックの院長として、スタッフ「${name}」さんへの総合フィードバックを書いてください。\n\n`;
+  prompt += `以下の評価データをもとに、温かく具体的なフィードバックを日本語で作成してください。\n`;
+  prompt += `フォーマット：【総合コメント】【特に良かった点】【成長してほしい点】【具体的なアドバイス】【次の目標（来期に向けて）】\n\n`;
+
+  if (feedbacks.length > 0) {
+    prompt += `=== 360度評価（${feedbacks.length}件の平均スコア、1〜5点） ===\n`;
+    const avg = (key) => {
+      const vals = feedbacks.map(r => key(r)).filter(v => v > 0);
+      return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : 'データなし';
+    };
+    prompt += `${qLabel('fb','s1','q1')}: ${avg(r=>r.s1.q1)}\n`;
+    prompt += `${qLabel('fb','s1','q2')}: ${avg(r=>r.s1.q2)}\n`;
+    prompt += `${qLabel('fb','s1','q3')}: ${avg(r=>r.s1.q3)}\n`;
+    prompt += `${qLabel('fb','s2','q1')}: ${avg(r=>r.s2.q1)}\n`;
+    prompt += `${qLabel('fb','s2','q2')}: ${avg(r=>r.s2.q2)}\n`;
+    prompt += `${qLabel('fb','s2','q3')}: ${avg(r=>r.s2.q3)}\n`;
+    prompt += `${qLabel('fb','s3','q1')}: ${avg(r=>r.s3.q1)}\n`;
+    prompt += `${qLabel('fb','s3','q2')}: ${avg(r=>r.s3.q2)}\n`;
+    prompt += `${qLabel('fb','s3','q3')}: ${avg(r=>r.s3.q3)}\n`;
+    prompt += `${qLabel('fb','s4','q1')}: ${avg(r=>r.s4.q1)}\n`;
+    prompt += `${qLabel('fb','s4','q2')}: ${avg(r=>r.s4.q2)}\n`;
+    const goods = feedbacks.map(r=>[r.s1.good,r.s2.good,r.s3.good,r.s4.good]).flat().filter(Boolean);
+    const improves = feedbacks.map(r=>[r.s1.improve,r.s2.improve,r.s3.improve,r.s4.improve]).flat().filter(Boolean);
+    if (goods.length) prompt += `\nできている点（コメント）:\n${goods.join('\n')}\n`;
+    if (improves.length) prompt += `\n改善点（コメント）:\n${improves.join('\n')}\n`;
+  }
+
+  if (selfRecs.length > 0) {
+    const r = selfRecs[0];
+    prompt += `\n=== 行動基準評価（自己評価、最新回答） ===\n`;
+    const secs = [['s1','s2','s3','s4'],['q1','q2','q3']];
+    for (const sid of ['s1','s2','s3','s4']) {
+      for (const qid of ['q1','q2','q3']) {
+        if (r[sid] && r[sid][qid]) {
+          prompt += `${qLabel('sa',sid,qid)}: ${r[sid][qid]}\n`;
+        }
+      }
+    }
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    res.json({ feedback: text });
+  } catch (e) {
+    console.error('Gemini error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ===== 統合管理画面 =====
 
 app.get('/staff-admin', async (req, res) => {
@@ -1554,6 +1630,22 @@ app.get('/staff-admin', async (req, res) => {
   const compFB = {};
   for (const doc of compFBArr) {
     compFB[doc.name] = { feedback: doc.feedback, updatedAt: doc.updatedAt };
+  }
+
+  const deadline = await loadDeadline();
+  const questions = await loadQuestions();
+
+  // 質問文取得ヘルパー
+  function qText(type, secId, qId) {
+    const form = type === 'sa' ? questions.selfAssessment : questions.feedback360;
+    const sec = form.sections.find(s => s.id === secId);
+    const q = sec && sec.questions.find(qi => qi.id === qId);
+    return q ? escHtml(q.text) : '—';
+  }
+  function secTitle(type, secId) {
+    const form = type === 'sa' ? questions.selfAssessment : questions.feedback360;
+    const sec = form.sections.find(s => s.id === secId);
+    return sec ? escHtml(sec.title) : '—';
   }
 
   const byTarget = {};
@@ -1615,17 +1707,17 @@ app.get('/staff-admin', async (req, res) => {
         <div class="target-bd">
           <div class="sec-title">スコア集計（全${recs.length}件の平均）</div>
           <div class="sc-grid">
-            <div class="sc"><div class="sc-lbl">①姿勢 / 明るい存在</div>${bar(avg(recs.map(r=>r.s1.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">①姿勢 / 前向き</div>${bar(avg(recs.map(r=>r.s1.q2)))}</div>
-            <div class="sc"><div class="sc-lbl">①姿勢 / 安定</div>${bar(avg(recs.map(r=>r.s1.q3)))}</div>
-            <div class="sc"><div class="sc-lbl">②患者 / 提案</div>${bar(avg(recs.map(r=>r.s2.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">②患者 / 説明</div>${bar(avg(recs.map(r=>r.s2.q2)))}</div>
-            <div class="sc"><div class="sc-lbl">②患者 / また来たい</div>${bar(avg(recs.map(r=>r.s2.q3)))}</div>
-            <div class="sc"><div class="sc-lbl">③成長 / 質問</div>${bar(avg(recs.map(r=>r.s3.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">③成長 / 挑戦</div>${bar(avg(recs.map(r=>r.s3.q2)))}</div>
-            <div class="sc"><div class="sc-lbl">③成長 / 報告</div>${bar(avg(recs.map(r=>r.s3.q3)))}</div>
-            <div class="sc"><div class="sc-lbl">④チーム / 言動</div>${bar(avg(recs.map(r=>r.s4.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">④チーム / 未来</div>${bar(avg(recs.map(r=>r.s4.q2)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s1','q1')}</div>${bar(avg(recs.map(r=>r.s1.q1)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s1','q2')}</div>${bar(avg(recs.map(r=>r.s1.q2)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s1','q3')}</div>${bar(avg(recs.map(r=>r.s1.q3)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s2','q1')}</div>${bar(avg(recs.map(r=>r.s2.q1)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s2','q2')}</div>${bar(avg(recs.map(r=>r.s2.q2)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s2','q3')}</div>${bar(avg(recs.map(r=>r.s2.q3)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s3','q1')}</div>${bar(avg(recs.map(r=>r.s3.q1)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s3','q2')}</div>${bar(avg(recs.map(r=>r.s3.q2)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s3','q3')}</div>${bar(avg(recs.map(r=>r.s3.q3)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s4','q1')}</div>${bar(avg(recs.map(r=>r.s4.q1)))}</div>
+            <div class="sc"><div class="sc-lbl">${qText('fb','s4','q2')}</div>${bar(avg(recs.map(r=>r.s4.q2)))}</div>
           </div>
           <div class="sec-title">個別回答（${recs.length}件）</div>
           ${recs.map(r => {
@@ -1642,19 +1734,19 @@ app.get('/staff-admin', async (req, res) => {
                 <span>④: ${r.s4.q1} / ${r.s4.q2}</span>
               </div>
               <div class="tg-grid">
-                <div class="tg-sec"><div class="tg-title">①姿勢</div>
+                <div class="tg-sec"><div class="tg-title">${secTitle('fb','s1')}</div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s1.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s1.improve)||'—'}</div></div>
                 </div>
-                <div class="tg-sec"><div class="tg-title">②患者さんへの姿勢</div>
+                <div class="tg-sec"><div class="tg-title">${secTitle('fb','s2')}</div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s2.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s2.improve)||'—'}</div></div>
                 </div>
-                <div class="tg-sec"><div class="tg-title">③成長</div>
+                <div class="tg-sec"><div class="tg-title">${secTitle('fb','s3')}</div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s3.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s3.improve)||'—'}</div></div>
                 </div>
-                <div class="tg-sec"><div class="tg-title">④チーム力</div>
+                <div class="tg-sec"><div class="tg-title">${secTitle('fb','s4')}</div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s4.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s4.improve)||'—'}</div></div>
                 </div>
@@ -1681,28 +1773,28 @@ app.get('/staff-admin', async (req, res) => {
         <span class="${r.managerFeedback?'fbdone':'fbpend'}">${r.managerFeedback?'FB済':'未FB'}</span>
       </div>
       <div class="self-sections">
-        <div class="self-sec"><div class="self-sec-title">①自分の姿勢</div>
-          <div class="qrow"><span class="ql">院内を明るくする存在</span>${badge(r.s1.q1)}</div>
-          <div class="qrow"><span class="ql">前向きな言葉を選んでいる</span>${badge(r.s1.q2)}</div>
-          <div class="qrow"><span class="ql">体調管理も仕事の一部</span>${badge(r.s1.q3)}</div>
+        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s1')}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s1','q1')}</span>${badge(r.s1.q1)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s1','q2')}</span>${badge(r.s1.q2)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s1','q3')}</span>${badge(r.s1.q3)}</div>
           <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s1.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s1.improve)||'—'}</div></div></div>
         </div>
-        <div class="self-sec"><div class="self-sec-title">②患者さんへの姿勢</div>
-          <div class="qrow"><span class="ql">患者さんの未来を考えた提案</span>${badge(r.s2.q1)}</div>
-          <div class="qrow"><span class="ql">不安を安心に変える説明</span>${badge(r.s2.q2)}</div>
-          <div class="qrow"><span class="ql">また来たいと思われる関わり</span>${badge(r.s2.q3)}</div>
+        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s2')}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s2','q1')}</span>${badge(r.s2.q1)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s2','q2')}</span>${badge(r.s2.q2)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s2','q3')}</span>${badge(r.s2.q3)}</div>
           <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s2.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s2.improve)||'—'}</div></div></div>
         </div>
-        <div class="self-sec"><div class="self-sec-title">③成長</div>
-          <div class="qrow"><span class="ql">分からないことをその日に確認</span>${badge(r.s3.q1)}</div>
-          <div class="qrow"><span class="ql">チャレンジ環境を自分で作れている</span>${badge(r.s3.q2)}</div>
-          <div class="qrow"><span class="ql">事前・即時報告でチームを守っている</span>${badge(r.s3.q3)}</div>
+        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s3')}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s3','q1')}</span>${badge(r.s3.q1)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s3','q2')}</span>${badge(r.s3.q2)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s3','q3')}</span>${badge(r.s3.q3)}</div>
           <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s3.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s3.improve)||'—'}</div></div></div>
         </div>
-        <div class="self-sec"><div class="self-sec-title">④チーム力</div>
-          <div class="qrow"><span class="ql">エネルギーがチームに影響すると理解</span>${badge(r.s4.q1)}</div>
-          <div class="qrow"><span class="ql">改善策を上司に伝えられている</span>${badge(r.s4.q2)}</div>
-          <div class="qrow"><span class="ql">医院の未来を一緒に創っている</span>${badge(r.s4.q3)}</div>
+        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s4')}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s4','q1')}</span>${badge(r.s4.q1)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s4','q2')}</span>${badge(r.s4.q2)}</div>
+          <div class="qrow"><span class="ql">${qText('sa','s4','q3')}</span>${badge(r.s4.q3)}</div>
           <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s4.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s4.improve)||'—'}</div></div></div>
         </div>
       </div>
@@ -1744,18 +1836,18 @@ app.get('/staff-admin', async (req, res) => {
       const dt = new Date(latestSelf.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
       summarySelf = `<div class="comp-sub-title">行動基準評価 最新回答（${escHtml(dt)}）</div>
         <div class="self-compact">
-          <div class="sc-row"><span class="ql">①院内を明るくする存在</span>${badge(latestSelf.s1.q1)}</div>
-          <div class="sc-row"><span class="ql">①前向きな言葉</span>${badge(latestSelf.s1.q2)}</div>
-          <div class="sc-row"><span class="ql">①体調管理</span>${badge(latestSelf.s1.q3)}</div>
-          <div class="sc-row"><span class="ql">②患者への提案</span>${badge(latestSelf.s2.q1)}</div>
-          <div class="sc-row"><span class="ql">②分かりやすい説明</span>${badge(latestSelf.s2.q2)}</div>
-          <div class="sc-row"><span class="ql">②また来たい関わり</span>${badge(latestSelf.s2.q3)}</div>
-          <div class="sc-row"><span class="ql">③その日に確認</span>${badge(latestSelf.s3.q1)}</div>
-          <div class="sc-row"><span class="ql">③チャレンジ環境</span>${badge(latestSelf.s3.q2)}</div>
-          <div class="sc-row"><span class="ql">③即時報告</span>${badge(latestSelf.s3.q3)}</div>
-          <div class="sc-row"><span class="ql">④チームへの影響理解</span>${badge(latestSelf.s4.q1)}</div>
-          <div class="sc-row"><span class="ql">④改善策を上司に伝える</span>${badge(latestSelf.s4.q2)}</div>
-          <div class="sc-row"><span class="ql">④医院の未来を共に創る</span>${badge(latestSelf.s4.q3)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s1','q1')}</span>${badge(latestSelf.s1.q1)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s1','q2')}</span>${badge(latestSelf.s1.q2)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s1','q3')}</span>${badge(latestSelf.s1.q3)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s2','q1')}</span>${badge(latestSelf.s2.q1)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s2','q2')}</span>${badge(latestSelf.s2.q2)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s2','q3')}</span>${badge(latestSelf.s2.q3)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s3','q1')}</span>${badge(latestSelf.s3.q1)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s3','q2')}</span>${badge(latestSelf.s3.q2)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s3','q3')}</span>${badge(latestSelf.s3.q3)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s4','q1')}</span>${badge(latestSelf.s4.q1)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s4','q2')}</span>${badge(latestSelf.s4.q2)}</div>
+          <div class="sc-row"><span class="ql">${qText('sa','s4','q3')}</span>${badge(latestSelf.s4.q3)}</div>
         </div>`;
     } else {
       summarySelf = `<p style="color:#9e9e9e;font-size:12px;margin-bottom:8px">行動基準評価のデータなし</p>`;
@@ -1775,15 +1867,15 @@ app.get('/staff-admin', async (req, res) => {
           <div class="fb-lbl">総合フィードバック${hasFb?` <span style="font-size:11px;color:#888">（最終更新: ${escHtml(fbDt)}）</span>`:''}</div>
           <div style="font-size:12px;color:#888;margin-bottom:6px">360度評価・行動基準評価の両方を踏まえて記入してください</div>
           <textarea class="fb-ta" id="cfbtxt-${encodeURIComponent(name)}" style="min-height:200px">${escHtml(fb.feedback || fbTemplate)}</textarea>
-          <button class="save-btn" onclick="saveCompFB('${encodeURIComponent(name)}')">保存</button>
-          <span class="fb-msg" id="cfbmsg-${encodeURIComponent(name)}"></span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+            <button class="save-btn" onclick="saveCompFB('${encodeURIComponent(name)}')">保存</button>
+            ${process.env.GEMINI_API_KEY ? `<button class="ai-btn" onclick="genAI('${encodeURIComponent(name)}')">✨ AIで生成</button>` : '<span style="font-size:12px;color:#888">（GEMINI_API_KEYを設定するとAI生成が使えます）</span>'}
+            <span class="fb-msg" id="cfbmsg-${encodeURIComponent(name)}"></span>
+          </div>
         </div>
       </div>
     </div>`;
   }).join('');
-
-  const deadline = await loadDeadline();
-  const questions = await loadQuestions();
 
   function fmtDL(iso) {
     if (!iso) return '';
@@ -1855,6 +1947,9 @@ header h1{font-size:17px;font-weight:bold}
 .fb-ta:focus{border-color:#673ab7}
 .save-btn{margin-top:6px;background:#673ab7;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:13px;cursor:pointer}
 .save-btn:hover{background:#512da8}
+.ai-btn{margin-top:6px;background:#f57c00;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:13px;cursor:pointer}
+.ai-btn:hover{background:#e65100}
+.ai-btn:disabled{background:#bdbdbd;cursor:not-allowed}
 .del-dl-btn{margin-top:6px;background:#c62828;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:13px;cursor:pointer;margin-left:8px}
 .fb-msg{font-size:12px;margin-left:8px}
 .fbdone{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px;white-space:nowrap}
@@ -1932,6 +2027,21 @@ async function deleteDeadline() {
   if (!confirm('回答期限を削除（無制限に）しますか？')) return;
   const r = await fetch('/api/deadline', {method:'DELETE'});
   if (r.ok) location.reload();
+}
+async function genAI(encodedName) {
+  const btn = event.target;
+  const msg = document.getElementById('cfbmsg-' + encodedName);
+  btn.disabled = true; btn.textContent = '生成中...';
+  try {
+    const r = await fetch('/api/ai-feedback/' + encodedName, {method:'POST'});
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'エラー'); }
+    const { feedback } = await r.json();
+    document.getElementById('cfbtxt-' + encodedName).value = feedback;
+    msg.style.color='#2e7d32'; msg.textContent='生成しました。内容を確認して「保存」を押してください。';
+  } catch(e) {
+    msg.style.color='#c62828'; msg.textContent='生成失敗: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '✨ AIで生成';
 }
 async function saveQuestions() {
   const msg = document.getElementById('q-msg');
