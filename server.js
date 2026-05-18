@@ -33,26 +33,7 @@ const PRINTNODE_PRINTER_ID = process.env.PRINTNODE_PRINTER_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'quiz-admin';
 
-// ---- 簡易DB（JSONファイル）----
-
-const DB_FILE = path.join(__dirname, 'data', 'submissions.json');
-
-function loadDB() {
-  try {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function saveDB(records) {
-  try {
-    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-    fs.writeFileSync(DB_FILE, JSON.stringify(records, null, 2), 'utf8');
-  } catch (err) {
-    console.error('DB保存エラー:', err.message);
-  }
-}
+// ---- MongoDB helpers ----
 
 // ---- 管理者認証 ----
 
@@ -229,8 +210,7 @@ app.post('/submit', async (req, res) => {
   console.log(`問診表受信(${typeLabel}): ${d.name}`);
   res.status(200).json({ ok: true });
 
-  const records = loadDB();
-  records.unshift({
+  const record = {
     id: crypto.randomUUID(),
     receivedAt: new Date().toISOString(),
     type: d.type || 'adult',
@@ -240,8 +220,8 @@ app.post('/submit', async (req, res) => {
     q1: d.q1 || [],
     checked: false,
     data: d,
-  });
-  saveDB(records);
+  };
+  (await getDb()).collection('submissions').insertOne(record).catch(err => console.error('DB保存エラー:', err.message));
 
   sendFormEmail(d).catch((err) => console.error('メール送信エラー:', err.message));
   printQuestionnaire(d).catch((err) => console.error('印刷エラー:', err.message));
@@ -249,10 +229,10 @@ app.post('/submit', async (req, res) => {
 
 // ---- 管理画面 ----
 
-app.get('/admin', (req, res) => {
+app.get('/admin', async (req, res) => {
   if (!checkAdminAuth(req, res)) return;
 
-  const records = loadDB();
+  const records = await (await getDb()).collection('submissions').find({}).sort({ receivedAt: -1 }).toArray();
   const unchecked = records.filter((r) => !r.checked).length;
 
   const rows = records
@@ -330,15 +310,10 @@ tr.new td:first-child { border-left: 4px solid #f59e0b; }
 </html>`);
 });
 
-app.post('/admin/check/:id', (req, res) => {
+app.post('/admin/check/:id', async (req, res) => {
   if (!checkAdminAuth(req, res)) return;
 
-  const records = loadDB();
-  const record = records.find((r) => r.id === req.params.id);
-  if (record) {
-    record.checked = true;
-    saveDB(records);
-  }
+  await (await getDb()).collection('submissions').updateOne({ id: req.params.id }, { $set: { checked: true } });
   res.redirect('/admin');
 });
 
@@ -565,24 +540,6 @@ async function printQuestionnaire(d) {
 
 // ===== クイズシステム =====
 
-const QUIZ_FILE = path.join(__dirname, 'data', 'quizzes.json');
-const QUIZ_SUBS_FILE = path.join(__dirname, 'data', 'quiz-subs.json');
-
-function loadQuizzes() {
-  try { return JSON.parse(fs.readFileSync(QUIZ_FILE, 'utf8')); } catch { return []; }
-}
-function saveQuizzes(d) {
-  fs.mkdirSync(path.dirname(QUIZ_FILE), { recursive: true });
-  fs.writeFileSync(QUIZ_FILE, JSON.stringify(d, null, 2));
-}
-function loadQuizSubs() {
-  try { return JSON.parse(fs.readFileSync(QUIZ_SUBS_FILE, 'utf8')); } catch { return []; }
-}
-function saveQuizSubs(d) {
-  fs.mkdirSync(path.dirname(QUIZ_SUBS_FILE), { recursive: true });
-  fs.writeFileSync(QUIZ_SUBS_FILE, JSON.stringify(d, null, 2));
-}
-
 function checkApiAuth(req, res) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Basic ')) {
@@ -600,21 +557,23 @@ function checkApiAuth(req, res) {
 }
 
 // スタッフ向け: 問題一覧（答えなし）
-app.get('/api/quizzes', (req, res) => {
-  const list = loadQuizzes().map(({ id, type, title, question, options, explanation, createdAt }) => ({
+app.get('/api/quizzes', async (req, res) => {
+  const all = await (await getDb()).collection('quizzes').find({}).sort({ createdAt: -1 }).toArray();
+  const list = all.map(({ id, type, title, question, options, explanation, createdAt }) => ({
     id, type, title, question, options, explanation, createdAt,
   }));
   res.json(list);
 });
 
 // 管理者向け: 問題一覧（答えあり）
-app.get('/api/quizzes/admin', (req, res) => {
+app.get('/api/quizzes/admin', async (req, res) => {
   if (!checkApiAuth(req, res)) return;
-  res.json(loadQuizzes());
+  const all = await (await getDb()).collection('quizzes').find({}).sort({ createdAt: -1 }).toArray();
+  res.json(all);
 });
 
 // 管理者向け: 問題作成
-app.post('/api/quizzes', (req, res) => {
+app.post('/api/quizzes', async (req, res) => {
   if (!checkApiAuth(req, res)) return;
   const { type, title, question, options, answer, explanation } = req.body;
   if (!type || !title || !question) return res.status(400).json({ error: '必須項目が不足しています' });
@@ -628,41 +587,39 @@ app.post('/api/quizzes', (req, res) => {
     explanation: (explanation || '').trim(),
     createdAt: new Date().toISOString(),
   };
-  const all = loadQuizzes();
-  all.unshift(quiz);
-  saveQuizzes(all);
+  await (await getDb()).collection('quizzes').insertOne(quiz);
   res.json(quiz);
 });
 
 // 管理者向け: 問題更新
-app.put('/api/quizzes/:id', (req, res) => {
+app.put('/api/quizzes/:id', async (req, res) => {
   if (!checkApiAuth(req, res)) return;
-  const all = loadQuizzes();
-  const i = all.findIndex(q => q.id === req.params.id);
-  if (i < 0) return res.status(404).json({ error: '見つかりません' });
+  const db = await getDb();
+  const existing = await db.collection('quizzes').findOne({ id: req.params.id });
+  if (!existing) return res.status(404).json({ error: '見つかりません' });
   const { type, title, question, options, answer, explanation } = req.body;
-  all[i] = {
-    ...all[i], type,
+  const updated = {
+    ...existing, type,
     title: title.trim(), question: question.trim(),
     options: Array.isArray(options) ? options : [],
     answer: answer ?? '',
     explanation: (explanation || '').trim(),
     updatedAt: new Date().toISOString(),
   };
-  saveQuizzes(all);
-  res.json(all[i]);
+  await db.collection('quizzes').replaceOne({ id: req.params.id }, updated);
+  res.json(updated);
 });
 
 // 管理者向け: 問題削除
-app.delete('/api/quizzes/:id', (req, res) => {
+app.delete('/api/quizzes/:id', async (req, res) => {
   if (!checkApiAuth(req, res)) return;
-  saveQuizzes(loadQuizzes().filter(q => q.id !== req.params.id));
+  await (await getDb()).collection('quizzes').deleteOne({ id: req.params.id });
   res.json({ ok: true });
 });
 
 // スタッフ向け: 回答送信
-app.post('/api/quizzes/:id/submit', (req, res) => {
-  const quiz = loadQuizzes().find(q => q.id === req.params.id);
+app.post('/api/quizzes/:id/submit', async (req, res) => {
+  const quiz = await (await getDb()).collection('quizzes').findOne({ id: req.params.id });
   if (!quiz) return res.status(404).json({ error: '問題が見つかりません' });
 
   const { staffName, userAnswer } = req.body;
@@ -702,9 +659,7 @@ app.post('/api/quizzes/:id/submit', (req, res) => {
     submittedAt: new Date().toISOString(),
   };
 
-  const subs = loadQuizSubs();
-  subs.unshift(sub);
-  saveQuizSubs(subs);
+  await (await getDb()).collection('quizSubs').insertOne(sub);
 
   res.json({
     isCorrect,
@@ -714,72 +669,56 @@ app.post('/api/quizzes/:id/submit', (req, res) => {
 });
 
 // 管理者向け: 回答一覧
-app.get('/api/quiz-subs', (req, res) => {
+app.get('/api/quiz-subs', async (req, res) => {
   if (!checkApiAuth(req, res)) return;
-  res.json(loadQuizSubs());
+  const subs = await (await getDb()).collection('quizSubs').find({}).sort({ submittedAt: -1 }).toArray();
+  res.json(subs);
 });
 
 // 管理者向け: マニュアル問題の採点・メモ
-app.patch('/api/quiz-subs/:id', (req, res) => {
+app.patch('/api/quiz-subs/:id', async (req, res) => {
   if (!checkApiAuth(req, res)) return;
-  const subs = loadQuizSubs();
-  const sub = subs.find(s => s.id === req.params.id);
+  const db = await getDb();
+  const sub = await db.collection('quizSubs').findOne({ id: req.params.id });
   if (!sub) return res.status(404).json({ error: '見つかりません' });
-  if (req.body.isCorrect !== undefined) sub.isCorrect = req.body.isCorrect;
-  if (req.body.adminNote !== undefined) sub.adminNote = req.body.adminNote;
-  saveQuizSubs(subs);
-  res.json(sub);
+  const update = {};
+  if (req.body.isCorrect !== undefined) update.isCorrect = req.body.isCorrect;
+  if (req.body.adminNote !== undefined) update.adminNote = req.body.adminNote;
+  await db.collection('quizSubs').updateOne({ id: req.params.id }, { $set: update });
+  res.json({ ...sub, ...update });
 });
 
 // ===== 360度評価 対象者管理 =====
 
-const TARGETS_FILE = path.join(__dirname, 'data', 'targets.json');
-
-function loadTargets() {
-  try { return JSON.parse(fs.readFileSync(TARGETS_FILE, 'utf8')); } catch { return []; }
-}
-function saveTargets(records) {
-  fs.mkdirSync(path.dirname(TARGETS_FILE), { recursive: true });
-  fs.writeFileSync(TARGETS_FILE, JSON.stringify(records, null, 2));
-}
-
 // 公開: 対象者一覧（名前のみ）
-app.get('/api/targets', (req, res) => {
-  res.json(loadTargets().map(({ id, name }) => ({ id, name })));
+app.get('/api/targets', async (req, res) => {
+  const targets = await (await getDb()).collection('targets').find({}).toArray();
+  res.json(targets.map(({ id, name }) => ({ id, name })));
 });
 
 // 管理者: 対象者追加
-app.post('/api/targets', (req, res) => {
+app.post('/api/targets', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
   const name = (req.body.name || '').trim();
   if (!name) return res.status(400).json({ error: '名前が必要です' });
-  const targets = loadTargets();
-  if (targets.some(t => t.name === name)) return res.status(409).json({ error: 'すでに登録されています' });
+  const db = await getDb();
+  const existing = await db.collection('targets').findOne({ name });
+  if (existing) return res.status(409).json({ error: 'すでに登録されています' });
   const target = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString() };
-  targets.push(target);
-  saveTargets(targets);
+  await db.collection('targets').insertOne(target);
   res.json(target);
 });
 
 // 管理者: 対象者削除
-app.delete('/api/targets/:id', (req, res) => {
+app.delete('/api/targets/:id', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  saveTargets(loadTargets().filter(t => t.id !== req.params.id));
+  await (await getDb()).collection('targets').deleteOne({ id: req.params.id });
   res.json({ ok: true });
 });
 
 // ===== 360度評価システム =====
 
-const FEEDBACK_FILE = path.join(__dirname, 'data', 'feedback.json');
 const FEEDBACK_ADMIN_PASSWORD = process.env.FEEDBACK_ADMIN_PASSWORD || ADMIN_PASSWORD;
-
-function loadFeedback() {
-  try { return JSON.parse(fs.readFileSync(FEEDBACK_FILE, 'utf8')); } catch { return []; }
-}
-function saveFeedback(records) {
-  fs.mkdirSync(path.dirname(FEEDBACK_FILE), { recursive: true });
-  fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(records, null, 2));
-}
 
 function checkFeedbackAuth(req, res) {
   const auth = req.headers.authorization;
@@ -800,7 +739,7 @@ function checkFeedbackAuth(req, res) {
 }
 
 // フィードバック受信
-app.post('/feedback/submit', (req, res) => {
+app.post('/feedback/submit', async (req, res) => {
   const d = req.body;
   if (!d || !d.respondent || !d.s1 || !d.s2 || !d.s3 || !d.s4) {
     return res.status(400).json({ error: 'invalid data' });
@@ -842,33 +781,37 @@ app.post('/feedback/submit', (req, res) => {
     },
   };
 
-  const records = loadFeedback();
-
-  const deadline = loadDeadline();
+  const db = await getDb();
+  const deadline = await loadDeadline();
   if (deadline) {
     const since = new Date(deadline.start);
-    const dup = records.find(r => r.respondent === record.respondent && r.target === record.target && new Date(r.submittedAt) >= since);
+    const dup = await db.collection('feedback').findOne({
+      respondent: record.respondent,
+      target: record.target,
+      submittedAt: { $gte: since.toISOString() },
+    });
     if (dup) return res.status(409).json({ error: 'duplicate', message: '同じ相手への評価は今回の期間内で1回のみです。すでに提出済みです。' });
   }
 
-  records.unshift(record);
-  saveFeedback(records);
+  await db.collection('feedback').insertOne(record);
 
   console.log(`360度評価受信: target="${record.target}" respondent="${record.respondent}"`);
   res.json({ ok: true });
 });
 
 // 管理者向けAPI: 全データ取得
-app.get('/api/feedback', (req, res) => {
+app.get('/api/feedback', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  res.json(loadFeedback());
+  const records = await (await getDb()).collection('feedback').find({}).sort({ submittedAt: -1 }).toArray();
+  res.json(records);
 });
 
 // 管理者向け: HTML結果ページ
-app.get('/feedback/admin', (req, res) => {
+app.get('/feedback/admin', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
 
-  const all = loadFeedback();
+  const db = await getDb();
+  const all = await db.collection('feedback').find({}).sort({ submittedAt: -1 }).toArray();
 
   // ターゲット別に集計
   const byTarget = {};
@@ -983,7 +926,7 @@ async function saveComment(id) {
 <div class="container">`;
 
   // 対象者管理パネル
-  const targets = loadTargets();
+  const targets = await db.collection('targets').find({}).toArray();
   html += `
 <div class="target-mgmt-card">
   <div class="target-mgmt-header">対象者管理</div>
@@ -1209,18 +1152,8 @@ async function deletTarget(id) {
 
 // ===== 行動基準評価システム =====
 
-const SELF_ASSESSMENT_FILE = path.join(__dirname, 'data', 'self-assessment.json');
-
-function loadSelfAssessments() {
-  try { return JSON.parse(fs.readFileSync(SELF_ASSESSMENT_FILE, 'utf8')); } catch { return []; }
-}
-function saveSelfAssessments(records) {
-  fs.mkdirSync(path.dirname(SELF_ASSESSMENT_FILE), { recursive: true });
-  fs.writeFileSync(SELF_ASSESSMENT_FILE, JSON.stringify(records, null, 2));
-}
-
 // 行動基準評価 受信
-app.post('/self-assessment/submit', (req, res) => {
+app.post('/self-assessment/submit', async (req, res) => {
   const d = req.body;
   if (!d || !d.respondent || !d.s1 || !d.s2 || !d.s3 || !d.s4) {
     return res.status(400).json({ error: 'invalid data' });
@@ -1262,57 +1195,61 @@ app.post('/self-assessment/submit', (req, res) => {
     },
   };
 
-  const records = loadSelfAssessments();
-
-  const deadline = loadDeadline();
+  const db = await getDb();
+  const deadline = await loadDeadline();
   if (deadline) {
     const since = new Date(deadline.start);
-    const dup = records.find(r => r.respondent === record.respondent && new Date(r.submittedAt) >= since);
+    const dup = await db.collection('selfAssessments').findOne({
+      respondent: record.respondent,
+      submittedAt: { $gte: since.toISOString() },
+    });
     if (dup) return res.status(409).json({ error: 'duplicate', message: '既に提出済みです。行動基準評価は今回の期間内で1回のみです。' });
   }
 
-  records.unshift(record);
-  saveSelfAssessments(records);
+  await db.collection('selfAssessments').insertOne(record);
 
   console.log(`行動基準評価受信: respondent="${record.respondent}"`);
   res.json({ ok: true });
 });
 
 // 管理者向けAPI: 全データ取得
-app.get('/api/self-assessments', (req, res) => {
+app.get('/api/self-assessments', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  res.json(loadSelfAssessments());
+  const records = await (await getDb()).collection('selfAssessments').find({}).sort({ submittedAt: -1 }).toArray();
+  res.json(records);
 });
 
 // 管理者向け: マネージャーフィードバック保存（行動基準評価）
-app.patch('/api/self-assessments/:id/feedback', (req, res) => {
+app.patch('/api/self-assessments/:id/feedback', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  const records = loadSelfAssessments();
-  const record = records.find(r => r.id === req.params.id);
+  const db = await getDb();
+  const record = await db.collection('selfAssessments').findOne({ id: req.params.id });
   if (!record) return res.status(404).json({ error: '見つかりません' });
-  record.managerFeedback = (req.body.feedback || '').trim();
-  record.feedbackAt = new Date().toISOString();
-  saveSelfAssessments(records);
+  await db.collection('selfAssessments').updateOne(
+    { id: req.params.id },
+    { $set: { managerFeedback: (req.body.feedback || '').trim(), feedbackAt: new Date().toISOString() } }
+  );
   res.json({ ok: true });
 });
 
 // 管理者向け: マネージャーフィードバック保存（360度評価）
-app.patch('/api/feedback/:id/comment', (req, res) => {
+app.patch('/api/feedback/:id/comment', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  const records = loadFeedback();
-  const record = records.find(r => r.id === req.params.id);
+  const db = await getDb();
+  const record = await db.collection('feedback').findOne({ id: req.params.id });
   if (!record) return res.status(404).json({ error: '見つかりません' });
-  record.managerComment = (req.body.comment || '').trim();
-  record.commentAt = new Date().toISOString();
-  saveFeedback(records);
+  await db.collection('feedback').updateOne(
+    { id: req.params.id },
+    { $set: { managerComment: (req.body.comment || '').trim(), commentAt: new Date().toISOString() } }
+  );
   res.json({ ok: true });
 });
 
 // 管理者向け: 行動基準評価 HTMLページ
-app.get('/self-assessment/admin', (req, res) => {
+app.get('/self-assessment/admin', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
 
-  const records = loadSelfAssessments();
+  const records = await (await getDb()).collection('selfAssessments').find({}).sort({ submittedAt: -1 }).toArray();
 
   const CHOICES = { 'Yes': '✅ Yes', 'どちらでもない': '🔶 どちらでもない', 'まだできていない': '🔴 まだできていない', '': '—' };
 
@@ -1482,53 +1419,44 @@ async function saveFeedback(id, type) {
 
 // ===== 総合フィードバック用データ =====
 
-const COMP_FB_FILE = path.join(__dirname, 'data', 'comprehensive-feedback.json');
-function loadCompFB() {
-  try { return JSON.parse(fs.readFileSync(COMP_FB_FILE, 'utf8')); } catch { return {}; }
-}
-function saveCompFB(data) {
-  fs.mkdirSync(path.dirname(COMP_FB_FILE), { recursive: true });
-  fs.writeFileSync(COMP_FB_FILE, JSON.stringify(data, null, 2));
-}
-
-app.patch('/api/comprehensive-feedback/:name', (req, res) => {
+app.patch('/api/comprehensive-feedback/:name', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
   const name = decodeURIComponent(req.params.name);
-  const compFB = loadCompFB();
-  compFB[name] = { feedback: (req.body.feedback || '').trim(), updatedAt: new Date().toISOString() };
-  saveCompFB(compFB);
+  const doc = { name, feedback: (req.body.feedback || '').trim(), updatedAt: new Date().toISOString() };
+  await (await getDb()).collection('compFeedback').replaceOne({ name }, doc, { upsert: true });
   res.json({ ok: true });
 });
 
 // ===== 回答期限管理 =====
 
-const DEADLINE_FILE = path.join(__dirname, 'data', 'deadline.json');
-function loadDeadline() {
-  try { return JSON.parse(fs.readFileSync(DEADLINE_FILE, 'utf8')); } catch { return null; }
-}
-function saveDeadline(data) {
-  fs.mkdirSync(path.dirname(DEADLINE_FILE), { recursive: true });
-  fs.writeFileSync(DEADLINE_FILE, JSON.stringify(data, null, 2));
+async function loadDeadline() {
+  const doc = await (await getDb()).collection('settings').findOne({ _id: 'deadline' });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
 }
 
-app.get('/api/deadline', (req, res) => res.json(loadDeadline()));
-app.put('/api/deadline', (req, res) => {
+app.get('/api/deadline', async (req, res) => {
+  const deadline = await loadDeadline();
+  res.json(deadline);
+});
+app.put('/api/deadline', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
   const { start, end } = req.body;
   if (!start || !end) return res.status(400).json({ error: 'start/end required' });
-  const data = { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
-  saveDeadline(data);
-  res.json({ ok: true, data });
+  const data = { _id: 'deadline', start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+  await (await getDb()).collection('settings').replaceOne({ _id: 'deadline' }, data, { upsert: true });
+  const { _id, ...rest } = data;
+  res.json({ ok: true, data: rest });
 });
-app.delete('/api/deadline', (req, res) => {
+app.delete('/api/deadline', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  try { fs.unlinkSync(DEADLINE_FILE); } catch {}
+  await (await getDb()).collection('settings').deleteOne({ _id: 'deadline' });
   res.json({ ok: true });
 });
 
 // ===== 質問管理 =====
 
-const QUESTIONS_FILE = path.join(__dirname, 'data', 'questions.json');
 const DEFAULT_QUESTIONS = {
   feedback360: {
     sections: [
@@ -1578,30 +1506,41 @@ const DEFAULT_QUESTIONS = {
     ]
   }
 };
-function loadQuestions() {
-  try { return JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8')); } catch { return DEFAULT_QUESTIONS; }
-}
-function saveQuestions(data) {
-  fs.mkdirSync(path.dirname(QUESTIONS_FILE), { recursive: true });
-  fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(data, null, 2));
+async function loadQuestions() {
+  const doc = await (await getDb()).collection('settings').findOne({ _id: 'questions' });
+  if (!doc) return DEFAULT_QUESTIONS;
+  const { _id, ...rest } = doc;
+  return rest;
 }
 
-app.get('/api/questions', (req, res) => res.json(loadQuestions()));
-app.put('/api/questions', (req, res) => {
+app.get('/api/questions', async (req, res) => {
+  const questions = await loadQuestions();
+  res.json(questions);
+});
+app.put('/api/questions', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  saveQuestions(req.body);
+  const data = { ...req.body, _id: 'questions' };
+  await (await getDb()).collection('settings').replaceOne({ _id: 'questions' }, data, { upsert: true });
   res.json({ ok: true });
 });
 
 // ===== 統合管理画面 =====
 
-app.get('/staff-admin', (req, res) => {
+app.get('/staff-admin', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
 
-  const feedbacks = loadFeedback();
-  const selfRecs = loadSelfAssessments();
-  const targets = loadTargets();
-  const compFB = loadCompFB();
+  const db = await getDb();
+  const [feedbacks, selfRecs, targets, compFBArr] = await Promise.all([
+    db.collection('feedback').find({}).sort({ submittedAt: -1 }).toArray(),
+    db.collection('selfAssessments').find({}).sort({ submittedAt: -1 }).toArray(),
+    db.collection('targets').find({}).toArray(),
+    db.collection('compFeedback').find({}).toArray(),
+  ]);
+  // Convert compFeedback array to object keyed by name
+  const compFB = {};
+  for (const doc of compFBArr) {
+    compFB[doc.name] = { feedback: doc.feedback, updatedAt: doc.updatedAt };
+  }
 
   const byTarget = {};
   for (const r of feedbacks) {
@@ -1829,8 +1768,8 @@ app.get('/staff-admin', (req, res) => {
     </div>`;
   }).join('');
 
-  const deadline = loadDeadline();
-  const questions = loadQuestions();
+  const deadline = await loadDeadline();
+  const questions = await loadQuestions();
 
   function fmtDL(iso) {
     if (!iso) return '';
