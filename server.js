@@ -1841,11 +1841,28 @@ app.get('/staff-admin', async (req, res) => {
     let summary360 = '';
     if (recs360.length > 0) {
       summary360 = `<div class="comp-sub-title">360度評価 スコア平均（${recs360.length}件）</div>
-        <div class="sc-grid" style="margin-bottom:8px">
-          <div class="sc"><div class="sc-lbl">①姿勢</div>${bar(avg([...recs360.map(r=>r.s1.q1),...recs360.map(r=>r.s1.q2),...recs360.map(r=>r.s1.q3)]))} </div>
-          <div class="sc"><div class="sc-lbl">②患者</div>${bar(avg([...recs360.map(r=>r.s2.q1),...recs360.map(r=>r.s2.q2),...recs360.map(r=>r.s2.q3)]))} </div>
-          <div class="sc"><div class="sc-lbl">③成長</div>${bar(avg([...recs360.map(r=>r.s3.q1),...recs360.map(r=>r.s3.q2),...recs360.map(r=>r.s3.q3)]))} </div>
-          <div class="sc"><div class="sc-lbl">④チーム</div>${bar(avg([...recs360.map(r=>r.s4.q1),...recs360.map(r=>r.s4.q2)]))} </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('fb','s1')}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s1','q1')}</span>${bar(avg(recs360.map(r=>r.s1.q1)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s1','q2')}</span>${bar(avg(recs360.map(r=>r.s1.q2)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s1','q3')}</span>${bar(avg(recs360.map(r=>r.s1.q3)))}</div>
+        </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('fb','s2')}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s2','q1')}</span>${bar(avg(recs360.map(r=>r.s2.q1)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s2','q2')}</span>${bar(avg(recs360.map(r=>r.s2.q2)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s2','q3')}</span>${bar(avg(recs360.map(r=>r.s2.q3)))}</div>
+        </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('fb','s3')}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s3','q1')}</span>${bar(avg(recs360.map(r=>r.s3.q1)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s3','q2')}</span>${bar(avg(recs360.map(r=>r.s3.q2)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s3','q3')}</span>${bar(avg(recs360.map(r=>r.s3.q3)))}</div>
+        </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('fb','s4')}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s4','q1')}</span>${bar(avg(recs360.map(r=>r.s4.q1)))}</div>
+          <div class="sc-row"><span class="ql">${qText('fb','s4','q2')}</span>${bar(avg(recs360.map(r=>r.s4.q2)))}</div>
         </div>`;
     } else {
       summary360 = `<p style="color:#9e9e9e;font-size:12px;margin-bottom:8px">360度評価のデータなし</p>`;
@@ -1855,16 +1872,26 @@ app.get('/staff-admin', async (req, res) => {
     if (latestSelf) {
       const dt = new Date(latestSelf.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
       summarySelf = `<div class="comp-sub-title">行動基準評価 最新回答（${escHtml(dt)}）</div>
-        <div class="self-compact">
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('sa','s1')}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s1','q1')}</span>${badge(latestSelf.s1.q1)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s1','q2')}</span>${badge(latestSelf.s1.q2)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s1','q3')}</span>${badge(latestSelf.s1.q3)}</div>
+        </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('sa','s2')}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s2','q1')}</span>${badge(latestSelf.s2.q1)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s2','q2')}</span>${badge(latestSelf.s2.q2)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s2','q3')}</span>${badge(latestSelf.s2.q3)}</div>
+        </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('sa','s3')}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s3','q1')}</span>${badge(latestSelf.s3.q1)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s3','q2')}</span>${badge(latestSelf.s3.q2)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s3','q3')}</span>${badge(latestSelf.s3.q3)}</div>
+        </div>
+        <div class="comp-sec-block">
+          <div class="comp-sec-hd">${secTitle('sa','s4')}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s4','q1')}</span>${badge(latestSelf.s4.q1)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s4','q2')}</span>${badge(latestSelf.s4.q2)}</div>
           <div class="sc-row"><span class="ql">${qText('sa','s4','q3')}</span>${badge(latestSelf.s4.q3)}</div>
@@ -1949,6 +1976,8 @@ header h1{font-size:17px;font-weight:bold}
 .badge{background:#ce93d8;color:#fff;border-radius:999px;padding:2px 8px;font-size:12px;margin-left:6px}
 .sec-title{font-size:13px;font-weight:bold;color:#512da8;border-left:4px solid #673ab7;padding-left:8px;margin:16px 0 10px}
 .comp-sub-title{font-size:12px;font-weight:bold;color:#512da8;border-left:3px solid #ce93d8;padding-left:6px;margin:12px 0 8px}
+.comp-sec-block{margin-bottom:12px}
+.comp-sec-hd{font-size:11px;font-weight:bold;color:#512da8;background:#ede7f6;border-radius:4px;padding:3px 8px;margin-bottom:4px}
 .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
 .sc{background:#f3e5f5;border-radius:8px;padding:10px 12px}
 .sc-lbl{font-size:11px;color:#7b1fa2;margin-bottom:6px}
