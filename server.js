@@ -5,6 +5,19 @@ const axios = require('axios');
 const { Resend } = require('resend');
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const { MongoClient } = require('mongodb');
+
+let _mongoDb = null;
+async function getDb() {
+  if (_mongoDb) return _mongoDb;
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is not set');
+  const client = new MongoClient(uri);
+  await client.connect();
+  _mongoDb = client.db('nobinobi');
+  console.log('MongoDB接続成功');
+  return _mongoDb;
+}
 
 const app = express();
 
