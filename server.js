@@ -1491,11 +1491,7 @@ app.get('/staff-admin', (req, res) => {
   }
 
   // 360度評価セクション
-  let sec360 = '';
-  if (feedbacks.length === 0) {
-    sec360 = '<div class="empty">まだ回答はありません</div>';
-  } else {
-    sec360 += `<div class="mgmt-card">
+  let sec360 = `<div class="mgmt-card">
       <div class="mgmt-hd" style="background:#4a148c">対象者管理</div>
       <div class="mgmt-bd">
         <div class="target-list">
@@ -1550,7 +1546,7 @@ app.get('/staff-admin', (req, res) => {
         </div>
       </div>`;
     }
-  }
+  if (feedbacks.length === 0) sec360 += '<div class="empty">まだ回答はありません</div>';
 
   // 行動基準評価セクション
   const selfRows = selfRecs.map(r => {
