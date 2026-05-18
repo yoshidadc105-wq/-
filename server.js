@@ -1710,18 +1710,36 @@ app.get('/staff-admin', async (req, res) => {
         <div class="target-hd">${escHtml(tName)} さん <span class="badge">${recs.length}件</span></div>
         <div class="target-bd">
           <div class="sec-title">スコア集計（全${recs.length}件の平均）</div>
-          <div class="sc-grid">
-            <div class="sc"><div class="sc-lbl">${qText('fb','s1','q1')}</div>${bar(avg(recs.map(r=>r.s1.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s1','q2')}</div>${bar(avg(recs.map(r=>r.s1.q2)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s1','q3')}</div>${bar(avg(recs.map(r=>r.s1.q3)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s2','q1')}</div>${bar(avg(recs.map(r=>r.s2.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s2','q2')}</div>${bar(avg(recs.map(r=>r.s2.q2)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s2','q3')}</div>${bar(avg(recs.map(r=>r.s2.q3)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s3','q1')}</div>${bar(avg(recs.map(r=>r.s3.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s3','q2')}</div>${bar(avg(recs.map(r=>r.s3.q2)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s3','q3')}</div>${bar(avg(recs.map(r=>r.s3.q3)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s4','q1')}</div>${bar(avg(recs.map(r=>r.s4.q1)))}</div>
-            <div class="sc"><div class="sc-lbl">${qText('fb','s4','q2')}</div>${bar(avg(recs.map(r=>r.s4.q2)))}</div>
+          <div class="avg-sec-block">
+            <div class="avg-sec-hd">${secTitle('fb','s1')}</div>
+            <div class="sc-grid">
+              <div class="sc"><div class="sc-lbl">${qText('fb','s1','q1')}</div>${bar(avg(recs.map(r=>r.s1.q1)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s1','q2')}</div>${bar(avg(recs.map(r=>r.s1.q2)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s1','q3')}</div>${bar(avg(recs.map(r=>r.s1.q3)))}</div>
+            </div>
+          </div>
+          <div class="avg-sec-block">
+            <div class="avg-sec-hd">${secTitle('fb','s2')}</div>
+            <div class="sc-grid">
+              <div class="sc"><div class="sc-lbl">${qText('fb','s2','q1')}</div>${bar(avg(recs.map(r=>r.s2.q1)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s2','q2')}</div>${bar(avg(recs.map(r=>r.s2.q2)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s2','q3')}</div>${bar(avg(recs.map(r=>r.s2.q3)))}</div>
+            </div>
+          </div>
+          <div class="avg-sec-block">
+            <div class="avg-sec-hd">${secTitle('fb','s3')}</div>
+            <div class="sc-grid">
+              <div class="sc"><div class="sc-lbl">${qText('fb','s3','q1')}</div>${bar(avg(recs.map(r=>r.s3.q1)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s3','q2')}</div>${bar(avg(recs.map(r=>r.s3.q2)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s3','q3')}</div>${bar(avg(recs.map(r=>r.s3.q3)))}</div>
+            </div>
+          </div>
+          <div class="avg-sec-block">
+            <div class="avg-sec-hd">${secTitle('fb','s4')}</div>
+            <div class="sc-grid">
+              <div class="sc"><div class="sc-lbl">${qText('fb','s4','q1')}</div>${bar(avg(recs.map(r=>r.s4.q1)))}</div>
+              <div class="sc"><div class="sc-lbl">${qText('fb','s4','q2')}</div>${bar(avg(recs.map(r=>r.s4.q2)))}</div>
+            </div>
           </div>
           <div class="sec-title">個別回答（${recs.length}件）</div>
           ${recs.map(r => {
@@ -1731,26 +1749,24 @@ app.get('/staff-admin', async (req, res) => {
                 <span><strong>${escHtml(r.respondent)}</strong> <span class="dt-sm">${escHtml(dt)}</span></span>
                 <span class="${r.managerComment?'fbdone':'fbpend'}">${r.managerComment?'コメント済':'未コメント'}</span>
               </div>
-              <div class="score-row">
-                <span>①: ${r.s1.q1} / ${r.s1.q2} / ${r.s1.q3}</span>
-                <span>②: ${r.s2.q1} / ${r.s2.q2} / ${r.s2.q3}</span>
-                <span>③: ${r.s3.q1} / ${r.s3.q2} / ${r.s3.q3}</span>
-                <span>④: ${r.s4.q1} / ${r.s4.q2}</span>
-              </div>
               <div class="tg-grid">
                 <div class="tg-sec"><div class="tg-title">${secTitle('fb','s1')}</div>
+                  <div class="tg-row scores-row"><span class="tl">スコア</span><div class="tv score-chips"><span class="schip">${qText('fb','s1','q1')}: <strong>${r.s1.q1}</strong></span><span class="schip">${qText('fb','s1','q2')}: <strong>${r.s1.q2}</strong></span><span class="schip">${qText('fb','s1','q3')}: <strong>${r.s1.q3}</strong></span></div></div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s1.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s1.improve)||'—'}</div></div>
                 </div>
                 <div class="tg-sec"><div class="tg-title">${secTitle('fb','s2')}</div>
+                  <div class="tg-row scores-row"><span class="tl">スコア</span><div class="tv score-chips"><span class="schip">${qText('fb','s2','q1')}: <strong>${r.s2.q1}</strong></span><span class="schip">${qText('fb','s2','q2')}: <strong>${r.s2.q2}</strong></span><span class="schip">${qText('fb','s2','q3')}: <strong>${r.s2.q3}</strong></span></div></div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s2.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s2.improve)||'—'}</div></div>
                 </div>
                 <div class="tg-sec"><div class="tg-title">${secTitle('fb','s3')}</div>
+                  <div class="tg-row scores-row"><span class="tl">スコア</span><div class="tv score-chips"><span class="schip">${qText('fb','s3','q1')}: <strong>${r.s3.q1}</strong></span><span class="schip">${qText('fb','s3','q2')}: <strong>${r.s3.q2}</strong></span><span class="schip">${qText('fb','s3','q3')}: <strong>${r.s3.q3}</strong></span></div></div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s3.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s3.improve)||'—'}</div></div>
                 </div>
                 <div class="tg-sec"><div class="tg-title">${secTitle('fb','s4')}</div>
+                  <div class="tg-row scores-row"><span class="tl">スコア</span><div class="tv score-chips"><span class="schip">${qText('fb','s4','q1')}: <strong>${r.s4.q1}</strong></span><span class="schip">${qText('fb','s4','q2')}: <strong>${r.s4.q2}</strong></span></div></div>
                   <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s4.good)||'—'}</div></div>
                   <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s4.improve)||'—'}</div></div>
                 </div>
@@ -1940,11 +1956,15 @@ header h1{font-size:17px;font-weight:bold}
 .rec-mini-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px}
 .dt-sm{font-size:12px;color:#888;margin-left:8px}
 .score-row{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#555;background:#f3e5f5;border-radius:6px;padding:8px 12px;margin-bottom:10px}
+.avg-sec-block{margin-bottom:16px}
+.avg-sec-hd{font-size:12px;font-weight:bold;color:#512da8;background:#ede7f6;border-radius:4px;padding:4px 10px;margin-bottom:8px}
 .tg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 @media(max-width:700px){.tg-grid{grid-template-columns:1fr}}
-.tg-sec{border-left:3px solid #ce93d8;padding-left:8px}
-.tg-title{font-size:12px;font-weight:bold;color:#673ab7;margin-bottom:6px}
+.tg-sec{border-left:3px solid #ce93d8;padding-left:8px;margin-bottom:4px}
+.tg-title{font-size:12px;font-weight:bold;color:#673ab7;background:#f3e5f5;border-radius:4px;padding:3px 8px;margin-bottom:6px}
 .tg-row{margin-bottom:6px}
+.score-chips{display:flex;flex-wrap:wrap;gap:6px}
+.schip{font-size:11px;background:#fff;border:1px solid #ce93d8;border-radius:4px;padding:2px 7px;color:#444}
 .fb-area{margin-top:10px}
 .fb-lbl{font-size:13px;font-weight:bold;color:#512da8;margin-bottom:6px}
 .fb-ta{width:100%;min-height:80px;border:1px solid #ce93d8;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none}
