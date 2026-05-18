@@ -830,6 +830,14 @@ app.post('/feedback/submit', (req, res) => {
   };
 
   const records = loadFeedback();
+
+  const deadline = loadDeadline();
+  if (deadline) {
+    const since = new Date(deadline.start);
+    const dup = records.find(r => r.respondent === record.respondent && r.target === record.target && new Date(r.submittedAt) >= since);
+    if (dup) return res.status(409).json({ error: 'duplicate', message: '同じ相手への評価は今回の期間内で1回のみです。すでに提出済みです。' });
+  }
+
   records.unshift(record);
   saveFeedback(records);
 
@@ -1242,6 +1250,14 @@ app.post('/self-assessment/submit', (req, res) => {
   };
 
   const records = loadSelfAssessments();
+
+  const deadline = loadDeadline();
+  if (deadline) {
+    const since = new Date(deadline.start);
+    const dup = records.find(r => r.respondent === record.respondent && new Date(r.submittedAt) >= since);
+    if (dup) return res.status(409).json({ error: 'duplicate', message: '既に提出済みです。行動基準評価は今回の期間内で1回のみです。' });
+  }
+
   records.unshift(record);
   saveSelfAssessments(records);
 
@@ -1468,6 +1484,99 @@ app.patch('/api/comprehensive-feedback/:name', (req, res) => {
   const compFB = loadCompFB();
   compFB[name] = { feedback: (req.body.feedback || '').trim(), updatedAt: new Date().toISOString() };
   saveCompFB(compFB);
+  res.json({ ok: true });
+});
+
+// ===== 回答期限管理 =====
+
+const DEADLINE_FILE = path.join(__dirname, 'data', 'deadline.json');
+function loadDeadline() {
+  try { return JSON.parse(fs.readFileSync(DEADLINE_FILE, 'utf8')); } catch { return null; }
+}
+function saveDeadline(data) {
+  fs.mkdirSync(path.dirname(DEADLINE_FILE), { recursive: true });
+  fs.writeFileSync(DEADLINE_FILE, JSON.stringify(data, null, 2));
+}
+
+app.get('/api/deadline', (req, res) => res.json(loadDeadline()));
+app.put('/api/deadline', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const { start, end } = req.body;
+  if (!start || !end) return res.status(400).json({ error: 'start/end required' });
+  const data = { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+  saveDeadline(data);
+  res.json({ ok: true, data });
+});
+app.delete('/api/deadline', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  try { fs.unlinkSync(DEADLINE_FILE); } catch {}
+  res.json({ ok: true });
+});
+
+// ===== 質問管理 =====
+
+const QUESTIONS_FILE = path.join(__dirname, 'data', 'questions.json');
+const DEFAULT_QUESTIONS = {
+  feedback360: {
+    sections: [
+      { id: 's1', title: 'セクション①姿勢', questions: [
+        { id: 'q1', text: '自分を明るくする存在である' },
+        { id: 'q2', text: '自分に対して前向きな言葉や態度で接してくれる' },
+        { id: 'q3', text: '体調管理を含め、安定した状態で仕事に取り組んでいるようにみえる' }
+      ]},
+      { id: 's2', title: 'セクション②患者さんへの姿勢', questions: [
+        { id: 'q1', text: '患者さんの将来を考えた提案をしているようにみえる' },
+        { id: 'q2', text: '不安を和らげる分かりやすい説明をしているようにみえる' },
+        { id: 'q3', text: '「また来たい」と思ってもらえる関わりをしているようにみえる' }
+      ]},
+      { id: 's3', title: 'セクション③成長', questions: [
+        { id: 'q1', text: '分からないことを明確にするためによく質問をしているようにみえる' },
+        { id: 'q2', text: '新しいことにチャレンジするための環境を自分で作れているようにみえる' },
+        { id: 'q3', text: '事前報告や、すぐ報告し、チームを守っているようにみえる' }
+      ]},
+      { id: 's4', title: 'セクション④チーム力', questions: [
+        { id: 'q1', text: '自分のエネルギーはチームに影響すると理解しているようにみえる' },
+        { id: 'q2', text: 'どうすれば良くなるかを、個人的に上司に伝えられているようにみえる' }
+      ]}
+    ]
+  },
+  selfAssessment: {
+    sections: [
+      { id: 's1', title: 'セクション①自分の姿勢', questions: [
+        { id: 'q1', text: '私は院内を明るくする存在である' },
+        { id: 'q2', text: '前向きな言葉を選んでいる' },
+        { id: 'q3', text: '体調管理も仕事の一部だと思っている' }
+      ]},
+      { id: 's2', title: 'セクション②患者さんへの姿勢', questions: [
+        { id: 'q1', text: '患者さんの未来を考えた提案をしている' },
+        { id: 'q2', text: '不安を安心に変える説明をしている' },
+        { id: 'q3', text: '「また来たい」と思ってもらえる関わりをしている' }
+      ]},
+      { id: 's3', title: 'セクション③成長', questions: [
+        { id: 'q1', text: '分からないことはその日のうちに確認している' },
+        { id: 'q2', text: '新しいことにチャレンジするための環境を自分で作れている' },
+        { id: 'q3', text: '事前報告や、すぐ報告し、チームを守っている' }
+      ]},
+      { id: 's4', title: 'セクション④チーム力', questions: [
+        { id: 'q1', text: '自分のエネルギーはチームに影響すると理解している' },
+        { id: 'q2', text: 'どうすれば良くなるかを、個人的に上司に伝えられている' },
+        { id: 'q3', text: '医院の未来を一緒に創っていると感じている' }
+      ]}
+    ]
+  }
+};
+function loadQuestions() {
+  try { return JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8')); } catch { return DEFAULT_QUESTIONS; }
+}
+function saveQuestions(data) {
+  fs.mkdirSync(path.dirname(QUESTIONS_FILE), { recursive: true });
+  fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(data, null, 2));
+}
+
+app.get('/api/questions', (req, res) => res.json(loadQuestions()));
+app.put('/api/questions', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  saveQuestions(req.body);
   res.json({ ok: true });
 });
 
@@ -1707,6 +1816,32 @@ app.get('/staff-admin', (req, res) => {
     </div>`;
   }).join('');
 
+  const deadline = loadDeadline();
+  const questions = loadQuestions();
+
+  function fmtDL(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // 質問編集UI生成
+  function qEditSection(type, label) {
+    const secs = type === 'feedback360' ? questions.feedback360.sections : questions.selfAssessment.sections;
+    const key = type;
+    return secs.map(sec => `
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:bold;color:#512da8;border-left:4px solid #673ab7;padding-left:8px;margin-bottom:8px">
+          セクションタイトル
+          <input data-q-type="${key}" data-q-sec="${sec.id}" data-q-field="title" type="text" value="${escHtml(sec.title)}" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:5px 8px;font-size:13px;margin-top:4px;font-family:inherit;outline:none;box-sizing:border-box" />
+        </div>
+        ${sec.questions.map(q => `
+          <div style="margin-bottom:8px">
+            <div style="font-size:11px;color:#888;margin-bottom:3px">質問${q.id.toUpperCase()}</div>
+            <input data-q-type="${key}" data-q-sec="${sec.id}" data-q-id="${q.id}" type="text" value="${escHtml(q.text)}" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:5px 8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box" />
+          </div>`).join('')}
+      </div>`).join('');
+  }
+
   res.send(`<!DOCTYPE html><html lang="ja"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>スタッフ評価 管理</title>
@@ -1716,16 +1851,16 @@ body{font-family:sans-serif;background:#ede7f6;color:#333;font-size:14px}
 .topbar{height:8px;background:#673ab7}
 header{background:#673ab7;color:#fff;padding:14px 20px}
 header h1{font-size:17px;font-weight:bold}
-.tabs{display:flex;background:#512da8;max-width:1100px;margin:0 auto}
-.tab-btn{flex:1;padding:12px 8px;background:none;border:none;color:#e1bee7;font-size:13px;cursor:pointer;font-weight:bold;transition:background .2s;white-space:nowrap}
+.tabs{display:flex;background:#512da8;max-width:1100px;margin:0 auto;flex-wrap:wrap}
+.tab-btn{flex:1;min-width:80px;padding:12px 8px;background:none;border:none;color:#e1bee7;font-size:13px;cursor:pointer;font-weight:bold;transition:background .2s;white-space:nowrap}
 .tab-btn.active{background:#fff;color:#673ab7}
 .tab-btn:hover:not(.active){background:#4527a0;color:#fff}
 .wrap{max-width:1100px;margin:16px auto;padding:0 16px 60px}
 .tab-panel{display:none}.tab-panel.active{display:block}
-.mgmt-card,.target-block,.comp-card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:20px;overflow:hidden}
-.mgmt-hd,.target-hd,.comp-hd{color:#fff;padding:12px 18px;font-size:15px;font-weight:bold;background:#512da8;display:flex;justify-content:space-between;align-items:center}
+.mgmt-card,.target-block,.comp-card,.set-card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:20px;overflow:hidden}
+.mgmt-hd,.target-hd,.comp-hd,.set-hd{color:#fff;padding:12px 18px;font-size:15px;font-weight:bold;background:#512da8;display:flex;justify-content:space-between;align-items:center}
 .comp-hd{font-size:16px}
-.mgmt-bd,.target-bd,.comp-bd{padding:16px}
+.mgmt-bd,.target-bd,.comp-bd,.set-bd{padding:16px}
 .target-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;min-height:28px}
 .target-item{display:flex;align-items:center;gap:6px;background:#f3e5f5;border-radius:20px;padding:4px 12px;font-size:13px}
 .del-btn{background:none;border:none;color:#9c27b0;cursor:pointer;font-size:11px}
@@ -1754,6 +1889,7 @@ header h1{font-size:17px;font-weight:bold}
 .fb-ta:focus{border-color:#673ab7}
 .save-btn{margin-top:6px;background:#673ab7;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:13px;cursor:pointer}
 .save-btn:hover{background:#512da8}
+.del-dl-btn{margin-top:6px;background:#c62828;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:13px;cursor:pointer;margin-left:8px}
 .fb-msg{font-size:12px;margin-left:8px}
 .fbdone{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px;white-space:nowrap}
 .fbpend{background:#fff8e1;color:#f57f17;border:1px solid #ffe082;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px;white-space:nowrap}
@@ -1770,6 +1906,14 @@ header h1{font-size:17px;font-weight:bold}
 .self-compact{border:1px solid #f3e5f5;border-radius:6px;padding:8px;margin-bottom:8px}
 .comp-data{background:#faf5ff;border-radius:8px;padding:14px;border:1px solid #e8d5f5}
 .empty{color:#9e9e9e;text-align:center;padding:40px;background:#fff;border-radius:10px}
+.dl-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}
+.dl-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#512da8;font-weight:bold}
+.dl-input{border:1px solid #ce93d8;border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none}
+.dl-input:focus{border-color:#673ab7}
+.dl-current{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.q-form-block{margin-bottom:24px;background:#faf5ff;border-radius:8px;padding:14px;border:1px solid #e8d5f5}
+.q-form-title{font-size:14px;font-weight:bold;color:#512da8;margin-bottom:12px}
+input[data-q-type]{display:block}
 </style>
 <script>
 function switchTab(tab) {
@@ -1808,22 +1952,91 @@ async function saveCompFB(encodedName) {
   if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>{msg.textContent='';location.reload();},1000); }
   else { msg.style.color='#c62828'; msg.textContent='エラー'; }
 }
+async function saveDeadline() {
+  const s = document.getElementById('dl-start').value;
+  const e = document.getElementById('dl-end').value;
+  const msg = document.getElementById('dl-msg');
+  if (!s || !e) { msg.style.color='#c62828'; msg.textContent='開始・終了を両方入力してください'; return; }
+  if (new Date(s) >= new Date(e)) { msg.style.color='#c62828'; msg.textContent='終了は開始より後にしてください'; return; }
+  const r = await fetch('/api/deadline', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:s,end:e})});
+  if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>location.reload(),800); }
+  else { msg.style.color='#c62828'; msg.textContent='エラー'; }
+}
+async function deleteDeadline() {
+  if (!confirm('回答期限を削除（無制限に）しますか？')) return;
+  const r = await fetch('/api/deadline', {method:'DELETE'});
+  if (r.ok) location.reload();
+}
+async function saveQuestions() {
+  const msg = document.getElementById('q-msg');
+  const inputs = document.querySelectorAll('[data-q-type]');
+  const data = {feedback360:{sections:[]},selfAssessment:{sections:[]}};
+  const map = {};
+  inputs.forEach(el => {
+    const type = el.dataset.qType;
+    const sec = el.dataset.qSec;
+    const field = el.dataset.qField;
+    const qid = el.dataset.qId;
+    if (!map[type]) map[type] = {};
+    if (!map[type][sec]) map[type][sec] = {id:sec,title:'',questions:[]};
+    if (field === 'title') { map[type][sec].title = el.value.trim(); }
+    else if (qid) { map[type][sec].questions.push({id:qid,text:el.value.trim()}); }
+  });
+  for (const type of ['feedback360','selfAssessment']) {
+    data[type].sections = Object.values(map[type] || {});
+  }
+  const r = await fetch('/api/questions', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました（次回フォームアクセス時から反映）'; }
+  else { msg.style.color='#c62828'; msg.textContent='エラー'; }
+}
 <\/script>
 </head><body>
 <div class="topbar"></div>
 <header><h1>スタッフ評価 管理画面</h1></header>
 <div class="tabs">
-  <button class="tab-btn active" id="tab-360" onclick="switchTab('360')">360度評価（${feedbacks.length}件）</button>
-  <button class="tab-btn" id="tab-self" onclick="switchTab('self')">行動基準評価（${selfRecs.length}件）</button>
+  <button class="tab-btn active" id="tab-self" onclick="switchTab('self')">行動基準評価（${selfRecs.length}件）</button>
+  <button class="tab-btn" id="tab-360" onclick="switchTab('360')">360度評価（${feedbacks.length}件）</button>
   <button class="tab-btn" id="tab-comp" onclick="switchTab('comp')">総合フィードバック（${allNames.length}名）</button>
+  <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">設定</button>
 </div>
 <div class="wrap">
-  <div class="tab-panel active" id="panel-360">${sec360}</div>
-  <div class="tab-panel" id="panel-self">
+  <div class="tab-panel active" id="panel-self">
     ${selfRecs.length === 0 ? '<div class="empty">まだ回答はありません</div>' : selfRows}
   </div>
+  <div class="tab-panel" id="panel-360">${sec360}</div>
   <div class="tab-panel" id="panel-comp">
     ${allNames.length === 0 ? '<div class="empty">まだデータはありません</div>' : compRows}
+  </div>
+  <div class="tab-panel" id="panel-settings">
+    <div class="set-card">
+      <div class="set-hd">回答期限設定</div>
+      <div class="set-bd">
+        ${deadline ? `<div class="dl-current">現在の設定: <strong>${escHtml(fmtDL(deadline.start))}</strong> 〜 <strong>${escHtml(fmtDL(deadline.end))}</strong></div>` : '<div class="dl-current" style="background:#fff8e1;border-color:#ffe082">期限未設定（いつでも回答可）</div>'}
+        <div class="dl-row">
+          <div class="dl-field">開始日時<input class="dl-input" type="datetime-local" id="dl-start" value="${deadline ? deadline.start.slice(0,16) : ''}" /></div>
+          <div class="dl-field">終了日時<input class="dl-input" type="datetime-local" id="dl-end" value="${deadline ? deadline.end.slice(0,16) : ''}" /></div>
+          <button class="save-btn" onclick="saveDeadline()">保存</button>
+          ${deadline ? '<button class="del-dl-btn" onclick="deleteDeadline()">期限を削除</button>' : ''}
+        </div>
+        <span id="dl-msg" style="font-size:12px"></span>
+        <p style="font-size:12px;color:#888;margin-top:8px">期限を設定すると、開始日以降は同じ人の重複回答が防止されます。期限終了後はフォームが締め切り表示になります。</p>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="set-hd">質問文の編集</div>
+      <div class="set-bd">
+        <div class="q-form-block">
+          <div class="q-form-title">360度評価 質問文</div>
+          ${qEditSection('feedback360', '360度評価')}
+        </div>
+        <div class="q-form-block">
+          <div class="q-form-title">行動基準評価（自己評価）質問文</div>
+          ${qEditSection('selfAssessment', '行動基準評価')}
+        </div>
+        <button class="save-btn" onclick="saveQuestions()">質問文を保存</button>
+        <span id="q-msg" style="font-size:12px;margin-left:8px"></span>
+      </div>
+    </div>
   </div>
 </div>
 </body></html>`);

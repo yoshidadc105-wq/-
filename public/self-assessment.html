@@ -142,6 +142,21 @@
     .clear-link { font-size: 13px; color: #673ab7; cursor: pointer; text-decoration: none; }
     .clear-link:hover { text-decoration: underline; }
 
+    /* Deadline banner */
+    .deadline-banner {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.12);
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      border-left: 4px solid #673ab7;
+    }
+    .deadline-banner.closed { border-left-color: #d93025; background: #fce4ec; }
+
     /* Success */
     #success-screen { display: none; text-align: center; padding: 60px 20px; }
     .success-card {
@@ -152,7 +167,19 @@
     }
     .success-icon { font-size: 56px; margin-bottom: 16px; }
     .success-card h2 { font-size: 22px; color: #673ab7; margin-bottom: 12px; }
-    .success-card p { color: #5f6368; font-size: 14px; }
+    .success-card p { color: #5f6368; font-size: 14px; margin-bottom: 20px; }
+    .back-btn {
+      display: inline-block;
+      background: #673ab7;
+      color: #fff;
+      border-radius: 4px;
+      padding: 10px 28px;
+      font-size: 14px;
+      font-weight: bold;
+      text-decoration: none;
+      margin-top: 8px;
+    }
+    .back-btn:hover { background: #512da8; }
 
     @media (max-width: 480px) {
       .header-card-body { padding: 16px; }
@@ -164,12 +191,16 @@
 <div class="top-bar"></div>
 <div class="container">
 
+  <!-- Deadline banner -->
+  <div id="deadline-banner" style="display:none" class="deadline-banner"></div>
+
   <!-- Success screen -->
   <div id="success-screen">
     <div class="success-card">
       <div class="success-icon">✅</div>
       <h2>回答を送信しました</h2>
       <p>行動基準評価へのご回答ありがとうございました。</p>
+      <a href="/" class="back-btn">ホームへ戻る</a>
     </div>
   </div>
 
@@ -203,11 +234,11 @@
 
     <!-- Section 1 — 自分の姿勢 -->
     <div class="section-card">
-      <div class="section-header">セクション①自分の姿勢</div>
+      <div class="section-header" data-q-section="s1">セクション①自分の姿勢</div>
     </div>
 
     <div class="question-card" id="card-s1q1">
-      <div class="question-label">私は院内を明るくする存在である <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s1.q1">私は院内を明るくする存在である <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s1q1" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s1q1" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -217,7 +248,7 @@
     </div>
 
     <div class="question-card" id="card-s1q2">
-      <div class="question-label">前向きな言葉を選んでいる <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s1.q2">前向きな言葉を選んでいる <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s1q2" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s1q2" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -227,7 +258,7 @@
     </div>
 
     <div class="question-card" id="card-s1q3">
-      <div class="question-label">体調管理も仕事の一部だと思っている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s1.q3">体調管理も仕事の一部だと思っている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s1q3" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s1q3" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -250,11 +281,11 @@
 
     <!-- Section 2 — 患者さんへの姿勢 -->
     <div class="section-card">
-      <div class="section-header">セクション②患者さんへの姿勢</div>
+      <div class="section-header" data-q-section="s2">セクション②患者さんへの姿勢</div>
     </div>
 
     <div class="question-card" id="card-s2q1">
-      <div class="question-label">患者さんの未来を考えた提案をしている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s2.q1">患者さんの未来を考えた提案をしている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s2q1" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s2q1" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -264,7 +295,7 @@
     </div>
 
     <div class="question-card" id="card-s2q2">
-      <div class="question-label">不安を安心に変える説明をしている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s2.q2">不安を安心に変える説明をしている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s2q2" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s2q2" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -274,7 +305,7 @@
     </div>
 
     <div class="question-card" id="card-s2q3">
-      <div class="question-label">「また来たい」と思ってもらえる関わりをしている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s2.q3">「また来たい」と思ってもらえる関わりをしている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s2q3" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s2q3" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -297,11 +328,11 @@
 
     <!-- Section 3 — 成長 -->
     <div class="section-card">
-      <div class="section-header">セクション③成長</div>
+      <div class="section-header" data-q-section="s3">セクション③成長</div>
     </div>
 
     <div class="question-card" id="card-s3q1">
-      <div class="question-label">分からないことはその日のうちに確認している <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s3.q1">分からないことはその日のうちに確認している <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s3q1" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s3q1" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -311,7 +342,7 @@
     </div>
 
     <div class="question-card" id="card-s3q2">
-      <div class="question-label">新しいことにチャレンジするための環境を自分で作れている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s3.q2">新しいことにチャレンジするための環境を自分で作れている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s3q2" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s3q2" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -321,7 +352,7 @@
     </div>
 
     <div class="question-card" id="card-s3q3">
-      <div class="question-label">事前報告や、すぐ報告し、チームを守っている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s3.q3">事前報告や、すぐ報告し、チームを守っている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s3q3" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s3q3" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -344,11 +375,11 @@
 
     <!-- Section 4 — チーム力 -->
     <div class="section-card">
-      <div class="section-header">セクション④チーム力</div>
+      <div class="section-header" data-q-section="s4">セクション④チーム力</div>
     </div>
 
     <div class="question-card" id="card-s4q1">
-      <div class="question-label">自分のエネルギーはチームに影響すると理解している <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s4.q1">自分のエネルギーはチームに影響すると理解している <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s4q1" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s4q1" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -358,7 +389,7 @@
     </div>
 
     <div class="question-card" id="card-s4q2">
-      <div class="question-label">どうすれば良くなるかを、個人的に上司に伝えられている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s4.q2">どうすれば良くなるかを、個人的に上司に伝えられている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s4q2" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s4q2" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -368,7 +399,7 @@
     </div>
 
     <div class="question-card" id="card-s4q3">
-      <div class="question-label">医院の未来を一緒に創っていると感じている <span class="required-star">*</span></div>
+      <div class="question-label" data-q-key="s4.q3">医院の未来を一緒に創っていると感じている <span class="required-star">*</span></div>
       <div class="radio-options">
         <label class="radio-option"><input type="radio" name="s4q3" value="Yes" /><span>Yes</span></label>
         <label class="radio-option"><input type="radio" name="s4q3" value="どちらでもない" /><span>どちらでもない</span></label>
@@ -399,6 +430,51 @@
 </div>
 
 <script>
+  // 期限・質問文の読み込み
+  (async () => {
+    // Deadline check
+    try {
+      const dl = await fetch('/api/deadline').then(r => r.json());
+      const banner = document.getElementById('deadline-banner');
+      if (dl) {
+        const now = new Date();
+        const end = new Date(dl.end);
+        const start = new Date(dl.start);
+        if (now > end) {
+          banner.className = 'deadline-banner closed';
+          banner.innerHTML = '⛔ 回答期限が終了しました（' + end.toLocaleString('ja-JP', {timeZone:'Asia/Tokyo'}) + ' 締切）';
+          banner.style.display = 'flex';
+          document.getElementById('submit-btn').disabled = true;
+          document.getElementById('submit-btn').textContent = '締め切り済み';
+        } else {
+          const diff = Math.ceil((end - now) / 86400000);
+          banner.innerHTML = '📅 回答期限: ' + end.toLocaleString('ja-JP', {timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) + ' まで（残り ' + diff + ' 日）';
+          banner.style.display = 'flex';
+        }
+      }
+    } catch {}
+
+    // Question text update
+    try {
+      const qs = await fetch('/api/questions').then(r => r.json());
+      const sa = qs.selfAssessment;
+      document.querySelectorAll('[data-q-section]').forEach(el => {
+        const sec = sa.sections.find(s => s.id === el.dataset.qSection);
+        if (sec) el.textContent = sec.title;
+      });
+      document.querySelectorAll('[data-q-key]').forEach(el => {
+        const [secId, qId] = el.dataset.qKey.split('.');
+        const sec = sa.sections.find(s => s.id === secId);
+        const q = sec && sec.questions.find(qi => qi.id === qId);
+        if (q) {
+          const star = el.querySelector('.required-star');
+          el.textContent = q.text + ' ';
+          if (star) el.appendChild(star);
+        }
+      });
+    } catch {}
+  })();
+
   // Auto-grow textareas
   document.querySelectorAll('.long-text').forEach(ta => {
     ta.addEventListener('input', () => {
@@ -530,6 +606,13 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      if (res.status === 409) {
+        const body = await res.json();
+        alert(body.message || '既に提出済みです。');
+        btn.disabled = false;
+        btn.textContent = '送信';
+        return;
+      }
       if (!res.ok) throw new Error('server error');
       document.getElementById('self-form').style.display = 'none';
       document.getElementById('success-screen').style.display = 'block';
