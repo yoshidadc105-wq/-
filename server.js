@@ -1451,6 +1451,26 @@ async function saveFeedback(id, type) {
 </html>`);
 });
 
+// ===== 総合フィードバック用データ =====
+
+const COMP_FB_FILE = path.join(__dirname, 'data', 'comprehensive-feedback.json');
+function loadCompFB() {
+  try { return JSON.parse(fs.readFileSync(COMP_FB_FILE, 'utf8')); } catch { return {}; }
+}
+function saveCompFB(data) {
+  fs.mkdirSync(path.dirname(COMP_FB_FILE), { recursive: true });
+  fs.writeFileSync(COMP_FB_FILE, JSON.stringify(data, null, 2));
+}
+
+app.patch('/api/comprehensive-feedback/:name', (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const name = decodeURIComponent(req.params.name);
+  const compFB = loadCompFB();
+  compFB[name] = { feedback: (req.body.feedback || '').trim(), updatedAt: new Date().toISOString() };
+  saveCompFB(compFB);
+  res.json({ ok: true });
+});
+
 // ===== 統合管理画面 =====
 
 app.get('/staff-admin', (req, res) => {
@@ -1459,12 +1479,18 @@ app.get('/staff-admin', (req, res) => {
   const feedbacks = loadFeedback();
   const selfRecs = loadSelfAssessments();
   const targets = loadTargets();
+  const compFB = loadCompFB();
 
   const byTarget = {};
   for (const r of feedbacks) {
     const key = r.target || '（未指定）';
     if (!byTarget[key]) byTarget[key] = [];
     byTarget[key].push(r);
+  }
+  const bySelf = {};
+  for (const r of selfRecs) {
+    if (!bySelf[r.respondent]) bySelf[r.respondent] = [];
+    bySelf[r.respondent].push(r);
   }
 
   function avg(arr) {
@@ -1490,25 +1516,29 @@ app.get('/staff-admin', (req, res) => {
     return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold;${style}">${escHtml(val || '—')}</span>`;
   }
 
-  // 360度評価セクション
+  // ===== 360度評価タブ =====
   let sec360 = `<div class="mgmt-card">
-      <div class="mgmt-hd" style="background:#4a148c">対象者管理</div>
-      <div class="mgmt-bd">
-        <div class="target-list">
-          ${targets.length === 0 ? '<p style="color:#9e9e9e;font-size:13px">未登録</p>' : targets.map(t => `<div class="target-item"><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delTarget('${t.id}')">✕</button></div>`).join('')}
-        </div>
-        <div class="add-row">
-          <input type="text" id="nt" class="add-input" placeholder="名前を入力" />
-          <button class="add-btn" onclick="addTarget()">＋ 追加</button>
-          <span id="tmsg" style="font-size:12px"></span>
-        </div>
+    <div class="mgmt-hd" style="background:#4a148c">対象者管理</div>
+    <div class="mgmt-bd">
+      <div class="target-list">
+        ${targets.length === 0 ? '<p style="color:#9e9e9e;font-size:13px">未登録</p>' : targets.map(t => `<div class="target-item"><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delTarget('${t.id}')">✕</button></div>`).join('')}
       </div>
-    </div>`;
+      <div class="add-row">
+        <input type="text" id="nt" class="add-input" placeholder="名前を入力" />
+        <button class="add-btn" onclick="addTarget()">＋ 追加</button>
+        <span id="tmsg" style="font-size:12px"></span>
+      </div>
+    </div>
+  </div>`;
+
+  if (feedbacks.length === 0) {
+    sec360 += '<div class="empty">まだ回答はありません</div>';
+  } else {
     for (const [tName, recs] of Object.entries(byTarget)) {
       sec360 += `<div class="target-block">
         <div class="target-hd">${escHtml(tName)} さん <span class="badge">${recs.length}件</span></div>
         <div class="target-bd">
-          <div class="sec-title">スコア集計</div>
+          <div class="sec-title">スコア集計（全${recs.length}件の平均）</div>
           <div class="sc-grid">
             <div class="sc"><div class="sc-lbl">①姿勢 / 明るい存在</div>${bar(avg(recs.map(r=>r.s1.q1)))}</div>
             <div class="sc"><div class="sc-lbl">①姿勢 / 前向き</div>${bar(avg(recs.map(r=>r.s1.q2)))}</div>
@@ -1522,21 +1552,40 @@ app.get('/staff-admin', (req, res) => {
             <div class="sc"><div class="sc-lbl">④チーム / 言動</div>${bar(avg(recs.map(r=>r.s4.q1)))}</div>
             <div class="sc"><div class="sc-lbl">④チーム / 未来</div>${bar(avg(recs.map(r=>r.s4.q2)))}</div>
           </div>
-          <div class="sec-title">個別回答 & フィードバック</div>
+          <div class="sec-title">個別回答（${recs.length}件）</div>
           ${recs.map(r => {
             const dt = new Date(r.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
             return `<div class="rec-card">
               <div class="rec-mini-hd">
-                <span><strong>${escHtml(r.respondent)}</strong> <span style="font-size:12px;color:#888">${escHtml(dt)}</span></span>
-                <span style="color:${r.managerComment?'#2e7d32':'#f57f17'};font-size:12px;font-weight:bold">${r.managerComment?'FB済':'未FB'}</span>
+                <span><strong>${escHtml(r.respondent)}</strong> <span class="dt-sm">${escHtml(dt)}</span></span>
+                <span class="${r.managerComment?'fbdone':'fbpend'}">${r.managerComment?'コメント済':'未コメント'}</span>
               </div>
-              <div style="font-size:12px;color:#555;margin:8px 0 4px">
-                ①: ${r.s1.q1}/${r.s1.q2}/${r.s1.q3} &nbsp;
-                ②: ${r.s2.q1}/${r.s2.q2}/${r.s2.q3} &nbsp;
-                ③: ${r.s3.q1}/${r.s3.q2}/${r.s3.q3} &nbsp;
-                ④: ${r.s4.q1}/${r.s4.q2}
+              <div class="score-row">
+                <span>①: ${r.s1.q1} / ${r.s1.q2} / ${r.s1.q3}</span>
+                <span>②: ${r.s2.q1} / ${r.s2.q2} / ${r.s2.q3}</span>
+                <span>③: ${r.s3.q1} / ${r.s3.q2} / ${r.s3.q3}</span>
+                <span>④: ${r.s4.q1} / ${r.s4.q2}</span>
+              </div>
+              <div class="tg-grid">
+                <div class="tg-sec"><div class="tg-title">①姿勢</div>
+                  <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s1.good)||'—'}</div></div>
+                  <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s1.improve)||'—'}</div></div>
+                </div>
+                <div class="tg-sec"><div class="tg-title">②患者さんへの姿勢</div>
+                  <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s2.good)||'—'}</div></div>
+                  <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s2.improve)||'—'}</div></div>
+                </div>
+                <div class="tg-sec"><div class="tg-title">③成長</div>
+                  <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s3.good)||'—'}</div></div>
+                  <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s3.improve)||'—'}</div></div>
+                </div>
+                <div class="tg-sec"><div class="tg-title">④チーム力</div>
+                  <div class="tg-row"><span class="tl">できている点</span><div class="tv">${escHtml(r.s4.good)||'—'}</div></div>
+                  <div class="tg-row"><span class="tl">改善点</span><div class="tv">${escHtml(r.s4.improve)||'—'}</div></div>
+                </div>
               </div>
               <div class="fb-area">
+                <div class="fb-lbl">この回答へのコメント</div>
                 <textarea class="fb-ta" id="cmttxt-${r.id}">${escHtml(r.managerComment||'')}</textarea>
                 <button class="save-btn" onclick="saveFB('${r.id}','feedback')">保存</button>
                 <span class="fb-msg" id="fbmsg-${r.id}"></span>
@@ -1546,14 +1595,14 @@ app.get('/staff-admin', (req, res) => {
         </div>
       </div>`;
     }
-  if (feedbacks.length === 0) sec360 += '<div class="empty">まだ回答はありません</div>';
+  }
 
-  // 行動基準評価セクション
+  // ===== 行動基準評価タブ =====
   const selfRows = selfRecs.map(r => {
     const dt = new Date(r.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
     return `<div class="rec-card">
       <div class="rec-mini-hd">
-        <span><strong>${escHtml(r.respondent)}</strong> <span style="font-size:12px;color:#888">${escHtml(dt)}</span></span>
+        <span><strong>${escHtml(r.respondent)}</strong> <span class="dt-sm">${escHtml(dt)}</span></span>
         <span class="${r.managerFeedback?'fbdone':'fbpend'}">${r.managerFeedback?'FB済':'未FB'}</span>
       </div>
       <div class="self-sections">
@@ -1583,9 +1632,77 @@ app.get('/staff-admin', (req, res) => {
         </div>
       </div>
       <div class="fb-area" style="margin-top:12px">
+        <div class="fb-lbl">フィードバック</div>
         <textarea class="fb-ta" id="fbtxt-${r.id}">${escHtml(r.managerFeedback||'')}</textarea>
         <button class="save-btn" onclick="saveFB('${r.id}','self')">保存</button>
         <span class="fb-msg" id="fbmsg-${r.id}"></span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ===== 総合フィードバックタブ =====
+  const allNames = [...new Set([...Object.keys(byTarget), ...Object.keys(bySelf)])].sort();
+  const fbTemplate = `【総合コメント】\n\n\n【特に良かった点】\n\n\n【成長してほしい点】\n\n\n【具体的なアドバイス】\n\n\n【次の目標（来期に向けて）】\n`;
+  const compRows = allNames.map(name => {
+    const fb = compFB[name] || {};
+    const recs360 = byTarget[name] || [];
+    const recsSelf = bySelf[name] || [];
+    const latestSelf = recsSelf[0];
+    const hasFb = !!fb.feedback;
+    const fbDt = fb.updatedAt ? new Date(fb.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}) : '';
+
+    let summary360 = '';
+    if (recs360.length > 0) {
+      summary360 = `<div class="comp-sub-title">360度評価 スコア平均（${recs360.length}件）</div>
+        <div class="sc-grid" style="margin-bottom:8px">
+          <div class="sc"><div class="sc-lbl">①姿勢</div>${bar(avg([...recs360.map(r=>r.s1.q1),...recs360.map(r=>r.s1.q2),...recs360.map(r=>r.s1.q3)]))} </div>
+          <div class="sc"><div class="sc-lbl">②患者</div>${bar(avg([...recs360.map(r=>r.s2.q1),...recs360.map(r=>r.s2.q2),...recs360.map(r=>r.s2.q3)]))} </div>
+          <div class="sc"><div class="sc-lbl">③成長</div>${bar(avg([...recs360.map(r=>r.s3.q1),...recs360.map(r=>r.s3.q2),...recs360.map(r=>r.s3.q3)]))} </div>
+          <div class="sc"><div class="sc-lbl">④チーム</div>${bar(avg([...recs360.map(r=>r.s4.q1),...recs360.map(r=>r.s4.q2)]))} </div>
+        </div>`;
+    } else {
+      summary360 = `<p style="color:#9e9e9e;font-size:12px;margin-bottom:8px">360度評価のデータなし</p>`;
+    }
+
+    let summarySelf = '';
+    if (latestSelf) {
+      const dt = new Date(latestSelf.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
+      summarySelf = `<div class="comp-sub-title">行動基準評価 最新回答（${escHtml(dt)}）</div>
+        <div class="self-compact">
+          <div class="sc-row"><span class="ql">①院内を明るくする存在</span>${badge(latestSelf.s1.q1)}</div>
+          <div class="sc-row"><span class="ql">①前向きな言葉</span>${badge(latestSelf.s1.q2)}</div>
+          <div class="sc-row"><span class="ql">①体調管理</span>${badge(latestSelf.s1.q3)}</div>
+          <div class="sc-row"><span class="ql">②患者への提案</span>${badge(latestSelf.s2.q1)}</div>
+          <div class="sc-row"><span class="ql">②分かりやすい説明</span>${badge(latestSelf.s2.q2)}</div>
+          <div class="sc-row"><span class="ql">②また来たい関わり</span>${badge(latestSelf.s2.q3)}</div>
+          <div class="sc-row"><span class="ql">③その日に確認</span>${badge(latestSelf.s3.q1)}</div>
+          <div class="sc-row"><span class="ql">③チャレンジ環境</span>${badge(latestSelf.s3.q2)}</div>
+          <div class="sc-row"><span class="ql">③即時報告</span>${badge(latestSelf.s3.q3)}</div>
+          <div class="sc-row"><span class="ql">④チームへの影響理解</span>${badge(latestSelf.s4.q1)}</div>
+          <div class="sc-row"><span class="ql">④改善策を上司に伝える</span>${badge(latestSelf.s4.q2)}</div>
+          <div class="sc-row"><span class="ql">④医院の未来を共に創る</span>${badge(latestSelf.s4.q3)}</div>
+        </div>`;
+    } else {
+      summarySelf = `<p style="color:#9e9e9e;font-size:12px;margin-bottom:8px">行動基準評価のデータなし</p>`;
+    }
+
+    return `<div class="comp-card">
+      <div class="comp-hd">
+        <span>${escHtml(name)} さん</span>
+        <span class="${hasFb?'fbdone':'fbpend'}">${hasFb?'FB済':'未FB'}</span>
+      </div>
+      <div class="comp-bd">
+        <div class="comp-data">
+          ${summary360}
+          ${summarySelf}
+        </div>
+        <div class="fb-area" style="margin-top:16px">
+          <div class="fb-lbl">総合フィードバック${hasFb?` <span style="font-size:11px;color:#888">（最終更新: ${escHtml(fbDt)}）</span>`:''}</div>
+          <div style="font-size:12px;color:#888;margin-bottom:6px">360度評価・行動基準評価の両方を踏まえて記入してください</div>
+          <textarea class="fb-ta" id="cfbtxt-${encodeURIComponent(name)}" style="min-height:200px">${escHtml(fb.feedback || fbTemplate)}</textarea>
+          <button class="save-btn" onclick="saveCompFB('${encodeURIComponent(name)}')">保存</button>
+          <span class="fb-msg" id="cfbmsg-${encodeURIComponent(name)}"></span>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1597,17 +1714,18 @@ app.get('/staff-admin', (req, res) => {
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:sans-serif;background:#ede7f6;color:#333;font-size:14px}
 .topbar{height:8px;background:#673ab7}
-header{background:#673ab7;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+header{background:#673ab7;color:#fff;padding:14px 20px}
 header h1{font-size:17px;font-weight:bold}
-.tabs{display:flex;gap:0;background:#512da8;border-radius:0 0 8px 8px;overflow:hidden;max-width:960px;margin:0 auto}
-.tab-btn{flex:1;padding:12px;background:none;border:none;color:#e1bee7;font-size:14px;cursor:pointer;font-weight:bold;transition:background .2s}
+.tabs{display:flex;background:#512da8;max-width:1100px;margin:0 auto}
+.tab-btn{flex:1;padding:12px 8px;background:none;border:none;color:#e1bee7;font-size:13px;cursor:pointer;font-weight:bold;transition:background .2s;white-space:nowrap}
 .tab-btn.active{background:#fff;color:#673ab7}
 .tab-btn:hover:not(.active){background:#4527a0;color:#fff}
-.wrap{max-width:960px;margin:16px auto;padding:0 16px 60px}
+.wrap{max-width:1100px;margin:16px auto;padding:0 16px 60px}
 .tab-panel{display:none}.tab-panel.active{display:block}
-.mgmt-card,.target-block{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:20px;overflow:hidden}
-.mgmt-hd,.target-hd{color:#fff;padding:12px 18px;font-size:15px;font-weight:bold;background:#512da8}
-.mgmt-bd,.target-bd{padding:16px}
+.mgmt-card,.target-block,.comp-card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:20px;overflow:hidden}
+.mgmt-hd,.target-hd,.comp-hd{color:#fff;padding:12px 18px;font-size:15px;font-weight:bold;background:#512da8;display:flex;justify-content:space-between;align-items:center}
+.comp-hd{font-size:16px}
+.mgmt-bd,.target-bd,.comp-bd{padding:16px}
 .target-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;min-height:28px}
 .target-item{display:flex;align-items:center;gap:6px;background:#f3e5f5;border-radius:20px;padding:4px 12px;font-size:13px}
 .del-btn{background:none;border:none;color:#9c27b0;cursor:pointer;font-size:11px}
@@ -1617,28 +1735,40 @@ header h1{font-size:17px;font-weight:bold}
 .add-btn{background:#673ab7;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer}
 .badge{background:#ce93d8;color:#fff;border-radius:999px;padding:2px 8px;font-size:12px;margin-left:6px}
 .sec-title{font-size:13px;font-weight:bold;color:#512da8;border-left:4px solid #673ab7;padding-left:8px;margin:16px 0 10px}
-.sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+.comp-sub-title{font-size:12px;font-weight:bold;color:#512da8;border-left:3px solid #ce93d8;padding-left:6px;margin:12px 0 8px}
+.sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
 .sc{background:#f3e5f5;border-radius:8px;padding:10px 12px}
 .sc-lbl{font-size:11px;color:#7b1fa2;margin-bottom:6px}
-.rec-card{background:#faf5ff;border-radius:8px;padding:12px 14px;margin-bottom:12px;border:1px solid #e8d5f5}
-.rec-mini-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.fb-area{margin-top:8px}
-.fb-ta{width:100%;min-height:70px;border:1px solid #ce93d8;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none}
+.rec-card{background:#faf5ff;border-radius:8px;padding:14px 16px;margin-bottom:12px;border:1px solid #e8d5f5}
+.rec-mini-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px}
+.dt-sm{font-size:12px;color:#888;margin-left:8px}
+.score-row{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#555;background:#f3e5f5;border-radius:6px;padding:8px 12px;margin-bottom:10px}
+.tg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:700px){.tg-grid{grid-template-columns:1fr}}
+.tg-sec{border-left:3px solid #ce93d8;padding-left:8px}
+.tg-title{font-size:12px;font-weight:bold;color:#673ab7;margin-bottom:6px}
+.tg-row{margin-bottom:6px}
+.fb-area{margin-top:10px}
+.fb-lbl{font-size:13px;font-weight:bold;color:#512da8;margin-bottom:6px}
+.fb-ta{width:100%;min-height:80px;border:1px solid #ce93d8;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none}
 .fb-ta:focus{border-color:#673ab7}
-.save-btn{margin-top:6px;background:#673ab7;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:13px;cursor:pointer}
+.save-btn{margin-top:6px;background:#673ab7;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:13px;cursor:pointer}
 .save-btn:hover{background:#512da8}
 .fb-msg{font-size:12px;margin-left:8px}
-.fbdone{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px}
-.fbpend{background:#fff8e1;color:#f57f17;border:1px solid #ffe082;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px}
-.self-sections{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.fbdone{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.fbpend{background:#fff8e1;color:#f57f17;border:1px solid #ffe082;font-size:12px;font-weight:bold;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.self-sections{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
 @media(max-width:600px){.self-sections{grid-template-columns:1fr}}
 .self-sec{border-left:3px solid #ce93d8;padding-left:10px}
 .self-sec-title{font-size:12px;font-weight:bold;color:#673ab7;margin-bottom:8px}
-.qrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid #f3e5f5;flex-wrap:wrap}
+.qrow,.sc-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid #f3e5f5;flex-wrap:wrap}
 .ql{font-size:12px;color:#444;flex:1}
 .text-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+@media(max-width:500px){.text-pair{grid-template-columns:1fr}}
 .tl{font-size:11px;color:#7b1fa2;font-weight:bold;display:block;margin-bottom:2px}
-.tv{font-size:12px;color:#444;background:#fff;border-radius:4px;padding:6px 8px;white-space:pre-wrap;line-height:1.5}
+.tv{font-size:12px;color:#444;background:#f9f5ff;border-radius:4px;padding:6px 8px;white-space:pre-wrap;line-height:1.5;min-height:30px}
+.self-compact{border:1px solid #f3e5f5;border-radius:6px;padding:8px;margin-bottom:8px}
+.comp-data{background:#faf5ff;border-radius:8px;padding:14px;border:1px solid #e8d5f5}
 .empty{color:#9e9e9e;text-align:center;padding:40px;background:#fff;border-radius:10px}
 </style>
 <script>
@@ -1671,6 +1801,13 @@ async function saveFB(id, type) {
   if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>{msg.textContent='';location.reload();},1000); }
   else { msg.style.color='#c62828'; msg.textContent='エラー'; }
 }
+async function saveCompFB(encodedName) {
+  const txtEl = document.getElementById('cfbtxt-' + encodedName);
+  const msg = document.getElementById('cfbmsg-' + encodedName);
+  const r = await fetch('/api/comprehensive-feedback/' + encodedName, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({feedback: txtEl.value.trim()})});
+  if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>{msg.textContent='';location.reload();},1000); }
+  else { msg.style.color='#c62828'; msg.textContent='エラー'; }
+}
 <\/script>
 </head><body>
 <div class="topbar"></div>
@@ -1678,11 +1815,15 @@ async function saveFB(id, type) {
 <div class="tabs">
   <button class="tab-btn active" id="tab-360" onclick="switchTab('360')">360度評価（${feedbacks.length}件）</button>
   <button class="tab-btn" id="tab-self" onclick="switchTab('self')">行動基準評価（${selfRecs.length}件）</button>
+  <button class="tab-btn" id="tab-comp" onclick="switchTab('comp')">総合フィードバック（${allNames.length}名）</button>
 </div>
 <div class="wrap">
   <div class="tab-panel active" id="panel-360">${sec360}</div>
   <div class="tab-panel" id="panel-self">
     ${selfRecs.length === 0 ? '<div class="empty">まだ回答はありません</div>' : selfRows}
+  </div>
+  <div class="tab-panel" id="panel-comp">
+    ${allNames.length === 0 ? '<div class="empty">まだデータはありません</div>' : compRows}
   </div>
 </div>
 </body></html>`);
