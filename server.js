@@ -2123,7 +2123,12 @@ app.get('/staff-admin', async (req, res) => {
 
   function fmtDL(iso) {
     if (!iso) return '';
-    return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+  function toJSTDate(iso) {
+    if (!iso) return '';
+    const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
   }
 
   // 質問編集UI生成
@@ -2322,8 +2327,8 @@ function addPeriodRow() {
   const tr = document.createElement('tr');
   tr.style.borderBottom = '1px solid #f3e5f5';
   const td1 = '<td style="padding:8px"><input type="text" placeholder="例: 2026年4月期" data-field="label" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
-  const td2 = '<td style="padding:8px"><input type="datetime-local" data-field="start" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
-  const td3 = '<td style="padding:8px"><input type="datetime-local" data-field="end" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
+  const td2 = '<td style="padding:8px"><input type="date" data-field="start" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
+  const td3 = '<td style="padding:8px"><input type="date" data-field="end" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
   const td4 = '<td style="padding:8px"><button onclick="deletePeriodRow(this)" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">削除</button></td>';
   tr.innerHTML = td1 + td2 + td3 + td4;
   tbody.appendChild(tr);
@@ -2341,8 +2346,9 @@ async function savePeriods() {
     const end = row.querySelector('[data-field="end"]').value;
     const pid = row.querySelector('[data-field="label"]').dataset.pid || '';
     if (!label || !start || !end) { msg.style.color='#c62828'; msg.textContent='全ての行を入力してください'; return; }
-    if (new Date(start) >= new Date(end)) { msg.style.color='#c62828'; msg.textContent='「' + label + '」の終了は開始より後にしてください'; return; }
-    list.push({ id: pid, label, start: new Date(start).toISOString(), end: new Date(end).toISOString() });
+    if (start > end) { msg.style.color='#c62828'; msg.textContent='「' + label + '」の終了日は開始日以降にしてください'; return; }
+    // 日付のみ入力 → JST 00:00:00 / 23:59:59 としてUTC変換
+    list.push({ id: pid, label, start: new Date(start + 'T00:00:00+09:00').toISOString(), end: new Date(end + 'T23:59:59+09:00').toISOString() });
   }
   const r = await fetch('/api/periods', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({list})});
   if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>location.reload(),800); }
@@ -2441,8 +2447,8 @@ async function saveQuestions() {
           <tbody id="periods-body">
             ${periods.sort((a,b)=>new Date(a.start)-new Date(b.start)).map((p,i)=>`<tr data-idx="${i}" style="border-bottom:1px solid #f3e5f5">
               <td style="padding:8px"><input type="text" value="${escHtml(p.label)}" data-field="label" data-pid="${escHtml(p.id)}" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
-              <td style="padding:8px"><input type="datetime-local" value="${p.start.slice(0,16)}" data-field="start" data-pid="${escHtml(p.id)}" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
-              <td style="padding:8px"><input type="datetime-local" value="${p.end.slice(0,16)}" data-field="end" data-pid="${escHtml(p.id)}" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+              <td style="padding:8px"><input type="date" value="${toJSTDate(p.start)}" data-field="start" data-pid="${escHtml(p.id)}" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+              <td style="padding:8px"><input type="date" value="${toJSTDate(p.end)}" data-field="end" data-pid="${escHtml(p.id)}" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
               <td style="padding:8px"><button onclick="deletePeriodRow(this)" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">削除</button></td>
             </tr>`).join('')}
           </tbody>
