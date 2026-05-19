@@ -274,7 +274,9 @@
     <!-- 回答者 -->
     <div class="question-card" id="card-respondent">
       <div class="question-label">回答者（あなたの名前）<span class="required-star">*</span></div>
-      <input type="text" class="short-text" id="respondent" placeholder="短文回答" autocomplete="name" />
+      <select id="respondent" class="short-text" style="cursor:pointer">
+        <option value="">-- 選択してください --</option>
+      </select>
       <div class="field-error" id="err-respondent">この項目は必須です</div>
     </div>
 
@@ -590,13 +592,16 @@
       });
     } catch {}
 
-    // Populate target dropdown
+    // Populate target dropdown and respondent dropdown
     const sel = document.getElementById('target-select');
+    const resSel = document.getElementById('respondent');
     targets.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.name;
       opt.textContent = t.name;
       sel.appendChild(opt);
+      const opt2 = opt.cloneNode(true);
+      resSel.appendChild(opt2);
     });
 
     if (deadlineClosed) {
@@ -637,7 +642,7 @@
       });
     });
 
-    document.getElementById('respondent').addEventListener('focus', () => {
+    document.getElementById('respondent').addEventListener('change', () => {
       document.getElementById('err-respondent').style.display = 'none';
       document.getElementById('card-respondent').classList.remove('has-error');
     });
@@ -649,7 +654,7 @@
 
     window.clearForm = function() {
       if (!confirm('入力内容をすべてクリアしますか？')) return;
-      document.getElementById('respondent').value = '';
+      document.getElementById('respondent').selectedIndex = 0;
       document.getElementById('target-select').value = '';
       document.querySelectorAll('.long-text').forEach(ta => { ta.value = ''; ta.style.height = ''; });
       Object.keys(ratings).forEach(f => {

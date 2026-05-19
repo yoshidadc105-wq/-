@@ -227,8 +227,10 @@
 
     <!-- 回答者 -->
     <div class="question-card" id="card-respondent">
-      <div class="question-label">回答者 <span class="required-star">*</span></div>
-      <input type="text" class="short-text" id="respondent" placeholder="短文回答" autocomplete="name" />
+      <div class="question-label">回答者（あなたの名前）<span class="required-star">*</span></div>
+      <select id="respondent" class="short-text" style="cursor:pointer">
+        <option value="">-- 選択してください --</option>
+      </select>
       <div class="field-error" id="err-respondent">この項目は必須です</div>
     </div>
 
@@ -475,6 +477,20 @@
     } catch {}
   })();
 
+  // 回答者プルダウンにtargetsを読み込む
+  (async () => {
+    try {
+      const targets = await fetch('/api/targets').then(r => r.json());
+      const sel = document.getElementById('respondent');
+      targets.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.name;
+        opt.textContent = t.name;
+        sel.appendChild(opt);
+      });
+    } catch {}
+  })();
+
   // Auto-grow textareas
   document.querySelectorAll('.long-text').forEach(ta => {
     ta.addEventListener('input', () => {
@@ -489,7 +505,7 @@
     });
   });
 
-  document.getElementById('respondent').addEventListener('focus', () => {
+  document.getElementById('respondent').addEventListener('change', () => {
     document.getElementById('err-respondent').style.display = 'none';
     document.getElementById('card-respondent').classList.remove('has-error');
   });
@@ -506,7 +522,7 @@
 
   function clearForm() {
     if (!confirm('入力内容をすべてクリアしますか？')) return;
-    document.getElementById('respondent').value = '';
+    document.getElementById('respondent').selectedIndex = 0;
     document.querySelectorAll('.long-text').forEach(ta => { ta.value = ''; ta.style.height = ''; });
     document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
     document.querySelectorAll('.field-error').forEach(e => e.style.display = 'none');
