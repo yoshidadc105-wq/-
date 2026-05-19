@@ -1624,76 +1624,91 @@ app.post('/api/ai-feedback/:name', async (req, res) => {
   }
 
   // プロンプト構築
-  let prompt = `歯科クリニックのスタッフ「${name}」さんへの具体的な総合フィードバックを日本語で作成してください。\n`;
-  prompt += `冒頭に「院長より」などの書き出しは不要です。本文から始めてください。\n\n`;
-  prompt += `【重要な分析ポイント】\n`;
-  prompt += `- 行動基準評価（自己評価）と360度評価（周囲の評価）のスコアを比較し、ずれが大きい項目を特定して具体的に言及してください\n`;
-  prompt += `- 自己評価が周囲より高い場合：「周囲にはまだ伝わっていない可能性がある」と具体的に指摘\n`;
-  prompt += `- 自己評価が周囲より低い場合：「周囲はきちんと見ている、自信を持って」と具体的に励ます\n`;
-  prompt += `- 自由記述のコメントに触れて具体的なエピソードを引用してください\n\n`;
-  prompt += `フォーマット：\n【総合コメント】\n【特に評価できる点】\n【自己認識とのずれ（気づきを促す）】\n【具体的な成長アドバイス】\n【来期の目標提案】\n\n`;
-
   const fbAvg = (key) => {
     const vals = feedbacks.map(r => key(r)).filter(v => v > 0);
     return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
   };
+  const scoreMap = { 'Yes': 5, 'どちらでもない': 3, 'まだできていない': 1 };
+  const scoreLabel = { 5: 'Yes(5)', 3: 'どちらでもない(3)', 1: 'まだできていない(1)' };
+
+  let dataSection = '';
 
   if (feedbacks.length > 0 && selfRecs.length > 0) {
     const self = selfRecs[0];
-    const scoreMap = { 'Yes': 5, 'どちらでもない': 3, 'まだできていない': 1 };
-    prompt += `=== スコア比較（自己評価 → 360度平均） ===\n`;
-    const pairs = [
-      ['fb','sa','s1','q1'], ['fb','sa','s1','q2'], ['fb','sa','s1','q3'],
-      ['fb','sa','s2','q1'], ['fb','sa','s2','q2'], ['fb','sa','s2','q3'],
-      ['fb','sa','s3','q1'], ['fb','sa','s3','q2'], ['fb','sa','s3','q3'],
-      ['fb','sa','s4','q1'], ['fb','sa','s4','q2'],
-    ];
-    for (const [ft, st, sid, qid] of pairs) {
-      const fb360 = fbAvg(r => r[sid][qid]);
-      const selfVal = self[sid] && self[sid][qid] ? scoreMap[self[sid][qid]] : null;
-      if (fb360 && selfVal) {
-        const diff = (selfVal - parseFloat(fb360)).toFixed(1);
-        const diffStr = diff > 0 ? `自己が+${diff}高い` : diff < 0 ? `周囲が${Math.abs(diff)}高い` : '一致';
-        prompt += `${qLabel('fb', sid, qid)}: 自己=${selfVal} / 周囲=${fb360}（${diffStr}）\n`;
-      }
-    }
-    const goods = feedbacks.map(r=>[r.s1.good,r.s2.good,r.s3.good,r.s4.good]).flat().filter(Boolean);
-    const improves = feedbacks.map(r=>[r.s1.improve,r.s2.improve,r.s3.improve,r.s4.improve]).flat().filter(Boolean);
-    if (goods.length) prompt += `\n周囲から見てできている点:\n${goods.join('\n')}\n`;
-    if (improves.length) prompt += `\n周囲からの改善提案:\n${improves.join('\n')}\n`;
-  } else if (feedbacks.length > 0) {
-    prompt += `=== 360度評価（${feedbacks.length}件の平均、自己評価データなし） ===\n`;
-    const pairs360 = [
+    const gapItems = [];
+    const allPairs = [
       ['s1','q1'],['s1','q2'],['s1','q3'],
       ['s2','q1'],['s2','q2'],['s2','q3'],
       ['s3','q1'],['s3','q2'],['s3','q3'],
       ['s4','q1'],['s4','q2'],
     ];
-    for (const [sid, qid] of pairs360) {
-      const v = fbAvg(r => r[sid][qid]);
-      if (v) prompt += `${qLabel('fb',sid,qid)}: ${v}\n`;
+    dataSection += `■ 自己評価 vs 360度評価 スコア比較\n`;
+    for (const [sid, qid] of allPairs) {
+      const avg360 = fbAvg(r => r[sid][qid]);
+      const selfRaw = self[sid] && self[sid][qid];
+      const selfVal = selfRaw ? scoreMap[selfRaw] : null;
+      if (!avg360 || !selfVal) continue;
+      const diff = (selfVal - parseFloat(avg360)).toFixed(1);
+      const diffNum = parseFloat(diff);
+      const gap = diffNum >= 1.5 ? `★自己過大評価(+${diff})` : diffNum <= -1.5 ? `★自己過小評価(${diff})` : `差=${diff}`;
+      dataSection += `・${qLabel('fb',sid,qid)}\n  自己:${scoreLabel[selfVal]} / 周囲平均:${avg360} / ${gap}\n`;
+      if (Math.abs(diffNum) >= 1.5) gapItems.push({ q: qLabel('fb',sid,qid), selfVal, avg360, diff: diffNum });
     }
     const goods = feedbacks.map(r=>[r.s1.good,r.s2.good,r.s3.good,r.s4.good]).flat().filter(Boolean);
     const improves = feedbacks.map(r=>[r.s1.improve,r.s2.improve,r.s3.improve,r.s4.improve]).flat().filter(Boolean);
-    if (goods.length) prompt += `\nできている点:\n${goods.join('\n')}\n`;
-    if (improves.length) prompt += `\n改善点:\n${improves.join('\n')}\n`;
-  } else if (selfRecs.length > 0) {
-    const r = selfRecs[0];
-    prompt += `=== 行動基準評価（自己評価のみ、360度データなし） ===\n`;
-    for (const sid of ['s1','s2','s3','s4']) {
-      for (const qid of ['q1','q2','q3']) {
-        if (r[sid] && r[sid][qid]) prompt += `${qLabel('sa',sid,qid)}: ${r[sid][qid]}\n`;
+    if (goods.length) dataSection += `\n■ 周囲から見てできている点（自由記述）\n${goods.map(s=>`・${s}`).join('\n')}\n`;
+    if (improves.length) dataSection += `\n■ 周囲からの改善提案（自由記述）\n${improves.map(s=>`・${s}`).join('\n')}\n`;
+    if (gapItems.length) {
+      dataSection += `\n■ ずれが大きい項目（±1.5以上）\n`;
+      for (const g of gapItems) {
+        dataSection += `・「${g.q}」: 自己${g.selfVal} vs 周囲${g.avg360}（${g.diff > 0 ? '自己が高く評価しすぎている可能性' : '周囲の方が高く評価している、本人は控えめ'}）\n`;
       }
     }
+  } else if (feedbacks.length > 0) {
+    dataSection += `■ 360度評価スコア（自己評価データなし）\n`;
+    for (const [sid,qid] of [['s1','q1'],['s1','q2'],['s1','q3'],['s2','q1'],['s2','q2'],['s2','q3'],['s3','q1'],['s3','q2'],['s3','q3'],['s4','q1'],['s4','q2']]) {
+      const v = fbAvg(r => r[sid][qid]);
+      if (v) dataSection += `・${qLabel('fb',sid,qid)}: ${v}/5\n`;
+    }
+    const goods = feedbacks.map(r=>[r.s1.good,r.s2.good,r.s3.good,r.s4.good]).flat().filter(Boolean);
+    const improves = feedbacks.map(r=>[r.s1.improve,r.s2.improve,r.s3.improve,r.s4.improve]).flat().filter(Boolean);
+    if (goods.length) dataSection += `\n■ できている点\n${goods.map(s=>`・${s}`).join('\n')}\n`;
+    if (improves.length) dataSection += `\n■ 改善提案\n${improves.map(s=>`・${s}`).join('\n')}\n`;
+  } else if (selfRecs.length > 0) {
+    const r = selfRecs[0];
+    dataSection += `■ 行動基準自己評価（360度データなし）\n`;
+    for (const sid of ['s1','s2','s3','s4'])
+      for (const qid of ['q1','q2','q3'])
+        if (r[sid]?.[qid]) dataSection += `・${qLabel('sa',sid,qid)}: ${r[sid][qid]}\n`;
   }
+
+  const prompt = `以下は歯科クリニックスタッフ「${name}」さんの評価データです。このデータをもとに、上司（院長）が本人に渡す総合フィードバック文章を日本語で書いてください。
+
+【執筆ルール】
+- 冒頭の挨拶・書き出し（「〇〇さんへ」「院長より」等）は不要。すぐ本文を始める
+- 各セクションは見出し【 】付きで書く
+- 自己評価と周囲評価にずれがある項目は必ず文章中で「〇〇については自分では△△と評価しているが、周囲からは□□と見られており〜」のように具体的に言及する
+- 自由記述コメントが含まれる場合は内容を引用または言い換えて文章に組み込む
+- 各セクション3〜5文程度、具体性を持たせる
+- 最後に来期に向けた行動目標を1〜2個、具体的な行動レベルで提案する
+
+【セクション構成】
+【総合所感】
+【強みと評価できる点】
+【自己認識と周囲の評価のずれ】（ずれがある場合のみ）
+【成長に向けた具体的アドバイス】
+【来期の目標】
+
+【評価データ】
+${dataSection}`;
 
   try {
     const groq = new Groq({ apiKey });
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 1500,
+      temperature: 0.65,
+      max_tokens: 2000,
     });
     const text = completion.choices[0]?.message?.content || '';
     res.json({ feedback: text });
