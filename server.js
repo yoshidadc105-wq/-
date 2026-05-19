@@ -1624,42 +1624,65 @@ app.post('/api/ai-feedback/:name', async (req, res) => {
   }
 
   // プロンプト構築
-  let prompt = `あなたは歯科クリニックの院長として、スタッフ「${name}」さんへの総合フィードバックを書いてください。\n\n`;
-  prompt += `以下の評価データをもとに、温かく具体的なフィードバックを日本語で作成してください。\n`;
-  prompt += `フォーマット：【総合コメント】【特に良かった点】【成長してほしい点】【具体的なアドバイス】【次の目標（来期に向けて）】\n\n`;
+  let prompt = `歯科クリニックのスタッフ「${name}」さんへの具体的な総合フィードバックを日本語で作成してください。\n`;
+  prompt += `冒頭に「院長より」などの書き出しは不要です。本文から始めてください。\n\n`;
+  prompt += `【重要な分析ポイント】\n`;
+  prompt += `- 行動基準評価（自己評価）と360度評価（周囲の評価）のスコアを比較し、ずれが大きい項目を特定して具体的に言及してください\n`;
+  prompt += `- 自己評価が周囲より高い場合：「周囲にはまだ伝わっていない可能性がある」と具体的に指摘\n`;
+  prompt += `- 自己評価が周囲より低い場合：「周囲はきちんと見ている、自信を持って」と具体的に励ます\n`;
+  prompt += `- 自由記述のコメントに触れて具体的なエピソードを引用してください\n\n`;
+  prompt += `フォーマット：\n【総合コメント】\n【特に評価できる点】\n【自己認識とのずれ（気づきを促す）】\n【具体的な成長アドバイス】\n【来期の目標提案】\n\n`;
 
-  if (feedbacks.length > 0) {
-    prompt += `=== 360度評価（${feedbacks.length}件の平均スコア、1〜5点） ===\n`;
-    const avg = (key) => {
-      const vals = feedbacks.map(r => key(r)).filter(v => v > 0);
-      return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : 'データなし';
-    };
-    prompt += `${qLabel('fb','s1','q1')}: ${avg(r=>r.s1.q1)}\n`;
-    prompt += `${qLabel('fb','s1','q2')}: ${avg(r=>r.s1.q2)}\n`;
-    prompt += `${qLabel('fb','s1','q3')}: ${avg(r=>r.s1.q3)}\n`;
-    prompt += `${qLabel('fb','s2','q1')}: ${avg(r=>r.s2.q1)}\n`;
-    prompt += `${qLabel('fb','s2','q2')}: ${avg(r=>r.s2.q2)}\n`;
-    prompt += `${qLabel('fb','s2','q3')}: ${avg(r=>r.s2.q3)}\n`;
-    prompt += `${qLabel('fb','s3','q1')}: ${avg(r=>r.s3.q1)}\n`;
-    prompt += `${qLabel('fb','s3','q2')}: ${avg(r=>r.s3.q2)}\n`;
-    prompt += `${qLabel('fb','s3','q3')}: ${avg(r=>r.s3.q3)}\n`;
-    prompt += `${qLabel('fb','s4','q1')}: ${avg(r=>r.s4.q1)}\n`;
-    prompt += `${qLabel('fb','s4','q2')}: ${avg(r=>r.s4.q2)}\n`;
+  const fbAvg = (key) => {
+    const vals = feedbacks.map(r => key(r)).filter(v => v > 0);
+    return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
+  };
+
+  if (feedbacks.length > 0 && selfRecs.length > 0) {
+    const self = selfRecs[0];
+    const scoreMap = { 'Yes': 5, 'どちらでもない': 3, 'まだできていない': 1 };
+    prompt += `=== スコア比較（自己評価 → 360度平均） ===\n`;
+    const pairs = [
+      ['fb','sa','s1','q1'], ['fb','sa','s1','q2'], ['fb','sa','s1','q3'],
+      ['fb','sa','s2','q1'], ['fb','sa','s2','q2'], ['fb','sa','s2','q3'],
+      ['fb','sa','s3','q1'], ['fb','sa','s3','q2'], ['fb','sa','s3','q3'],
+      ['fb','sa','s4','q1'], ['fb','sa','s4','q2'],
+    ];
+    for (const [ft, st, sid, qid] of pairs) {
+      const fb360 = fbAvg(r => r[sid][qid]);
+      const selfVal = self[sid] && self[sid][qid] ? scoreMap[self[sid][qid]] : null;
+      if (fb360 && selfVal) {
+        const diff = (selfVal - parseFloat(fb360)).toFixed(1);
+        const diffStr = diff > 0 ? `自己が+${diff}高い` : diff < 0 ? `周囲が${Math.abs(diff)}高い` : '一致';
+        prompt += `${qLabel('fb', sid, qid)}: 自己=${selfVal} / 周囲=${fb360}（${diffStr}）\n`;
+      }
+    }
     const goods = feedbacks.map(r=>[r.s1.good,r.s2.good,r.s3.good,r.s4.good]).flat().filter(Boolean);
     const improves = feedbacks.map(r=>[r.s1.improve,r.s2.improve,r.s3.improve,r.s4.improve]).flat().filter(Boolean);
-    if (goods.length) prompt += `\nできている点（コメント）:\n${goods.join('\n')}\n`;
-    if (improves.length) prompt += `\n改善点（コメント）:\n${improves.join('\n')}\n`;
-  }
-
-  if (selfRecs.length > 0) {
+    if (goods.length) prompt += `\n周囲から見てできている点:\n${goods.join('\n')}\n`;
+    if (improves.length) prompt += `\n周囲からの改善提案:\n${improves.join('\n')}\n`;
+  } else if (feedbacks.length > 0) {
+    prompt += `=== 360度評価（${feedbacks.length}件の平均、自己評価データなし） ===\n`;
+    const pairs360 = [
+      ['s1','q1'],['s1','q2'],['s1','q3'],
+      ['s2','q1'],['s2','q2'],['s2','q3'],
+      ['s3','q1'],['s3','q2'],['s3','q3'],
+      ['s4','q1'],['s4','q2'],
+    ];
+    for (const [sid, qid] of pairs360) {
+      const v = fbAvg(r => r[sid][qid]);
+      if (v) prompt += `${qLabel('fb',sid,qid)}: ${v}\n`;
+    }
+    const goods = feedbacks.map(r=>[r.s1.good,r.s2.good,r.s3.good,r.s4.good]).flat().filter(Boolean);
+    const improves = feedbacks.map(r=>[r.s1.improve,r.s2.improve,r.s3.improve,r.s4.improve]).flat().filter(Boolean);
+    if (goods.length) prompt += `\nできている点:\n${goods.join('\n')}\n`;
+    if (improves.length) prompt += `\n改善点:\n${improves.join('\n')}\n`;
+  } else if (selfRecs.length > 0) {
     const r = selfRecs[0];
-    prompt += `\n=== 行動基準評価（自己評価、最新回答） ===\n`;
-    const secs = [['s1','s2','s3','s4'],['q1','q2','q3']];
+    prompt += `=== 行動基準評価（自己評価のみ、360度データなし） ===\n`;
     for (const sid of ['s1','s2','s3','s4']) {
       for (const qid of ['q1','q2','q3']) {
-        if (r[sid] && r[sid][qid]) {
-          prompt += `${qLabel('sa',sid,qid)}: ${r[sid][qid]}\n`;
-        }
+        if (r[sid] && r[sid][qid]) prompt += `${qLabel('sa',sid,qid)}: ${r[sid][qid]}\n`;
       }
     }
   }
@@ -1670,7 +1693,7 @@ app.post('/api/ai-feedback/:name', async (req, res) => {
       model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 1200,
+      max_tokens: 1500,
     });
     const text = completion.choices[0]?.message?.content || '';
     res.json({ feedback: text });
@@ -1694,11 +1717,12 @@ app.get('/staff-admin', async (req, res) => {
     ? { submittedAt: { $gte: selectedPeriod.start, $lte: selectedPeriod.end } }
     : {};
 
-  const [feedbacks, selfRecs, targets, compFBArr] = await Promise.all([
+  const [feedbacks, selfRecs, targets, compFBArr, respondentDocs] = await Promise.all([
     db.collection('feedback').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('selfAssessments').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
-    db.collection('targets').find({}).toArray(),
+    db.collection('targets').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
     db.collection('compFeedback').find({}).toArray(),
+    db.collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
   ]);
   // Convert compFeedback array to object keyed by name
   const compFB = {};
@@ -1911,6 +1935,70 @@ app.get('/staff-admin', async (req, res) => {
       </div>`;
     }
   }
+
+  // ===== 回答状況タブ =====
+  const respNames = respondentDocs.map(r => r.name);
+  const targetNames = targets.map(t => t.name);
+  // 行動基準評価: 回答者ごとに提出済みか
+  const selfSubmitted = new Set(selfRecs.map(r => r.respondent));
+  // 360度評価: 回答者×対象者のマトリクス
+  const fb360Done = new Set(feedbacks.map(r => r.respondent + '|' + r.target));
+
+  const periodLabel = selectedPeriod ? escHtml(selectedPeriod.label) : '全期間';
+
+  let statusHtml = `<div style="margin-bottom:20px">
+    <div class="sec-title">行動基準評価 回答状況（${periodLabel}）</div>
+    <table style="border-collapse:collapse;font-size:13px;width:100%;max-width:500px">
+      <thead><tr style="background:#ede7f6">
+        <th style="padding:8px 12px;text-align:left">名前</th>
+        <th style="padding:8px 12px;text-align:center">状況</th>
+        <th style="padding:8px 12px;text-align:left">提出日時</th>
+      </tr></thead>
+      <tbody>`;
+  if (respNames.length === 0) {
+    statusHtml += `<tr><td colspan="3" style="padding:10px;color:#9e9e9e">回答者が未登録です（設定タブで追加）</td></tr>`;
+  } else {
+    for (const name of respNames) {
+      const rec = selfRecs.find(r => r.respondent === name);
+      const dt = rec ? new Date(rec.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}) : '';
+      statusHtml += `<tr style="border-bottom:1px solid #f3e5f5">
+        <td style="padding:8px 12px;font-weight:bold">${escHtml(name)}</td>
+        <td style="padding:8px 12px;text-align:center">${rec ? '<span style="color:#2e7d32;font-weight:bold">✅ 提出済</span>' : '<span style="color:#c62828;font-weight:bold">❌ 未提出</span>'}</td>
+        <td style="padding:8px 12px;font-size:12px;color:#666">${escHtml(dt)}</td>
+      </tr>`;
+    }
+  }
+  statusHtml += `</tbody></table></div>`;
+
+  statusHtml += `<div>
+    <div class="sec-title">360度評価 回答状況（${periodLabel}）</div>`;
+  if (respNames.length === 0 || targetNames.length === 0) {
+    statusHtml += `<p style="color:#9e9e9e;font-size:13px">回答者または対象者が未登録です</p>`;
+  } else {
+    statusHtml += `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#ede7f6">
+        <th style="padding:8px 12px;text-align:left;white-space:nowrap">回答者 ＼ 評価対象</th>
+        ${targetNames.map(t => `<th style="padding:8px 12px;text-align:center;white-space:nowrap">${escHtml(t)}</th>`).join('')}
+        <th style="padding:8px 12px;text-align:center">完了数</th>
+      </tr></thead>
+      <tbody>`;
+    for (const resp of respNames) {
+      const cells = targetNames.map(tgt => {
+        if (resp === tgt) return `<td style="padding:8px 12px;text-align:center;background:#f5f5f5;color:#bbb">—</td>`;
+        const done = fb360Done.has(resp + '|' + tgt);
+        return `<td style="padding:8px 12px;text-align:center">${done ? '<span style="color:#2e7d32;font-weight:bold">✅</span>' : '<span style="color:#c62828">❌</span>'}</td>`;
+      });
+      const doneCount = targetNames.filter(tgt => tgt !== resp && fb360Done.has(resp + '|' + tgt)).length;
+      const total = targetNames.filter(t => t !== resp).length;
+      statusHtml += `<tr style="border-bottom:1px solid #f3e5f5">
+        <td style="padding:8px 12px;font-weight:bold;white-space:nowrap">${escHtml(resp)}</td>
+        ${cells.join('')}
+        <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:bold;color:${doneCount===total?'#2e7d32':'#f57f17'}">${doneCount}/${total}</td>
+      </tr>`;
+    }
+    statusHtml += `</tbody></table></div>`;
+  }
+  statusHtml += `</div>`;
 
   // ===== 総合フィードバックタブ =====
   const allNames = [...new Set([...Object.keys(byTarget), ...Object.keys(bySelf)])].sort();
@@ -2289,6 +2377,7 @@ async function saveQuestions() {
   <button class="tab-btn active" id="tab-self" onclick="switchTab('self')">行動基準評価（${selfRecs.length}件）</button>
   <button class="tab-btn" id="tab-360" onclick="switchTab('360')">360度評価（${feedbacks.length}件）</button>
   <button class="tab-btn" id="tab-comp" onclick="switchTab('comp')">総合フィードバック（${allNames.length}名）</button>
+  <button class="tab-btn" id="tab-status" onclick="switchTab('status')">回答状況</button>
   <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">設定</button>
 </div>
 <div class="wrap">
@@ -2296,6 +2385,11 @@ async function saveQuestions() {
     ${selfSection}
   </div>
   <div class="tab-panel" id="panel-360">${sec360}</div>
+  <div class="tab-panel" id="panel-status">
+    <div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:20px;margin-bottom:20px">
+      ${statusHtml}
+    </div>
+  </div>
   <div class="tab-panel" id="panel-comp">
     ${allNames.length === 0 ? '<div class="empty">まだデータはありません</div>' : compRows}
   </div>
