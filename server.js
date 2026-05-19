@@ -707,7 +707,7 @@ app.patch('/api/quiz-subs/:id', async (req, res) => {
 
 // 公開: 対象者一覧（名前のみ）
 app.get('/api/targets', async (req, res) => {
-  const targets = await (await getDb()).collection('targets').find({}).toArray();
+  const targets = await (await getDb()).collection('targets').find({}).sort({ order: 1, createdAt: 1 }).toArray();
   res.json(targets.map(({ id, name }) => ({ id, name })));
 });
 
@@ -719,7 +719,9 @@ app.post('/api/targets', async (req, res) => {
   const db = await getDb();
   const existing = await db.collection('targets').findOne({ name });
   if (existing) return res.status(409).json({ error: 'すでに登録されています' });
-  const target = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString() };
+  const maxDoc = await db.collection('targets').find({}).sort({ order: -1 }).limit(1).toArray();
+  const order = maxDoc.length ? (maxDoc[0].order ?? 0) + 1 : 0;
+  const target = { id: crypto.randomUUID(), name, order, createdAt: new Date().toISOString() };
   await db.collection('targets').insertOne(target);
   res.json(target);
 });
@@ -731,9 +733,19 @@ app.delete('/api/targets/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// 管理者: 対象者並び替え
+app.put('/api/targets/reorder', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids required' });
+  const db = await getDb();
+  await Promise.all(ids.map((id, i) => db.collection('targets').updateOne({ id }, { $set: { order: i } })));
+  res.json({ ok: true });
+}));
+
 // ===== 回答者管理 =====
 app.get('/api/respondents', async (req, res) => {
-  const list = await (await getDb()).collection('respondents').find({}).toArray();
+  const list = await (await getDb()).collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray();
   res.json(list.map(({ id, name }) => ({ id, name })));
 });
 app.post('/api/respondents', ah(async (req, res) => {
@@ -742,13 +754,23 @@ app.post('/api/respondents', ah(async (req, res) => {
   if (!name) return res.status(400).json({ error: '名前が必要です' });
   const db = await getDb();
   if (await db.collection('respondents').findOne({ name })) return res.status(409).json({ error: 'すでに登録されています' });
-  const doc = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString() };
+  const maxDoc = await db.collection('respondents').find({}).sort({ order: -1 }).limit(1).toArray();
+  const order = maxDoc.length ? (maxDoc[0].order ?? 0) + 1 : 0;
+  const doc = { id: crypto.randomUUID(), name, order, createdAt: new Date().toISOString() };
   await db.collection('respondents').insertOne(doc);
   res.json(doc);
 }));
 app.delete('/api/respondents/:id', ah(async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
   await (await getDb()).collection('respondents').deleteOne({ id: req.params.id });
+  res.json({ ok: true });
+}));
+app.put('/api/respondents/reorder', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids required' });
+  const db = await getDb();
+  await Promise.all(ids.map((id, i) => db.collection('respondents').updateOne({ id }, { $set: { order: i } })));
   res.json({ ok: true });
 }));
 
@@ -1738,8 +1760,8 @@ app.get('/staff-admin', async (req, res) => {
   let sec360 = `<div class="mgmt-card">
     <div class="mgmt-hd" style="background:#4a148c">対象者管理</div>
     <div class="mgmt-bd">
-      <div class="target-list">
-        ${targets.length === 0 ? '<p style="color:#9e9e9e;font-size:13px">未登録</p>' : targets.map(t => `<div class="target-item"><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delTarget('${t.id}')">✕</button></div>`).join('')}
+      <div class="sort-list" id="target-sort-list">
+        ${targets.length === 0 ? '<p style="color:#9e9e9e;font-size:13px">未登録</p>' : targets.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delTarget('${t.id}')">✕</button></div>`).join('')}
       </div>
       <div class="add-row">
         <input type="text" id="nt" class="add-input" placeholder="名前を入力" />
@@ -2032,6 +2054,12 @@ header h1{font-size:17px;font-weight:bold}
 .target-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;min-height:28px}
 .target-item{display:flex;align-items:center;gap:6px;background:#f3e5f5;border-radius:20px;padding:4px 12px;font-size:13px}
 .del-btn{background:none;border:none;color:#9c27b0;cursor:pointer;font-size:11px}
+.sort-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;min-height:28px}
+.sort-item{display:flex;align-items:center;gap:8px;background:#f3e5f5;border-radius:8px;padding:6px 12px;font-size:13px;cursor:default;transition:opacity .15s}
+.sort-item.dragging{opacity:.4}
+.sort-item.drag-over{outline:2px dashed #673ab7}
+.drag-handle{cursor:grab;color:#9c27b0;font-size:16px;line-height:1;user-select:none}
+.drag-handle:active{cursor:grabbing}
 .add-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .add-input{border:1px solid #ce93d8;border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;outline:none;width:180px}
 .add-input:focus{border-color:#673ab7}
@@ -2099,6 +2127,40 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
 }
+function initDragSort(listId, reorderUrl) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  let dragged = null;
+  list.addEventListener('dragstart', e => {
+    dragged = e.target.closest('.sort-item');
+    if (dragged) setTimeout(() => dragged.classList.add('dragging'), 0);
+  });
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    const over = e.target.closest('.sort-item');
+    if (!over || over === dragged) return;
+    list.querySelectorAll('.sort-item').forEach(el => el.classList.remove('drag-over'));
+    over.classList.add('drag-over');
+    const rect = over.getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) list.insertBefore(dragged, over);
+    else over.after(dragged);
+  });
+  list.addEventListener('dragleave', e => {
+    const over = e.target.closest('.sort-item');
+    if (over) over.classList.remove('drag-over');
+  });
+  list.addEventListener('dragend', async () => {
+    if (dragged) dragged.classList.remove('dragging');
+    list.querySelectorAll('.sort-item').forEach(el => el.classList.remove('drag-over'));
+    const ids = [...list.querySelectorAll('.sort-item')].map(el => el.dataset.id);
+    dragged = null;
+    await fetch(reorderUrl, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});
+  });
+}
+document.addEventListener('DOMContentLoaded', () => {
+  initDragSort('target-sort-list', '/api/targets/reorder');
+  initDragSort('resp-sort-list', '/api/respondents/reorder');
+});
 async function addRespondent() {
   const inp = document.getElementById('nr'); const msg = document.getElementById('rmsg');
   const name = inp.value.trim();
@@ -2242,8 +2304,8 @@ async function saveQuestions() {
       <div class="set-hd">回答者管理（フォームに回答するスタッフ）</div>
       <div class="set-bd">
         <p style="font-size:12px;color:#555;margin-bottom:12px">行動基準評価・360度評価フォームの「回答者（あなたの名前）」プルダウンに表示される名前リストです。</p>
-        <div class="target-list" id="resp-list">
-          ${(await (await getDb()).collection('respondents').find({}).toArray()).map(t => `<div class="target-item"><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
+        <div class="sort-list" id="resp-sort-list">
+          ${(await (await getDb()).collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray()).map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
         </div>
         <div class="add-row">
           <input type="text" id="nr" class="add-input" placeholder="名前を入力" />
