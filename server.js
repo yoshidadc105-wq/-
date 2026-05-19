@@ -2094,12 +2094,11 @@ function addPeriodRow() {
   const tbody = document.getElementById('periods-body');
   const tr = document.createElement('tr');
   tr.style.borderBottom = '1px solid #f3e5f5';
-  tr.innerHTML = `
-    <td style="padding:8px"><input type="text" placeholder="例: 2026年4月期" data-field="label" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
-    <td style="padding:8px"><input type="datetime-local" data-field="start" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
-    <td style="padding:8px"><input type="datetime-local" data-field="end" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
-    <td style="padding:8px"><button onclick="deletePeriodRow(this)" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">削除</button></td>
-  `;
+  const td1 = '<td style="padding:8px"><input type="text" placeholder="例: 2026年4月期" data-field="label" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
+  const td2 = '<td style="padding:8px"><input type="datetime-local" data-field="start" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
+  const td3 = '<td style="padding:8px"><input type="datetime-local" data-field="end" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>';
+  const td4 = '<td style="padding:8px"><button onclick="deletePeriodRow(this)" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">削除</button></td>';
+  tr.innerHTML = td1 + td2 + td3 + td4;
   tbody.appendChild(tr);
 }
 function deletePeriodRow(btn) {
@@ -2115,7 +2114,7 @@ async function savePeriods() {
     const end = row.querySelector('[data-field="end"]').value;
     const pid = row.querySelector('[data-field="label"]').dataset.pid || '';
     if (!label || !start || !end) { msg.style.color='#c62828'; msg.textContent='全ての行を入力してください'; return; }
-    if (new Date(start) >= new Date(end)) { msg.style.color='#c62828'; msg.textContent=`「${label}」の終了は開始より後にしてください`; return; }
+    if (new Date(start) >= new Date(end)) { msg.style.color='#c62828'; msg.textContent='「' + label + '」の終了は開始より後にしてください'; return; }
     list.push({ id: pid, label, start: new Date(start).toISOString(), end: new Date(end).toISOString() });
   }
   const r = await fetch('/api/periods', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({list})});
