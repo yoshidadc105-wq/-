@@ -1646,12 +1646,14 @@ app.get('/staff-admin', async (req, res) => {
   const periods = await loadPeriods();
   const selectedPeriodId = req.query.period || null; // null = all periods
 
-  const feedbackQuery = selectedPeriodId ? { periodId: selectedPeriodId } : {};
-  const selfQuery = selectedPeriodId ? { periodId: selectedPeriodId } : {};
+  const selectedPeriod = selectedPeriodId ? periods.find(p => p.id === selectedPeriodId) : null;
+  const dateQuery = selectedPeriod
+    ? { submittedAt: { $gte: selectedPeriod.start, $lte: selectedPeriod.end } }
+    : {};
 
   const [feedbacks, selfRecs, targets, compFBArr] = await Promise.all([
-    db.collection('feedback').find(feedbackQuery).sort({ submittedAt: -1 }).toArray(),
-    db.collection('selfAssessments').find(selfQuery).sort({ submittedAt: -1 }).toArray(),
+    db.collection('feedback').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
+    db.collection('selfAssessments').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('targets').find({}).toArray(),
     db.collection('compFeedback').find({}).toArray(),
   ]);
