@@ -1810,48 +1810,64 @@ app.get('/staff-admin', async (req, res) => {
     }
   }
 
-  // ===== 行動基準評価タブ =====
-  const selfRows = selfRecs.map(r => {
-    const dt = new Date(r.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
-    return `<div class="rec-card">
-      <div class="rec-mini-hd">
-        <span><strong>${escHtml(r.respondent)}</strong> <span class="dt-sm">${escHtml(dt)}</span></span>
-        <span class="${r.managerFeedback?'fbdone':'fbpend'}">${r.managerFeedback?'FB済':'未FB'}</span>
-      </div>
-      <div class="self-sections">
-        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s1')}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s1','q1')}</span>${badge(r.s1.q1)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s1','q2')}</span>${badge(r.s1.q2)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s1','q3')}</span>${badge(r.s1.q3)}</div>
-          <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s1.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s1.improve)||'—'}</div></div></div>
+  // ===== 行動基準評価タブ（人ごとにグループ化） =====
+  let selfSection = '';
+  if (selfRecs.length === 0) {
+    selfSection = '<div class="empty">まだ回答はありません</div>';
+  } else {
+    const selfNames = [...new Set(selfRecs.map(r => r.respondent))].sort();
+    for (const name of selfNames) {
+      const recs = selfRecs.filter(r => r.respondent === name);
+      const hasFB = recs.some(r => r.managerFeedback);
+      selfSection += `<div class="target-block">
+        <div class="target-hd">${escHtml(name)} さん <span class="badge">${recs.length}件</span>
+          <span class="${hasFB?'fbdone':'fbpend'}" style="margin-left:8px">${hasFB?'FB済':'未FB'}</span>
         </div>
-        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s2')}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s2','q1')}</span>${badge(r.s2.q1)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s2','q2')}</span>${badge(r.s2.q2)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s2','q3')}</span>${badge(r.s2.q3)}</div>
-          <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s2.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s2.improve)||'—'}</div></div></div>
+        <div class="target-bd">
+          ${recs.map(r => {
+            const dt = new Date(r.submittedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
+            return `<div class="rec-card">
+              <div class="rec-mini-hd">
+                <span class="dt-sm">${escHtml(dt)}</span>
+              </div>
+              <div class="self-sections">
+                <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s1')}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s1','q1')}</span>${badge(r.s1.q1)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s1','q2')}</span>${badge(r.s1.q2)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s1','q3')}</span>${badge(r.s1.q3)}</div>
+                  <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s1.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s1.improve)||'—'}</div></div></div>
+                </div>
+                <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s2')}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s2','q1')}</span>${badge(r.s2.q1)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s2','q2')}</span>${badge(r.s2.q2)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s2','q3')}</span>${badge(r.s2.q3)}</div>
+                  <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s2.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s2.improve)||'—'}</div></div></div>
+                </div>
+                <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s3')}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s3','q1')}</span>${badge(r.s3.q1)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s3','q2')}</span>${badge(r.s3.q2)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s3','q3')}</span>${badge(r.s3.q3)}</div>
+                  <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s3.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s3.improve)||'—'}</div></div></div>
+                </div>
+                <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s4')}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s4','q1')}</span>${badge(r.s4.q1)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s4','q2')}</span>${badge(r.s4.q2)}</div>
+                  <div class="qrow"><span class="ql">${qText('sa','s4','q3')}</span>${badge(r.s4.q3)}</div>
+                  <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s4.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s4.improve)||'—'}</div></div></div>
+                </div>
+              </div>
+              <div class="fb-area" style="margin-top:12px">
+                <div class="fb-lbl">フィードバック</div>
+                <textarea class="fb-ta" id="fbtxt-${r.id}">${escHtml(r.managerFeedback||'')}</textarea>
+                <button class="save-btn" onclick="saveFB('${r.id}','self')">保存</button>
+                <span class="fb-msg" id="fbmsg-${r.id}"></span>
+              </div>
+            </div>`;
+          }).join('')}
         </div>
-        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s3')}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s3','q1')}</span>${badge(r.s3.q1)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s3','q2')}</span>${badge(r.s3.q2)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s3','q3')}</span>${badge(r.s3.q3)}</div>
-          <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s3.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s3.improve)||'—'}</div></div></div>
-        </div>
-        <div class="self-sec"><div class="self-sec-title">${secTitle('sa','s4')}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s4','q1')}</span>${badge(r.s4.q1)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s4','q2')}</span>${badge(r.s4.q2)}</div>
-          <div class="qrow"><span class="ql">${qText('sa','s4','q3')}</span>${badge(r.s4.q3)}</div>
-          <div class="text-pair"><div><span class="tl">できている点</span><div class="tv">${escHtml(r.s4.good)||'—'}</div></div><div><span class="tl">改善点</span><div class="tv">${escHtml(r.s4.improve)||'—'}</div></div></div>
-        </div>
-      </div>
-      <div class="fb-area" style="margin-top:12px">
-        <div class="fb-lbl">フィードバック</div>
-        <textarea class="fb-ta" id="fbtxt-${r.id}">${escHtml(r.managerFeedback||'')}</textarea>
-        <button class="save-btn" onclick="saveFB('${r.id}','self')">保存</button>
-        <span class="fb-msg" id="fbmsg-${r.id}"></span>
-      </div>
-    </div>`;
-  }).join('');
+      </div>`;
+    }
+  }
 
   // ===== 総合フィードバックタブ =====
   const allNames = [...new Set([...Object.keys(byTarget), ...Object.keys(bySelf)])].sort();
@@ -2180,7 +2196,7 @@ async function saveQuestions() {
 </div>
 <div class="wrap">
   <div class="tab-panel active" id="panel-self">
-    ${selfRecs.length === 0 ? '<div class="empty">まだ回答はありません</div>' : selfRows}
+    ${selfSection}
   </div>
   <div class="tab-panel" id="panel-360">${sec360}</div>
   <div class="tab-panel" id="panel-comp">
