@@ -797,13 +797,15 @@ app.post('/feedback/submit', async (req, res) => {
   };
 
   const db = await getDb();
-  const deadline = await loadDeadline();
-  if (deadline) {
-    const since = new Date(deadline.start);
+  const periods = await loadPeriods();
+  const activePeriod = getActivePeriod(periods);
+  record.periodId = activePeriod ? activePeriod.id : null;
+
+  if (activePeriod) {
     const dup = await db.collection('feedback').findOne({
       respondent: record.respondent,
       target: record.target,
-      submittedAt: { $gte: since.toISOString() },
+      periodId: activePeriod.id,
     });
     if (dup) return res.status(409).json({ error: 'duplicate', message: '同じ相手への評価は今回の期間内で1回のみです。すでに提出済みです。' });
   }
@@ -1211,12 +1213,14 @@ app.post('/self-assessment/submit', async (req, res) => {
   };
 
   const db = await getDb();
-  const deadline = await loadDeadline();
-  if (deadline) {
-    const since = new Date(deadline.start);
+  const periods = await loadPeriods();
+  const activePeriod = getActivePeriod(periods);
+  record.periodId = activePeriod ? activePeriod.id : null;
+
+  if (activePeriod) {
     const dup = await db.collection('selfAssessments').findOne({
       respondent: record.respondent,
-      submittedAt: { $gte: since.toISOString() },
+      periodId: activePeriod.id,
     });
     if (dup) return res.status(409).json({ error: 'duplicate', message: '既に提出済みです。行動基準評価は今回の期間内で1回のみです。' });
   }
@@ -1442,33 +1446,48 @@ app.patch('/api/comprehensive-feedback/:name', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ===== 回答期限管理 =====
+// ===== 評価期間管理 =====
 
-async function loadDeadline() {
-  const doc = await (await getDb()).collection('settings').findOne({ _id: 'deadline' });
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return rest;
+async function loadPeriods() {
+  const doc = await (await getDb()).collection('settings').findOne({ _id: 'periods' });
+  if (!doc || !Array.isArray(doc.list)) return [];
+  return doc.list;
 }
 
-app.get('/api/deadline', async (req, res) => {
+function getActivePeriod(periods) {
+  const now = new Date();
+  return periods.find(p => new Date(p.start) <= now && new Date(p.end) >= now) || null;
+}
+
+// kept for frontend banner compat (feedback.html / self-assessment.html fetch /api/deadline)
+async function loadDeadline() {
+  const periods = await loadPeriods();
+  const active = getActivePeriod(periods);
+  return active ? { start: active.start, end: active.end } : null;
+}
+
+app.get('/api/deadline', ah(async (req, res) => {
   const deadline = await loadDeadline();
   res.json(deadline);
-});
-app.put('/api/deadline', async (req, res) => {
+}));
+
+app.get('/api/periods', ah(async (req, res) => {
+  res.json(await loadPeriods());
+}));
+
+app.put('/api/periods', ah(async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
-  const { start, end } = req.body;
-  if (!start || !end) return res.status(400).json({ error: 'start/end required' });
-  const data = { _id: 'deadline', start: new Date(start).toISOString(), end: new Date(end).toISOString() };
-  await (await getDb()).collection('settings').replaceOne({ _id: 'deadline' }, data, { upsert: true });
-  const { _id, ...rest } = data;
-  res.json({ ok: true, data: rest });
-});
-app.delete('/api/deadline', async (req, res) => {
-  if (!checkFeedbackAuth(req, res)) return;
-  await (await getDb()).collection('settings').deleteOne({ _id: 'deadline' });
-  res.json({ ok: true });
-});
+  let { list } = req.body;
+  if (!Array.isArray(list)) return res.status(400).json({ error: 'list required' });
+  // assign IDs to new periods
+  list = list.map(p => ({ ...p, id: p.id || ('p' + Date.now().toString(36) + Math.random().toString(36).slice(2,5)) }));
+  await (await getDb()).collection('settings').replaceOne(
+    { _id: 'periods' },
+    { _id: 'periods', list },
+    { upsert: true }
+  );
+  res.json({ ok: true, list });
+}));
 
 // ===== 質問管理 =====
 
@@ -1624,9 +1643,15 @@ app.get('/staff-admin', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
 
   const db = await getDb();
+  const periods = await loadPeriods();
+  const selectedPeriodId = req.query.period || null; // null = all periods
+
+  const feedbackQuery = selectedPeriodId ? { periodId: selectedPeriodId } : {};
+  const selfQuery = selectedPeriodId ? { periodId: selectedPeriodId } : {};
+
   const [feedbacks, selfRecs, targets, compFBArr] = await Promise.all([
-    db.collection('feedback').find({}).sort({ submittedAt: -1 }).toArray(),
-    db.collection('selfAssessments').find({}).sort({ submittedAt: -1 }).toArray(),
+    db.collection('feedback').find(feedbackQuery).sort({ submittedAt: -1 }).toArray(),
+    db.collection('selfAssessments').find(selfQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('targets').find({}).toArray(),
     db.collection('compFeedback').find({}).toArray(),
   ]);
@@ -1636,7 +1661,6 @@ app.get('/staff-admin', async (req, res) => {
     compFB[doc.name] = { feedback: doc.feedback, updatedAt: doc.updatedAt };
   }
 
-  const deadline = await loadDeadline();
   const questions = await loadQuestions();
 
   // 質問文取得ヘルパー
@@ -2066,20 +2090,37 @@ async function saveCompFB(encodedName) {
   if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>{msg.textContent='';location.reload();},1000); }
   else { msg.style.color='#c62828'; msg.textContent='エラー'; }
 }
-async function saveDeadline() {
-  const s = document.getElementById('dl-start').value;
-  const e = document.getElementById('dl-end').value;
-  const msg = document.getElementById('dl-msg');
-  if (!s || !e) { msg.style.color='#c62828'; msg.textContent='開始・終了を両方入力してください'; return; }
-  if (new Date(s) >= new Date(e)) { msg.style.color='#c62828'; msg.textContent='終了は開始より後にしてください'; return; }
-  const r = await fetch('/api/deadline', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:s,end:e})});
+function addPeriodRow() {
+  const tbody = document.getElementById('periods-body');
+  const tr = document.createElement('tr');
+  tr.style.borderBottom = '1px solid #f3e5f5';
+  tr.innerHTML = `
+    <td style="padding:8px"><input type="text" placeholder="例: 2026年4月期" data-field="label" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+    <td style="padding:8px"><input type="datetime-local" data-field="start" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+    <td style="padding:8px"><input type="datetime-local" data-field="end" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+    <td style="padding:8px"><button onclick="deletePeriodRow(this)" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">削除</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+function deletePeriodRow(btn) {
+  btn.closest('tr').remove();
+}
+async function savePeriods() {
+  const msg = document.getElementById('periods-msg');
+  const rows = document.querySelectorAll('#periods-body tr');
+  const list = [];
+  for (const row of rows) {
+    const label = row.querySelector('[data-field="label"]').value.trim();
+    const start = row.querySelector('[data-field="start"]').value;
+    const end = row.querySelector('[data-field="end"]').value;
+    const pid = row.querySelector('[data-field="label"]').dataset.pid || '';
+    if (!label || !start || !end) { msg.style.color='#c62828'; msg.textContent='全ての行を入力してください'; return; }
+    if (new Date(start) >= new Date(end)) { msg.style.color='#c62828'; msg.textContent=`「${label}」の終了は開始より後にしてください`; return; }
+    list.push({ id: pid, label, start: new Date(start).toISOString(), end: new Date(end).toISOString() });
+  }
+  const r = await fetch('/api/periods', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({list})});
   if (r.ok) { msg.style.color='#2e7d32'; msg.textContent='保存しました'; setTimeout(()=>location.reload(),800); }
   else { msg.style.color='#c62828'; msg.textContent='エラー'; }
-}
-async function deleteDeadline() {
-  if (!confirm('回答期限を削除（無制限に）しますか？')) return;
-  const r = await fetch('/api/deadline', {method:'DELETE'});
-  if (r.ok) location.reload();
 }
 async function genAI(encodedName) {
   const btn = event.target;
@@ -2122,6 +2163,14 @@ async function saveQuestions() {
 </head><body>
 <div class="topbar"></div>
 <header><h1>スタッフ評価 管理画面</h1></header>
+<div style="background:#4a148c;padding:8px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <span style="color:#e1bee7;font-size:13px;font-weight:bold">表示期間:</span>
+  <select id="period-sel" style="border:none;border-radius:4px;padding:6px 10px;font-size:13px;background:#fff;color:#333;cursor:pointer" onchange="location.href='/staff-admin?period='+this.value+(location.hash||'')">
+    <option value="" ${!selectedPeriodId?'selected':''}>全期間（合算）</option>
+    ${periods.sort((a,b)=>new Date(b.start)-new Date(a.start)).map(p=>`<option value="${escHtml(p.id)}" ${selectedPeriodId===p.id?'selected':''}>${escHtml(p.label)} （${fmtDL(p.start)}〜${fmtDL(p.end)}）</option>`).join('')}
+  </select>
+  ${getActivePeriod(periods) ? `<span style="font-size:12px;background:#7b1fa2;color:#fff;border-radius:10px;padding:2px 10px">現在募集中: ${escHtml(getActivePeriod(periods).label)}</span>` : '<span style="font-size:12px;color:#ce93d8">（現在募集中の期なし）</span>'}
+</div>
 <div class="tabs">
   <button class="tab-btn active" id="tab-self" onclick="switchTab('self')">行動基準評価（${selfRecs.length}件）</button>
   <button class="tab-btn" id="tab-360" onclick="switchTab('360')">360度評価（${feedbacks.length}件）</button>
@@ -2138,17 +2187,25 @@ async function saveQuestions() {
   </div>
   <div class="tab-panel" id="panel-settings">
     <div class="set-card">
-      <div class="set-hd">回答期限設定</div>
+      <div class="set-hd">評価期間の管理</div>
       <div class="set-bd">
-        ${deadline ? `<div class="dl-current">現在の設定: <strong>${escHtml(fmtDL(deadline.start))}</strong> 〜 <strong>${escHtml(fmtDL(deadline.end))}</strong></div>` : '<div class="dl-current" style="background:#fff8e1;border-color:#ffe082">期限未設定（いつでも回答可）</div>'}
-        <div class="dl-row">
-          <div class="dl-field">開始日時<input class="dl-input" type="datetime-local" id="dl-start" value="${deadline ? deadline.start.slice(0,16) : ''}" /></div>
-          <div class="dl-field">終了日時<input class="dl-input" type="datetime-local" id="dl-end" value="${deadline ? deadline.end.slice(0,16) : ''}" /></div>
-          <button class="save-btn" onclick="saveDeadline()">保存</button>
-          ${deadline ? '<button class="del-dl-btn" onclick="deleteDeadline()">期限を削除</button>' : ''}
+        <p style="font-size:12px;color:#555;margin-bottom:12px">期を事前に複数登録できます。開始〜終了期間中に回答した場合、その期のデータとして蓄積されます。同じ期内の重複回答は防止されます。</p>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px" id="periods-table">
+          <thead><tr style="background:#ede7f6"><th style="padding:8px;text-align:left">期名</th><th style="padding:8px;text-align:left">開始</th><th style="padding:8px;text-align:left">終了</th><th style="padding:8px"></th></tr></thead>
+          <tbody id="periods-body">
+            ${periods.sort((a,b)=>new Date(a.start)-new Date(b.start)).map((p,i)=>`<tr data-idx="${i}" style="border-bottom:1px solid #f3e5f5">
+              <td style="padding:8px"><input type="text" value="${escHtml(p.label)}" data-field="label" data-pid="${escHtml(p.id)}" style="width:100%;border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+              <td style="padding:8px"><input type="datetime-local" value="${p.start.slice(0,16)}" data-field="start" data-pid="${escHtml(p.id)}" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+              <td style="padding:8px"><input type="datetime-local" value="${p.end.slice(0,16)}" data-field="end" data-pid="${escHtml(p.id)}" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px" /></td>
+              <td style="padding:8px"><button onclick="deletePeriodRow(this)" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">削除</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="save-btn" onclick="addPeriodRow()">＋ 期を追加</button>
+          <button class="save-btn" onclick="savePeriods()">保存</button>
+          <span id="periods-msg" style="font-size:12px"></span>
         </div>
-        <span id="dl-msg" style="font-size:12px"></span>
-        <p style="font-size:12px;color:#888;margin-top:8px">期限を設定すると、開始日以降は同じ人の重複回答が防止されます。期限終了後はフォームが締め切り表示になります。</p>
       </div>
     </div>
     <div class="set-card">
