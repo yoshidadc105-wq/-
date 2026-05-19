@@ -778,23 +778,93 @@ app.put('/api/respondents/reorder', ah(async (req, res) => {
 
 const FEEDBACK_ADMIN_PASSWORD = process.env.FEEDBACK_ADMIN_PASSWORD || ADMIN_PASSWORD;
 
+// セッションストア（メモリ）: token → expiry timestamp
+const adminSessions = new Map();
+const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8時間
+
+function getCookie(req, name) {
+  const header = req.headers.cookie || '';
+  for (const part of header.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(v.join('='));
+  }
+  return null;
+}
+
 function checkFeedbackAuth(req, res) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Basic ')) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="FeedbackAdmin"');
-    res.status(401).send('認証が必要です');
+  const token = getCookie(req, 'adminToken');
+  if (!token) {
+    // APIリクエストはJSONで返す
+    if (req.path.startsWith('/api/')) {
+      res.status(401).json({ error: '認証が必要です' });
+    } else {
+      res.redirect('/staff-admin/login');
+    }
     return false;
   }
-  const decoded = Buffer.from(auth.slice(6), 'base64').toString();
-  const colonIdx = decoded.indexOf(':');
-  const pass = colonIdx >= 0 ? decoded.slice(colonIdx + 1) : '';
-  if (pass !== FEEDBACK_ADMIN_PASSWORD) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="FeedbackAdmin"');
-    res.status(401).send('パスワードが違います');
+  const expiry = adminSessions.get(token);
+  if (!expiry || Date.now() > expiry) {
+    adminSessions.delete(token);
+    if (req.path.startsWith('/api/')) {
+      res.status(401).json({ error: 'セッションが期限切れです' });
+    } else {
+      res.redirect('/staff-admin/login');
+    }
     return false;
   }
   return true;
 }
+
+// ---- ログイン画面 ----
+app.get('/staff-admin/login', (req, res) => {
+  const error = req.query.error ? '<p style="color:red;margin:0 0 12px">パスワードが違います</p>' : '';
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理者ログイン</title>
+<style>
+  body { font-family: sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .box { background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12); width: 320px; }
+  h2 { margin: 0 0 24px; font-size: 1.3rem; text-align: center; color: #333; }
+  label { display: block; margin-bottom: 6px; font-size: 0.9rem; color: #555; }
+  input[type=password] { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; margin-bottom: 18px; }
+  button { width: 100%; padding: 12px; background: #4a90d9; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+  button:hover { background: #3478c0; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>管理者ログイン</h2>
+  ${error}
+  <form method="POST" action="/staff-admin/login">
+    <label>パスワード</label>
+    <input type="password" name="password" autofocus required>
+    <button type="submit">ログイン</button>
+  </form>
+</div>
+</body>
+</html>`);
+});
+
+app.post('/staff-admin/login', express.urlencoded({ extended: false }), (req, res) => {
+  const { password } = req.body;
+  if (password !== FEEDBACK_ADMIN_PASSWORD) {
+    return res.redirect('/staff-admin/login?error=1');
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  adminSessions.set(token, Date.now() + SESSION_DURATION_MS);
+  res.setHeader('Set-Cookie', `adminToken=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DURATION_MS / 1000}`);
+  res.redirect('/staff-admin');
+});
+
+app.get('/staff-admin/logout', (req, res) => {
+  const token = getCookie(req, 'adminToken');
+  if (token) adminSessions.delete(token);
+  res.setHeader('Set-Cookie', 'adminToken=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+  res.redirect('/staff-admin/login');
+});
 
 // フィードバック受信
 app.post('/feedback/submit', async (req, res) => {
@@ -2394,7 +2464,7 @@ async function saveQuestions() {
 <\/script>
 </head><body>
 <div class="topbar"></div>
-<header><h1>スタッフ評価 管理画面</h1></header>
+<header style="display:flex;align-items:center;justify-content:space-between;padding:0 20px"><h1>スタッフ評価 管理画面</h1><a href="/staff-admin/logout" style="font-size:13px;color:#ce93d8;text-decoration:none;border:1px solid #7b1fa2;padding:4px 12px;border-radius:4px" onclick="return confirm('ログアウトしますか？')">ログアウト</a></header>
 <div style="background:#4a148c;padding:8px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
   <span style="color:#e1bee7;font-size:13px;font-weight:bold">表示期間:</span>
   <select id="period-sel" style="border:none;border-radius:4px;padding:6px 10px;font-size:13px;background:#fff;color:#333;cursor:pointer" onchange="location.href='/staff-admin?period='+this.value+(location.hash||'')">
