@@ -592,17 +592,25 @@
       });
     } catch {}
 
-    // Populate target dropdown and respondent dropdown
+    // Populate target dropdown (評価される人)
     const sel = document.getElementById('target-select');
-    const resSel = document.getElementById('respondent');
     targets.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.name;
       opt.textContent = t.name;
       sel.appendChild(opt);
-      const opt2 = opt.cloneNode(true);
-      resSel.appendChild(opt2);
     });
+    // Populate respondent dropdown (回答者) from separate list
+    try {
+      const respondents = await fetch('/api/respondents').then(r => r.json());
+      const resSel = document.getElementById('respondent');
+      respondents.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.name;
+        opt.textContent = t.name;
+        resSel.appendChild(opt);
+      });
+    } catch {}
 
     if (deadlineClosed) {
       document.getElementById('submit-btn').disabled = true;

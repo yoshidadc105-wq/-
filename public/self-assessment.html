@@ -477,12 +477,12 @@
     } catch {}
   })();
 
-  // 回答者プルダウンにtargetsを読み込む
+  // 回答者プルダウンにrespondentsを読み込む
   (async () => {
     try {
-      const targets = await fetch('/api/targets').then(r => r.json());
+      const respondents = await fetch('/api/respondents').then(r => r.json());
       const sel = document.getElementById('respondent');
-      targets.forEach(t => {
+      respondents.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t.name;
         opt.textContent = t.name;

@@ -731,6 +731,27 @@ app.delete('/api/targets/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ===== 回答者管理 =====
+app.get('/api/respondents', async (req, res) => {
+  const list = await (await getDb()).collection('respondents').find({}).toArray();
+  res.json(list.map(({ id, name }) => ({ id, name })));
+});
+app.post('/api/respondents', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: '名前が必要です' });
+  const db = await getDb();
+  if (await db.collection('respondents').findOne({ name })) return res.status(409).json({ error: 'すでに登録されています' });
+  const doc = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString() };
+  await db.collection('respondents').insertOne(doc);
+  res.json(doc);
+}));
+app.delete('/api/respondents/:id', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  await (await getDb()).collection('respondents').deleteOne({ id: req.params.id });
+  res.json({ ok: true });
+}));
+
 // ===== 360度評価システム =====
 
 const FEEDBACK_ADMIN_PASSWORD = process.env.FEEDBACK_ADMIN_PASSWORD || ADMIN_PASSWORD;
@@ -2078,6 +2099,20 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
 }
+async function addRespondent() {
+  const inp = document.getElementById('nr'); const msg = document.getElementById('rmsg');
+  const name = inp.value.trim();
+  if (!name) { msg.style.color='#c62828'; msg.textContent='名前を入力'; return; }
+  const r = await fetch('/api/respondents', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if (r.status===409) { msg.style.color='#c62828'; msg.textContent='すでに登録済み'; return; }
+  if (!r.ok) { msg.style.color='#c62828'; msg.textContent='エラー'; return; }
+  msg.style.color='#2e7d32'; msg.textContent='追加しました'; inp.value='';
+  setTimeout(() => location.reload(), 800);
+}
+async function delRespondent(id) {
+  if (!confirm('削除しますか？')) return;
+  await fetch('/api/respondents/' + id, {method:'DELETE'}); location.reload();
+}
 async function addTarget() {
   const inp = document.getElementById('nt'); const msg = document.getElementById('tmsg');
   const name = inp.value.trim();
@@ -2203,6 +2238,20 @@ async function saveQuestions() {
     ${allNames.length === 0 ? '<div class="empty">まだデータはありません</div>' : compRows}
   </div>
   <div class="tab-panel" id="panel-settings">
+    <div class="set-card">
+      <div class="set-hd">回答者管理（フォームに回答するスタッフ）</div>
+      <div class="set-bd">
+        <p style="font-size:12px;color:#555;margin-bottom:12px">行動基準評価・360度評価フォームの「回答者（あなたの名前）」プルダウンに表示される名前リストです。</p>
+        <div class="target-list" id="resp-list">
+          ${(await (await getDb()).collection('respondents').find({}).toArray()).map(t => `<div class="target-item"><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
+        </div>
+        <div class="add-row">
+          <input type="text" id="nr" class="add-input" placeholder="名前を入力" />
+          <button class="add-btn" onclick="addRespondent()">＋ 追加</button>
+          <span id="rmsg" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>
     <div class="set-card">
       <div class="set-hd">評価期間の管理</div>
       <div class="set-bd">
