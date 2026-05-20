@@ -24,8 +24,8 @@
   header button { background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background .2s; }
   header button:hover { background: rgba(255,255,255,0.25); }
 
-  .tabs { background: #fff; display: flex; border-bottom: 2px solid #e0e7ff; padding: 0 24px; }
-  .tab-btn { padding: 14px 20px; border: none; background: none; cursor: pointer; font-size: 0.95rem; color: #6b7280; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s, border-color .2s; white-space: nowrap; }
+  .tabs { background: #fff; display: flex; border-bottom: 2px solid #e0e7ff; padding: 0 24px; overflow-x: auto; }
+  .tab-btn { padding: 14px 18px; border: none; background: none; cursor: pointer; font-size: 0.9rem; color: #6b7280; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s, border-color .2s; white-space: nowrap; font-family: inherit; }
   .tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
   .tab-btn:hover:not(.active) { color: #4f46e5; }
 
@@ -38,11 +38,12 @@
 
   .set-list { display: grid; gap: 12px; }
   .set-item { background: #fff; border: 2px solid #e0e7ff; border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; transition: border-color .2s; }
+  .set-item.inactive { opacity: 0.6; background: #f9f9f9; }
   .set-item:hover { border-color: #a5b4fc; }
   .set-item-info h3 { font-size: 1rem; font-weight: 700; color: #1e1b4b; }
   .set-item-info p { font-size: 0.82rem; color: #6b7280; margin-top: 2px; }
-  .set-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
-  .btn { padding: 7px 14px; border: none; border-radius: 7px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; }
+  .set-item-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .btn { padding: 7px 14px; border: none; border-radius: 7px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; font-family: inherit; }
   .btn:active { transform: scale(0.97); }
   .btn-primary { background: #4f46e5; color: #fff; }
   .btn-primary:hover { background: #4338ca; }
@@ -52,6 +53,8 @@
   .btn-danger:hover { background: #fecaca; }
   .btn-success { background: #16a34a; color: #fff; }
   .btn-success:hover { background: #15803d; }
+  .btn-warning { background: #fef3c7; color: #92400e; }
+  .btn-warning:hover { background: #fde68a; }
   .btn-lg { padding: 11px 24px; font-size: 1rem; }
 
   .form-group { margin-bottom: 16px; }
@@ -92,19 +95,32 @@
   .badge-yellow { background: #fef9c3; color: #ca8a04; }
   .badge-red { background: #fee2e2; color: #dc2626; }
 
-  /* 回答記録詳細 */
-  .sub-detail { margin-top: 8px; }
-  .sub-detail-toggle { background: none; border: 1px solid #a5b4fc; color: #4f46e5; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; cursor: pointer; font-weight: 600; }
-  .sub-detail-toggle:hover { background: #e0e7ff; }
-  .sub-detail-body { display: none; margin-top: 8px; border: 1px solid #e0e7ff; border-radius: 8px; overflow: hidden; }
+  /* Submission detail */
+  .sub-detail-toggle { background: #e0e7ff; border: none; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; cursor: pointer; color: #4f46e5; font-weight: 600; white-space: nowrap; font-family: inherit; }
+  .sub-detail-body { display: none; margin-top: 8px; }
   .sub-detail-body.open { display: block; }
-  .detail-row { padding: 8px 12px; border-bottom: 1px solid #f0f0ff; font-size: 0.82rem; }
-  .detail-row:last-child { border-bottom: none; }
-  .detail-row .d-q { font-weight: 600; color: #1e1b4b; margin-bottom: 3px; }
-  .detail-row .d-ans { display: flex; gap: 12px; flex-wrap: wrap; }
-  .d-correct { color: #16a34a; font-weight: 600; }
-  .d-wrong { color: #dc2626; }
-  .d-icon { font-size: 0.9rem; }
+  .sub-detail-item { font-size: 0.82rem; padding: 4px 0; border-bottom: 1px dashed #e0e7ff; line-height: 1.5; }
+  .sub-detail-item:last-child { border: none; }
+  .sub-detail-correct { color: #16a34a; }
+  .sub-detail-wrong { color: #dc2626; }
+
+  /* Staff tab */
+  .staff-group { background: #fff; border: 2px solid #e0e7ff; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .staff-group-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background .15s; }
+  .staff-group-header:hover { background: #f8f7ff; }
+  .staff-name-label { font-size: 1rem; font-weight: 700; color: #1e1b4b; }
+  .staff-stats { font-size: 0.82rem; color: #6b7280; margin-top: 2px; }
+  .staff-toggle-icon { color: #4f46e5; font-size: 0.9rem; font-weight: 700; }
+  .staff-history { display: none; border-top: 1px solid #e0e7ff; }
+  .staff-history.open { display: block; }
+  .staff-history-item { padding: 10px 18px; border-bottom: 1px solid #f0f0ff; }
+  .staff-history-item:last-child { border: none; }
+  .staff-history-item .h-meta { font-size: 0.8rem; color: #6b7280; margin-bottom: 4px; }
+  .staff-history-item .h-score { font-size: 0.9rem; font-weight: 700; }
+  .staff-history-item .h-details { margin-top: 6px; display: none; }
+  .staff-history-item .h-details.open { display: block; }
+  .h-q-item { font-size: 0.8rem; padding: 3px 0; border-bottom: 1px dashed #e0e7ff; line-height: 1.5; }
+  .h-q-item:last-child { border: none; }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modal-overlay.hidden { display: none; }
@@ -121,9 +137,13 @@
   .alert { padding: 12px 16px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 16px; }
   .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
   .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .type-label { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-left: 8px; }
+  .type-truefalse { background: #dbeafe; color: #1d4ed8; }
+  .type-choice { background: #fce7f3; color: #9d174d; }
+  .type-fill { background: #d1fae5; color: #065f46; }
+  .type-sort { background: #fef3c7; color: #92400e; }
 
   @media (max-width: 600px) {
-    .tabs { overflow-x: auto; padding: 0 12px; }
     .tab-content { padding: 12px; }
     .set-item { flex-direction: column; align-items: flex-start; gap: 10px; }
     .modal { max-height: 95vh; }
@@ -152,8 +172,10 @@
     <button class="tab-btn active" onclick="switchTab('sets')">📋 クイズ一覧</button>
     <button class="tab-btn" onclick="switchTab('generate')">✨ AI生成</button>
     <button class="tab-btn" onclick="switchTab('submissions')">📊 回答記録</button>
+    <button class="tab-btn" onclick="switchTab('staff')">👤 回答者</button>
   </div>
 
+  <!-- Tab: Quiz Sets -->
   <div id="tab-sets" class="tab-content active">
     <div class="card">
       <div class="card-header">
@@ -164,10 +186,10 @@
     </div>
   </div>
 
+  <!-- Tab: AI Generation -->
   <div id="tab-generate" class="tab-content">
     <div class="card">
       <div class="card-header"><h2>AIでクイズを生成する</h2></div>
-
       <div class="form-group">
         <label>マニュアルシステムから選ぶ</label>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -178,9 +200,7 @@
         </div>
         <div id="manual-load-status" style="font-size:0.82rem;margin-top:6px;color:#6b7280;"></div>
       </div>
-
       <div style="text-align:center;color:#9ca3af;font-size:0.85rem;margin:-4px 0 12px;">— または手動で入力 —</div>
-
       <div class="form-group">
         <label for="manual-name">マニュアル名</label>
         <input type="text" id="manual-name" placeholder="例: 感染管理マニュアル 2024年版">
@@ -206,7 +226,6 @@
       </div>
       <button class="btn btn-primary btn-lg" onclick="generateQuestions()">✨ AIで生成する</button>
     </div>
-
     <div id="generate-status"></div>
     <div id="generated-questions-wrap" style="display:none;">
       <div class="card-header" style="margin-top:8px;">
@@ -217,6 +236,7 @@
     </div>
   </div>
 
+  <!-- Tab: Submissions -->
   <div id="tab-submissions" class="tab-content">
     <div class="card">
       <div class="card-header">
@@ -224,6 +244,17 @@
         <button class="btn btn-secondary" onclick="loadSubmissions()">🔄 更新</button>
       </div>
       <div id="submissions-list"><div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div></div>
+    </div>
+  </div>
+
+  <!-- Tab: Staff -->
+  <div id="tab-staff" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h2>回答者別記録</h2>
+        <button class="btn btn-secondary" onclick="loadStaffTab()">🔄 更新</button>
+      </div>
+      <div id="staff-list"><div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div></div>
     </div>
   </div>
 </div>
@@ -275,6 +306,7 @@ let generatedQuestions = [];
 let editingSetId = null;
 let deletingSetId = null;
 
+// ========== Auth ==========
 function doLogin() {
   const pw = document.getElementById('password-input').value;
   if (!pw) { document.getElementById('login-error').textContent = 'パスワードを入力してください'; return; }
@@ -304,17 +336,18 @@ function doLogout() {
   document.getElementById('login-error').textContent = '';
 }
 
+// ========== Tabs ==========
 function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['sets', 'generate', 'submissions'];
-    b.classList.toggle('active', names[i] === name);
-  });
+  const names = ['sets', 'generate', 'submissions', 'staff'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', names[i] === name));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'sets') loadSets();
   if (name === 'submissions') loadSubmissions();
+  if (name === 'staff') loadStaffTab();
 }
 
+// ========== Sets Tab ==========
 async function loadSets() {
   const el = document.getElementById('sets-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -334,20 +367,38 @@ function renderSets() {
     el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>クイズセットがありません。「AI生成」タブから作成してください。</p></div>';
     return;
   }
-  el.innerHTML = '<div class="set-list">' + currentSets.map(s => `
-    <div class="set-item">
+  el.innerHTML = '<div class="set-list">' + currentSets.map(s => {
+    const id = s._id || s.id;
+    const isActive = s.active !== false;
+    return `<div class="set-item ${isActive ? '' : 'inactive'}" id="set-item-${id}">
       <div class="set-item-info">
-        <h3>${esc(s.manualName || s.name || '無題')}</h3>
+        <h3>${esc(s.manualName || s.name || '無題')} ${isActive ? '' : '<span style="font-size:0.75rem;color:#dc2626;">（停止中）</span>'}</h3>
         <p>${(s.questions||[]).length}問 ／ 作成: ${formatDate(s.createdAt)}</p>
       </div>
       <div class="set-item-actions">
-        <button class="btn btn-secondary" onclick="openEditModal('${s._id||s.id}')">✏️ 編集</button>
-        <button class="btn btn-danger" onclick="openDeleteModal('${s._id||s.id}', '${esc(s.manualName||s.name||'')}')">🗑 削除</button>
+        <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '⛔ 停止' : '✅ 公開'}</button>
+        <button class="btn btn-secondary" onclick="openEditModal('${id}')">✏️ 編集</button>
+        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')}">🗑 削除</button>
       </div>
-    </div>
-  `).join('') + '</div>';
+    </div>`;
+  }).join('') + '</div>';
 }
 
+async function toggleActive(id, currentActive) {
+  try {
+    const r = await fetch('/api/sets/' + id + '/active', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+      body: JSON.stringify({ active: !currentActive }),
+    });
+    if (!r.ok) throw new Error();
+    await loadSets();
+  } catch {
+    alert('更新に失敗しました');
+  }
+}
+
+// ========== Edit Modal ==========
 function openEditModal(id) {
   const set = currentSets.find(s => (s._id||s.id) === id);
   if (!set) return;
@@ -388,6 +439,7 @@ async function saveEdit() {
   }
 }
 
+// ========== Delete Modal ==========
 function openDeleteModal(id, name) {
   deletingSetId = id;
   document.getElementById('delete-set-name').textContent = name;
@@ -403,21 +455,18 @@ async function confirmDelete() {
     if (!r.ok) throw new Error();
     closeDeleteModal();
     loadSets();
-  } catch {
-    alert('削除に失敗しました');
-  }
+  } catch { alert('削除に失敗しました'); }
 }
 
+// ========== Generate Tab ==========
 async function generateQuestions() {
   const text = document.getElementById('manual-text').value.trim();
   const name = document.getElementById('manual-name').value.trim();
   const count = parseInt(document.getElementById('q-count').value);
   if (!text) { showGenerateStatus('error', 'マニュアルテキストを入力してください'); return; }
   if (!name) { showGenerateStatus('error', 'マニュアル名を入力してください'); return; }
-
   document.getElementById('generated-questions-wrap').style.display = 'none';
   showGenerateStatus('loading', '');
-
   try {
     const r = await fetch('/api/generate', {
       method: 'POST',
@@ -449,14 +498,6 @@ function renderGeneratedQuestions() {
   const wrap = document.getElementById('generated-questions-wrap');
   const container = document.getElementById('generated-questions');
   container.innerHTML = '';
-
-  if (generatedQuestions.length > 0) {
-    const debugDiv = document.createElement('div');
-    debugDiv.style.cssText = 'background:#f0f0f0;border:1px solid #ccc;padding:8px;margin-bottom:12px;font-size:0.75rem;font-family:monospace;white-space:pre-wrap;word-break:break-all;';
-    debugDiv.textContent = '【デバッグ】問1の生データ: ' + JSON.stringify(generatedQuestions[0]);
-    container.appendChild(debugDiv);
-  }
-
   generatedQuestions.forEach((q, i) => appendQuestionEditor(container, q, i, true));
   wrap.style.display = 'block';
 }
@@ -472,18 +513,16 @@ async function saveGeneratedSet() {
       body: JSON.stringify({ manualName: name, questions })
     });
     if (!r.ok) throw new Error();
-    showGenerateStatus('', '');
     document.getElementById('generate-status').innerHTML = '<div class="alert alert-success">✅ クイズセットを保存しました！</div>';
     document.getElementById('generated-questions-wrap').style.display = 'none';
     document.getElementById('manual-text').value = '';
     document.getElementById('manual-name').value = '';
     generatedQuestions = [];
-  } catch {
-    alert('保存に失敗しました');
-  }
+  } catch { alert('保存に失敗しました'); }
 }
 
-function appendQuestionEditor(container, q, idx, isGenerated = false) {
+// ========== Question Editor ==========
+function appendQuestionEditor(container, q, idx) {
   const div = document.createElement('div');
   div.className = 'question-editor';
   div.dataset.idx = idx;
@@ -571,7 +610,7 @@ function updateTypeFields(editorDiv, q) {
   } else if (type === 'sort') {
     const opts = q.options && q.options.length ? q.options : ['', '', ''];
     container.innerHTML = `
-      <label>正しい順番（上から順番通りに入力）</label>
+      <label>正しい順番（上から順番通りに入力 ※スタッフ画面ではシャッフルされます）</label>
       <div class="options-list q-sort-list">
         ${opts.map((o, i) => `
           <div class="option-row">
@@ -652,7 +691,7 @@ function collectEditQuestions(containerId) {
   return questions;
 }
 
-// ========== 回答記録 ==========
+// ========== Submissions Tab ==========
 async function loadSubmissions() {
   const el = document.getElementById('submissions-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -666,22 +705,20 @@ async function loadSubmissions() {
     }
     el.innerHTML = `<div class="table-wrap"><table>
       <thead><tr><th>日時</th><th>スタッフ名</th><th>マニュアル名</th><th>スコア</th><th>回答詳細</th></tr></thead>
-      <tbody>${subs.map(s => {
+      <tbody>${subs.map((s, idx) => {
         const total = s.total || 0;
         const score = s.score || 0;
         const pct = total ? Math.round(score / total * 100) : 0;
         const badgeClass = pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-yellow' : 'badge-red';
-        const detailId = 'detail-' + s.id;
-        const detailHtml = buildDetailHtml(s);
         return `<tr>
-          <td style="white-space:nowrap;font-size:0.82rem;">${formatDate(s.submittedAt)}</td>
-          <td style="font-weight:600;">${esc(s.staffName||'不明')}</td>
+          <td style="white-space:nowrap;">${formatDate(s.submittedAt||s.createdAt)}</td>
+          <td>${esc(s.staffName||'不明')}</td>
           <td>${esc(s.manualName||'不明')}</td>
           <td><span class="badge ${badgeClass}">${score}/${total} (${pct}%)</span></td>
           <td>
-            <div class="sub-detail">
-              <button class="sub-detail-toggle" onclick="toggleDetail('${detailId}')">詳細を見る ▼</button>
-              <div class="sub-detail-body" id="${detailId}">${detailHtml}</div>
+            <button class="sub-detail-toggle" onclick="toggleSubDetail('sub-${idx}')">詳細 ▾</button>
+            <div class="sub-detail-body" id="sub-${idx}">
+              ${buildSubDetailHtml(s)}
             </div>
           </td>
         </tr>`;
@@ -692,40 +729,107 @@ async function loadSubmissions() {
   }
 }
 
-function toggleDetail(id) {
+function toggleSubDetail(id) {
   const el = document.getElementById(id);
-  if (!el) return;
-  const isOpen = el.classList.toggle('open');
-  const btn = el.previousElementSibling;
-  if (btn) btn.textContent = isOpen ? '詳細を閉じる ▲' : '詳細を見る ▼';
+  if (el) el.classList.toggle('open');
 }
 
-function buildDetailHtml(s) {
-  const results = s.results || [];
-  if (!results.length) return '<div style="padding:8px 12px;font-size:0.82rem;color:#6b7280;">詳細データなし</div>';
-  return results.map((r, i) => {
+function buildSubDetailHtml(s) {
+  if (!s.results || !s.results.length) return '<div style="color:#6b7280;font-size:0.8rem;padding:4px 0;">詳細なし</div>';
+  return s.results.map((r, i) => {
     const icon = r.isCorrect ? '⭕' : '❌';
-    const userAns = formatAnsText(r.type, r.userAnswer);
-    const correctAns = formatAnsText(r.type, r.correctAnswer);
-    return `<div class="detail-row">
-      <div class="d-q"><span class="d-icon">${icon}</span> 問${i+1}: ${esc(r.question || '')}</div>
-      <div class="d-ans">
-        <span class="${r.isCorrect ? 'd-correct' : 'd-wrong'}">回答: ${esc(userAns)}</span>
-        ${!r.isCorrect ? `<span class="d-correct">正解: ${esc(correctAns)}</span>` : ''}
-        ${r.explanation ? `<span style="color:#6b7280;">💡 ${esc(r.explanation)}</span>` : ''}
-      </div>
+    const cls = r.isCorrect ? 'sub-detail-correct' : 'sub-detail-wrong';
+    return `<div class="sub-detail-item ${cls}">
+      ${icon} 問${i+1}: ${esc(r.question||'')}
+      ${!r.isCorrect ? `<br><span style="color:#6b7280;">　あなた: ${formatAnsText(r.type, r.userAnswer)} ／ 正解: ${formatAnsText(r.type, r.correctAnswer)}</span>` : ''}
     </div>`;
   }).join('');
 }
 
 function formatAnsText(type, ans) {
-  if (ans === null || ans === undefined) return '未回答';
-  if (type === 'truefalse') return String(ans) === 'true' ? '○ 正しい' : '× 誤り';
-  if (Array.isArray(ans)) return ans.join(type === 'sort' ? ' → ' : ' / ');
-  return String(ans);
+  if (ans === null || ans === undefined) return '（未回答）';
+  if (type === 'truefalse') return String(ans) === 'true' ? '○正しい' : '×誤り';
+  if (type === 'sort') return Array.isArray(ans) ? ans.join('→') : String(ans);
+  if (type === 'fill') return Array.isArray(ans) ? ans.join(' / ') : String(ans);
+  return esc(String(ans));
 }
 
-// ========== マニュアル連携 ==========
+// ========== Staff Tab ==========
+async function loadStaffTab() {
+  const el = document.getElementById('staff-list');
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
+  try {
+    const r = await fetch('/api/submissions', { headers: { Authorization: authHeader } });
+    if (!r.ok) throw new Error();
+    const subs = await r.json();
+    if (!subs.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>まだ回答記録がありません</p></div>';
+      return;
+    }
+    // Group by staffName
+    const groups = {};
+    subs.forEach(s => {
+      const name = s.staffName || '不明';
+      if (!groups[name]) groups[name] = [];
+      groups[name].push(s);
+    });
+    const sorted = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
+    el.innerHTML = sorted.map(([name, records]) => {
+      const totalSessions = records.length;
+      const avgPct = Math.round(records.reduce((acc, s) => acc + (s.total ? s.score / s.total * 100 : 0), 0) / totalSessions);
+      const safeName = name.replace(/'/g, "\\'");
+      return `<div class="staff-group">
+        <div class="staff-group-header" onclick="toggleStaffGroup('sg-${encodeURIComponent(name)}')">
+          <div>
+            <div class="staff-name-label">👤 ${esc(name)}</div>
+            <div class="staff-stats">${totalSessions}回受験 ／ 平均スコア ${avgPct}%</div>
+          </div>
+          <span class="staff-toggle-icon">▾</span>
+        </div>
+        <div class="staff-history" id="sg-${encodeURIComponent(name)}">
+          ${records.map((s, si) => {
+            const total = s.total || 0;
+            const score = s.score || 0;
+            const pct = total ? Math.round(score / total * 100) : 0;
+            const badgeClass = pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-yellow' : 'badge-red';
+            const detailId = 'sh-' + encodeURIComponent(name) + '-' + si;
+            return `<div class="staff-history-item">
+              <div class="h-meta">${formatDate(s.submittedAt||s.createdAt)} ／ ${esc(s.manualName||'不明')}</div>
+              <div class="h-score">
+                <span class="badge ${badgeClass}">${score}/${total} (${pct}%)</span>
+                <button class="sub-detail-toggle" style="margin-left:8px;" onclick="toggleStaffDetail('${detailId}')">詳細 ▾</button>
+              </div>
+              <div class="h-details" id="${detailId}">
+                ${(s.results||[]).map((r, ri) => {
+                  const icon = r.isCorrect ? '⭕' : '❌';
+                  const cls = r.isCorrect ? 'sub-detail-correct' : 'sub-detail-wrong';
+                  return `<div class="h-q-item ${cls}">
+                    ${icon} 問${ri+1}: ${esc(r.question||'')}
+                    ${!r.isCorrect ? `<br><span style="color:#6b7280;">　あなた: ${formatAnsText(r.type, r.userAnswer)} ／ 正解: ${formatAnsText(r.type, r.correctAnswer)}</span>` : ''}
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<div class="alert alert-error">読み込みに失敗しました</div>';
+  }
+}
+
+function toggleStaffGroup(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+function toggleStaffDetail(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ========== Manual Integration ==========
 let manualList = [];
 
 async function loadManualList() {
@@ -739,7 +843,9 @@ async function loadManualList() {
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
     manualList = await r.json();
     sel.innerHTML = '<option value="">— マニュアルを選択してください —</option>';
-    let lastMain = null, lastSub = null, group = null;
+    let lastMain = null;
+    let lastSub = null;
+    let group = null;
     manualList.forEach(m => {
       const mainCat = m.main_category || 'カテゴリなし';
       const subCat = (m.sub_category && m.sub_category !== m.main_category) ? m.sub_category : null;
@@ -747,7 +853,8 @@ async function loadManualList() {
         if (group) sel.appendChild(group);
         group = document.createElement('optgroup');
         group.label = '━━ ' + mainCat + ' ━━';
-        lastMain = mainCat; lastSub = null;
+        lastMain = mainCat;
+        lastSub = null;
       }
       if (subCat && subCat !== lastSub) {
         const sep = document.createElement('option');
@@ -796,6 +903,7 @@ async function onManualSelect() {
   }
 }
 
+// ========== Utils ==========
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
