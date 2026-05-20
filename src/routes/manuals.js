@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
-    const safe = file.originalname.replace(/[^a-zA-Z0-9.\-_\u3000-\u9fff\u30a0-\u30ff\u3040-\u309f]/g, '_');
+    const safe = file.originalname.replace(/[^a-zA-Z0-9.\-_　-鿿゠-ヿ぀-ゟ]/g, '_');
     cb(null, `${timestamp}_${safe}`);
   }
 });
@@ -215,16 +215,29 @@ router.put('/:id/pdf', requireLogin, upload.single('pdf'), (req, res) => {
   res.json({ message: 'PDFを更新しました' });
 });
 
+// カテゴリ移動
+router.patch('/:id/category', requireLogin, (req, res) => {
+  const db = getDb();
+  const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
+  if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
+
+  if (req.session.role !== 'admin' && manual.created_by !== req.session.userId) {
+    return res.status(403).json({ error: 'このマニュアルを移動する権限がありません' });
+  }
+
+  const { category_id } = req.body;
+  db.prepare(`
+    UPDATE manuals SET category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?
+  `).run(category_id || null, req.session.userId, req.params.id);
+
+  res.json({ message: 'カテゴリを変更しました' });
+});
+
 // マニュアル削除（論理削除）
 router.delete('/:id', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-
-  // 管理者または作成者のみ削除可能
-  if (req.session.role !== 'admin' && manual.created_by !== req.session.userId) {
-    return res.status(403).json({ error: 'このマニュアルを削除する権限がありません' });
-  }
 
   db.prepare("UPDATE manuals SET is_deleted = 1, updated_at = datetime('now', 'localtime') WHERE id = ?").run(req.params.id);
   res.json({ message: 'マニュアルを削除しました' });
@@ -267,7 +280,7 @@ router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res)
   for (const file of req.files) {
     const raw = file.originalname;
     const asUtf8 = Buffer.from(raw, 'latin1').toString('utf8');
-    const fixedName = asUtf8.includes('\uFFFD') ? raw : asUtf8;
+    const fixedName = asUtf8.includes('�') ? raw : asUtf8;
     const title = path.parse(fixedName).name;
     const result = insert.run(
       title, file.filename, fixedName, file.size,

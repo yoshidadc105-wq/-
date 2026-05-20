@@ -20,6 +20,9 @@
     .manual-content table { border-collapse: collapse; margin-bottom: 12px; }
     .manual-content th, .manual-content td { border: 1px solid var(--border); padding: 8px 12px; }
     .manual-content th { background: var(--bg); }
+    .cat-option { padding: 8px 12px; cursor: pointer; border-radius: 6px; }
+    .cat-option:hover { background: var(--bg); }
+    .cat-option.selected { background: var(--primary); color: white; }
   </style>
 </head>
 <body>
@@ -60,11 +63,31 @@
   </div>
 </div>
 
+<!-- カテゴリ移動モーダル -->
+<div class="modal-overlay hidden" id="moveModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">📁 カテゴリを移動</span>
+      <button class="modal-close" onclick="closeModal('moveModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted mb-2">移動先のカテゴリを選んでください</p>
+      <div id="moveCatList" style="max-height:360px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeModal('moveModal')" class="btn btn-secondary">キャンセル</button>
+      <button onclick="doMove()" class="btn btn-primary" id="doMoveBtn" disabled>移動する</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/common.js"></script>
 <script>
 let manualId = null;
 let currentUser = null;
 let manualData = null;
+let selectedCategoryId = undefined;
+let allCategories = [];
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
@@ -105,6 +128,7 @@ async function loadManual() {
         <a href="/uploads/${manualData.file_path}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
         <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
         ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+        ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
         ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
       </div>
       <iframe src="/uploads/${manualData.file_path}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>
@@ -147,13 +171,20 @@ async function loadManual() {
     `;
   }
 
+  const editBtns = manualData.type !== 'pdf' ? `
+    <div class="flex gap-2">
+      ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+      ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
+      ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+    </div>` : '';
+
   document.getElementById('content').innerHTML = `
     <div class="card mb-2">
       <div class="card-header">
         <div>
           <div class="flex items-center gap-2 mb-1">
             <span class="badge ${manualData.type === 'pdf' ? 'badge-pdf' : manualData.type === 'steps' ? 'badge-steps' : 'badge-text'}">${manualData.type === 'pdf' ? 'PDF' : manualData.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
-            ${manualData.category_name ? `<span class="badge" style="background:#f1f5f9;color:var(--text-muted);">${manualData.category_name}</span>` : ''}
+            ${manualData.category_name ? `<span class="badge" style="background:#f1f5f9;color:var(--text-muted);" id="currentCatBadge">${manualData.category_name}</span>` : '<span id="currentCatBadge"></span>'}
           </div>
           <h1 style="font-size: 22px; font-weight: 700;">${manualData.title}</h1>
           ${manualData.description ? `<p class="text-muted text-sm mt-1">${manualData.description}</p>` : ''}
@@ -163,12 +194,7 @@ async function loadManual() {
             更新日: ${formatDate(manualData.updated_at)}
           </div>
         </div>
-        ${manualData.type !== 'pdf' ? `
-        <div class="flex gap-2">
-          ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
-          ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
-        </div>
-        ` : ''}
+        ${editBtns}
       </div>
     </div>
     ${bodyHtml}
@@ -228,6 +254,67 @@ async function deleteManual() {
     const data = await res.json();
     alert(data.error || '削除に失敗しました');
     closeModal('deleteModal');
+  }
+}
+
+// ── カテゴリ移動 ──
+async function openMoveModal() {
+  selectedCategoryId = manualData.category_id || null;
+  if (allCategories.length === 0) {
+    const res = await fetch('/api/categories');
+    allCategories = await res.json();
+  }
+  renderMoveCatList();
+  document.getElementById('doMoveBtn').disabled = false;
+  openModal('moveModal');
+}
+
+function renderMoveCatList() {
+  const container = document.getElementById('moveCatList');
+  let html = `<div class="cat-option ${selectedCategoryId === null ? 'selected' : ''}" onclick="selectCat(null, this)">（カテゴリなし）</div>`;
+
+  function renderNodes(parentId, depth) {
+    allCategories
+      .filter(c => parentId === null ? !c.parent_id : c.parent_id == parentId)
+      .forEach(c => {
+        const indent = depth * 16;
+        const isSelected = selectedCategoryId == c.id;
+        html += `<div class="cat-option ${isSelected ? 'selected' : ''}" onclick="selectCat(${c.id}, this)" style="padding-left:${12 + indent}px;">${depth > 0 ? '└ ' : ''}${c.name}</div>`;
+        renderNodes(c.id, depth + 1);
+      });
+  }
+  renderNodes(null, 0);
+  container.innerHTML = html;
+}
+
+function selectCat(id, el) {
+  selectedCategoryId = id;
+  document.querySelectorAll('#moveCatList .cat-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function doMove() {
+  const btn = document.getElementById('doMoveBtn');
+  btn.disabled = true;
+  const res = await fetch(`/api/manuals/${manualId}/category`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category_id: selectedCategoryId })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    closeModal('moveModal');
+    manualData.category_id = selectedCategoryId;
+    const moved = allCategories.find(c => c.id == selectedCategoryId);
+    const badge = document.getElementById('currentCatBadge');
+    if (badge) {
+      badge.textContent = moved ? moved.name : '';
+      badge.style.display = moved ? '' : 'none';
+    }
+    alert('カテゴリを移動しました');
+  } else {
+    alert(data.error || '移動に失敗しました');
+    btn.disabled = false;
   }
 }
 
