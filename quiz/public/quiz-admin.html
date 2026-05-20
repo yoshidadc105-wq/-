@@ -8,7 +8,6 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background: #f1f0ff; color: #1e1b4b; min-height: 100vh; }
 
-  /* Login */
   #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
   .login-card { background: #fff; border-radius: 16px; padding: 48px 40px; box-shadow: 0 8px 32px rgba(79,70,229,0.12); width: 100%; max-width: 400px; text-align: center; }
   .login-card .logo { font-size: 2rem; font-weight: 800; color: #4f46e5; margin-bottom: 4px; }
@@ -19,29 +18,24 @@
   .login-card button:hover { background: #4338ca; }
   .login-error { color: #dc2626; font-size: 0.85rem; margin-top: 8px; }
 
-  /* Main App */
   #app { display: none; flex-direction: column; min-height: 100vh; }
   header { background: #4f46e5; color: #fff; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 60px; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
   header .title { font-size: 1.2rem; font-weight: 800; letter-spacing: 0.02em; }
   header button { background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background .2s; }
   header button:hover { background: rgba(255,255,255,0.25); }
 
-  /* Tabs */
   .tabs { background: #fff; display: flex; border-bottom: 2px solid #e0e7ff; padding: 0 24px; }
   .tab-btn { padding: 14px 20px; border: none; background: none; cursor: pointer; font-size: 0.95rem; color: #6b7280; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s, border-color .2s; white-space: nowrap; }
   .tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
   .tab-btn:hover:not(.active) { color: #4f46e5; }
 
-  /* Content */
   .tab-content { display: none; padding: 24px; flex: 1; }
   .tab-content.active { display: block; }
 
-  /* Cards */
   .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(79,70,229,0.07); margin-bottom: 16px; }
   .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .card-header h2 { font-size: 1.1rem; font-weight: 700; color: #312e81; }
 
-  /* Quiz Set List */
   .set-list { display: grid; gap: 12px; }
   .set-item { background: #fff; border: 2px solid #e0e7ff; border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; transition: border-color .2s; }
   .set-item:hover { border-color: #a5b4fc; }
@@ -60,7 +54,6 @@
   .btn-success:hover { background: #15803d; }
   .btn-lg { padding: 11px 24px; font-size: 1rem; }
 
-  /* AI Generation */
   .form-group { margin-bottom: 16px; }
   .form-group label { display: block; font-size: 0.88rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
   .form-group input, .form-group textarea, .form-group select {
@@ -70,12 +63,10 @@
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #4f46e5; }
   .form-group textarea { resize: vertical; min-height: 160px; }
 
-  /* Spinner */
   .spinner-wrap { display: flex; align-items: center; justify-content: center; padding: 40px; gap: 12px; color: #4f46e5; font-weight: 600; }
   .spinner { width: 36px; height: 36px; border: 4px solid #e0e7ff; border-top-color: #4f46e5; border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Generated Questions */
   .question-editor { background: #f8f7ff; border: 2px solid #e0e7ff; border-radius: 10px; padding: 16px; margin-bottom: 14px; position: relative; }
   .question-editor .q-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .question-editor .q-num { font-size: 0.78rem; font-weight: 700; color: #4f46e5; background: #e0e7ff; padding: 2px 8px; border-radius: 20px; }
@@ -91,18 +82,30 @@
   .option-row button { flex-shrink: 0; padding: 6px 10px; }
   .add-option-btn { margin-top: 6px; font-size: 0.8rem; }
 
-  /* Table */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
   th { background: #4f46e5; color: #fff; padding: 10px 14px; text-align: left; font-weight: 600; }
-  td { padding: 10px 14px; border-bottom: 1px solid #e0e7ff; }
+  td { padding: 10px 14px; border-bottom: 1px solid #e0e7ff; vertical-align: top; }
   tr:hover td { background: #f8f7ff; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
   .badge-green { background: #dcfce7; color: #16a34a; }
   .badge-yellow { background: #fef9c3; color: #ca8a04; }
   .badge-red { background: #fee2e2; color: #dc2626; }
 
-  /* Modal */
+  /* 回答記録詳細 */
+  .sub-detail { margin-top: 8px; }
+  .sub-detail-toggle { background: none; border: 1px solid #a5b4fc; color: #4f46e5; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; cursor: pointer; font-weight: 600; }
+  .sub-detail-toggle:hover { background: #e0e7ff; }
+  .sub-detail-body { display: none; margin-top: 8px; border: 1px solid #e0e7ff; border-radius: 8px; overflow: hidden; }
+  .sub-detail-body.open { display: block; }
+  .detail-row { padding: 8px 12px; border-bottom: 1px solid #f0f0ff; font-size: 0.82rem; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .d-q { font-weight: 600; color: #1e1b4b; margin-bottom: 3px; }
+  .detail-row .d-ans { display: flex; gap: 12px; flex-wrap: wrap; }
+  .d-correct { color: #16a34a; font-weight: 600; }
+  .d-wrong { color: #dc2626; }
+  .d-icon { font-size: 0.9rem; }
+
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modal-overlay.hidden { display: none; }
   .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
@@ -112,18 +115,12 @@
   .modal-body { padding: 20px 24px; }
   .modal-footer { padding: 16px 24px; border-top: 1px solid #e0e7ff; display: flex; justify-content: flex-end; gap: 10px; }
 
-  /* Misc */
   .empty-state { text-align: center; padding: 48px 24px; color: #9ca3af; }
   .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
   .empty-state p { font-size: 0.95rem; }
   .alert { padding: 12px 16px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 16px; }
   .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
   .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-  .type-label { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-left: 8px; }
-  .type-truefalse { background: #dbeafe; color: #1d4ed8; }
-  .type-choice { background: #fce7f3; color: #9d174d; }
-  .type-fill { background: #d1fae5; color: #065f46; }
-  .type-sort { background: #fef3c7; color: #92400e; }
 
   @media (max-width: 600px) {
     .tabs { overflow-x: auto; padding: 0 12px; }
@@ -135,7 +132,6 @@
 </head>
 <body>
 
-<!-- Login Screen -->
 <div id="login-screen">
   <div class="login-card">
     <div class="logo">🦷 のびのび歯科</div>
@@ -146,7 +142,6 @@
   </div>
 </div>
 
-<!-- Main App -->
 <div id="app">
   <header>
     <div class="title">🦷 のびのび歯科 クイズ管理</div>
@@ -159,7 +154,6 @@
     <button class="tab-btn" onclick="switchTab('submissions')">📊 回答記録</button>
   </div>
 
-  <!-- Tab: Quiz Sets -->
   <div id="tab-sets" class="tab-content active">
     <div class="card">
       <div class="card-header">
@@ -170,12 +164,10 @@
     </div>
   </div>
 
-  <!-- Tab: AI Generation -->
   <div id="tab-generate" class="tab-content">
     <div class="card">
       <div class="card-header"><h2>AIでクイズを生成する</h2></div>
 
-      <!-- マニュアルシステムから選ぶ -->
       <div class="form-group">
         <label>マニュアルシステムから選ぶ</label>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -200,9 +192,15 @@
       <div class="form-group">
         <label for="q-count">問題数</label>
         <select id="q-count">
+          <option value="1">1問</option>
+          <option value="2">2問</option>
           <option value="3">3問</option>
+          <option value="4">4問</option>
           <option value="5" selected>5問</option>
+          <option value="6">6問</option>
           <option value="7">7問</option>
+          <option value="8">8問</option>
+          <option value="9">9問</option>
           <option value="10">10問</option>
         </select>
       </div>
@@ -219,7 +217,6 @@
     </div>
   </div>
 
-  <!-- Tab: Submissions -->
   <div id="tab-submissions" class="tab-content">
     <div class="card">
       <div class="card-header">
@@ -272,7 +269,6 @@
 </div>
 
 <script>
-// ========== Auth ==========
 let authHeader = '';
 let currentSets = [];
 let generatedQuestions = [];
@@ -308,7 +304,6 @@ function doLogout() {
   document.getElementById('login-error').textContent = '';
 }
 
-// ========== Tabs ==========
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
     const names = ['sets', 'generate', 'submissions'];
@@ -320,7 +315,6 @@ function switchTab(name) {
   if (name === 'submissions') loadSubmissions();
 }
 
-// ========== Sets Tab ==========
 async function loadSets() {
   const el = document.getElementById('sets-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -354,7 +348,6 @@ function renderSets() {
   `).join('') + '</div>';
 }
 
-// ========== Edit Modal ==========
 function openEditModal(id) {
   const set = currentSets.find(s => (s._id||s.id) === id);
   if (!set) return;
@@ -395,7 +388,6 @@ async function saveEdit() {
   }
 }
 
-// ========== Delete Modal ==========
 function openDeleteModal(id, name) {
   deletingSetId = id;
   document.getElementById('delete-set-name').textContent = name;
@@ -416,7 +408,6 @@ async function confirmDelete() {
   }
 }
 
-// ========== Generate Tab ==========
 async function generateQuestions() {
   const text = document.getElementById('manual-text').value.trim();
   const name = document.getElementById('manual-name').value.trim();
@@ -481,7 +472,7 @@ async function saveGeneratedSet() {
       body: JSON.stringify({ manualName: name, questions })
     });
     if (!r.ok) throw new Error();
-    showGenerateStatus('success-saved', '');
+    showGenerateStatus('', '');
     document.getElementById('generate-status').innerHTML = '<div class="alert alert-success">✅ クイズセットを保存しました！</div>';
     document.getElementById('generated-questions-wrap').style.display = 'none';
     document.getElementById('manual-text').value = '';
@@ -492,7 +483,6 @@ async function saveGeneratedSet() {
   }
 }
 
-// ========== Question Editor ==========
 function appendQuestionEditor(container, q, idx, isGenerated = false) {
   const div = document.createElement('div');
   div.className = 'question-editor';
@@ -662,7 +652,7 @@ function collectEditQuestions(containerId) {
   return questions;
 }
 
-// ========== Submissions Tab ==========
+// ========== 回答記録 ==========
 async function loadSubmissions() {
   const el = document.getElementById('submissions-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -675,17 +665,25 @@ async function loadSubmissions() {
       return;
     }
     el.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>スタッフ名</th><th>マニュアル名</th><th>スコア</th><th>日時</th></tr></thead>
+      <thead><tr><th>日時</th><th>スタッフ名</th><th>マニュアル名</th><th>スコア</th><th>回答詳細</th></tr></thead>
       <tbody>${subs.map(s => {
-        const total = s.total || (s.answers ? Object.keys(s.answers).length : 0);
+        const total = s.total || 0;
         const score = s.score || 0;
         const pct = total ? Math.round(score / total * 100) : 0;
         const badgeClass = pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-yellow' : 'badge-red';
+        const detailId = 'detail-' + s.id;
+        const detailHtml = buildDetailHtml(s);
         return `<tr>
-          <td>${esc(s.staffName||'不明')}</td>
+          <td style="white-space:nowrap;font-size:0.82rem;">${formatDate(s.submittedAt)}</td>
+          <td style="font-weight:600;">${esc(s.staffName||'不明')}</td>
           <td>${esc(s.manualName||'不明')}</td>
           <td><span class="badge ${badgeClass}">${score}/${total} (${pct}%)</span></td>
-          <td>${formatDate(s.createdAt||s.submittedAt)}</td>
+          <td>
+            <div class="sub-detail">
+              <button class="sub-detail-toggle" onclick="toggleDetail('${detailId}')">詳細を見る ▼</button>
+              <div class="sub-detail-body" id="${detailId}">${detailHtml}</div>
+            </div>
+          </td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
@@ -694,7 +692,40 @@ async function loadSubmissions() {
   }
 }
 
-// ========== Manual Integration ==========
+function toggleDetail(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isOpen = el.classList.toggle('open');
+  const btn = el.previousElementSibling;
+  if (btn) btn.textContent = isOpen ? '詳細を閉じる ▲' : '詳細を見る ▼';
+}
+
+function buildDetailHtml(s) {
+  const results = s.results || [];
+  if (!results.length) return '<div style="padding:8px 12px;font-size:0.82rem;color:#6b7280;">詳細データなし</div>';
+  return results.map((r, i) => {
+    const icon = r.isCorrect ? '⭕' : '❌';
+    const userAns = formatAnsText(r.type, r.userAnswer);
+    const correctAns = formatAnsText(r.type, r.correctAnswer);
+    return `<div class="detail-row">
+      <div class="d-q"><span class="d-icon">${icon}</span> 問${i+1}: ${esc(r.question || '')}</div>
+      <div class="d-ans">
+        <span class="${r.isCorrect ? 'd-correct' : 'd-wrong'}">回答: ${esc(userAns)}</span>
+        ${!r.isCorrect ? `<span class="d-correct">正解: ${esc(correctAns)}</span>` : ''}
+        ${r.explanation ? `<span style="color:#6b7280;">💡 ${esc(r.explanation)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatAnsText(type, ans) {
+  if (ans === null || ans === undefined) return '未回答';
+  if (type === 'truefalse') return String(ans) === 'true' ? '○ 正しい' : '× 誤り';
+  if (Array.isArray(ans)) return ans.join(type === 'sort' ? ' → ' : ' / ');
+  return String(ans);
+}
+
+// ========== マニュアル連携 ==========
 let manualList = [];
 
 async function loadManualList() {
@@ -705,15 +736,10 @@ async function loadManualList() {
   status.textContent = '読み込み中…';
   try {
     const r = await fetch('/api/manual-list', { headers: { Authorization: authHeader } });
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.error || 'エラー');
-    }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
     manualList = await r.json();
     sel.innerHTML = '<option value="">— マニュアルを選択してください —</option>';
-    let lastMain = null;
-    let lastSub = null;
-    let group = null;
+    let lastMain = null, lastSub = null, group = null;
     manualList.forEach(m => {
       const mainCat = m.main_category || 'カテゴリなし';
       const subCat = (m.sub_category && m.sub_category !== m.main_category) ? m.sub_category : null;
@@ -721,8 +747,7 @@ async function loadManualList() {
         if (group) sel.appendChild(group);
         group = document.createElement('optgroup');
         group.label = '━━ ' + mainCat + ' ━━';
-        lastMain = mainCat;
-        lastSub = null;
+        lastMain = mainCat; lastSub = null;
       }
       if (subCat && subCat !== lastSub) {
         const sep = document.createElement('option');
@@ -754,17 +779,12 @@ async function onManualSelect() {
   if (!id) return;
   const manual = manualList.find(m => String(m.id) === String(id));
   if (!manual) return;
-
   const status = document.getElementById('manual-load-status');
   status.style.color = '#4f46e5';
   status.textContent = `「${manual.title}」のテキストを取得中…`;
-
   try {
     const r = await fetch('/api/manual-text/' + id, { headers: { Authorization: authHeader } });
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.error || 'エラー');
-    }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
     const data = await r.json();
     document.getElementById('manual-name').value = data.title || manual.title;
     document.getElementById('manual-text').value = data.text || '';
@@ -776,7 +796,6 @@ async function onManualSelect() {
   }
 }
 
-// ========== Utils ==========
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
