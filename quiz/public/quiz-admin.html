@@ -281,6 +281,25 @@
   </div>
 </div>
 
+<!-- Submission Edit Modal -->
+<div class="modal-overlay hidden" id="sub-edit-modal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h2>回答記録を修正</h2>
+      <button class="modal-close" onclick="closeSubEditModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="sub-edit-info" style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;"></div>
+      <div id="sub-edit-questions"></div>
+    </div>
+    <div class="modal-footer">
+      <div id="sub-edit-score" style="font-size:0.9rem;font-weight:700;color:#4f46e5;margin-right:auto;"></div>
+      <button class="btn btn-secondary" onclick="closeSubEditModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveSubEdit()">保存する</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete Confirm Modal -->
 <div class="modal-overlay hidden" id="delete-modal">
   <div class="modal" style="max-width:400px;">
@@ -378,7 +397,7 @@ function renderSets() {
       <div class="set-item-actions">
         <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '⛔ 停止' : '✅ 公開'}</button>
         <button class="btn btn-secondary" onclick="openEditModal('${id}')">✏️ 編集</button>
-        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')}">🗑 削除</button>
+        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')">🗑 削除</button>
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -704,7 +723,7 @@ async function loadSubmissions() {
       return;
     }
     el.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>日時</th><th>スタッフ名</th><th>マニュアル名</th><th>スコア</th><th>回答詳細</th></tr></thead>
+      <thead><tr><th>日時</th><th>スタッフ名</th><th>マニュアル名</th><th>スコア</th><th>操作</th></tr></thead>
       <tbody>${subs.map((s, idx) => {
         const total = s.total || 0;
         const score = s.score || 0;
@@ -716,7 +735,11 @@ async function loadSubmissions() {
           <td>${esc(s.manualName||'不明')}</td>
           <td><span class="badge ${badgeClass}">${score}/${total} (${pct}%)</span></td>
           <td>
-            <button class="sub-detail-toggle" onclick="toggleSubDetail('sub-${idx}')">詳細 ▾</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="sub-detail-toggle" onclick="toggleSubDetail('sub-${idx}')">詳細 ▾</button>
+              <button class="sub-detail-toggle" style="background:#e0e7ff;color:#4f46e5;" onclick="openSubEditModal('${s.id}')">✏️ 修正</button>
+              <button class="sub-detail-toggle" style="background:#fee2e2;color:#dc2626;" onclick="deleteSubmission('${s.id}')">🗑</button>
+            </div>
             <div class="sub-detail-body" id="sub-${idx}">
               ${buildSubDetailHtml(s)}
             </div>
@@ -903,6 +926,86 @@ async function onManualSelect() {
   }
 }
 
+// ========== Submission Edit ==========
+let editingSubId = null;
+let editingSubResults = [];
+
+async function openSubEditModal(id) {
+  const r = await fetch('/api/submissions', { headers: { Authorization: authHeader } });
+  if (!r.ok) { alert('読み込みに失敗しました'); return; }
+  const subs = await r.json();
+  const sub = subs.find(s => s.id === id);
+  if (!sub) { alert('記録が見つかりません'); return; }
+  editingSubId = id;
+  editingSubResults = JSON.parse(JSON.stringify(sub.results || []));
+  document.getElementById('sub-edit-info').textContent =
+    `${sub.staffName} さん ／ ${sub.manualName} ／ ${formatDate(sub.submittedAt||sub.createdAt)}`;
+  renderSubEditQuestions();
+  document.getElementById('sub-edit-modal').classList.remove('hidden');
+}
+
+function renderSubEditQuestions() {
+  const container = document.getElementById('sub-edit-questions');
+  container.innerHTML = editingSubResults.map((r, i) => `
+    <div style="background:#f8f7ff;border:2px solid #e0e7ff;border-radius:10px;padding:14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <button onclick="toggleSubResult(${i})" style="
+          flex-shrink:0;width:40px;height:40px;border:none;border-radius:8px;font-size:1.3rem;
+          cursor:pointer;background:${r.isCorrect ? '#dcfce7' : '#fee2e2'};
+          transition:background .15s;" title="クリックで切り替え">${r.isCorrect ? '⭕' : '❌'}</button>
+        <div style="flex:1;">
+          <div style="font-size:0.88rem;font-weight:600;color:#1e1b4b;margin-bottom:4px;">問${i+1}: ${esc(r.question||'')}</div>
+          <div style="font-size:0.8rem;color:#6b7280;">
+            回答: ${esc(formatAnsText(r.type, r.userAnswer))}
+            ／ 正解: ${esc(formatAnsText(r.type, r.correctAnswer))}
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  updateSubEditScore();
+}
+
+function toggleSubResult(idx) {
+  editingSubResults[idx].isCorrect = !editingSubResults[idx].isCorrect;
+  renderSubEditQuestions();
+}
+
+function updateSubEditScore() {
+  const score = editingSubResults.filter(r => r.isCorrect).length;
+  const total = editingSubResults.length;
+  const pct = total ? Math.round(score / total * 100) : 0;
+  document.getElementById('sub-edit-score').textContent = `スコア: ${score}/${total} (${pct}%)`;
+}
+
+async function saveSubEdit() {
+  try {
+    const r = await fetch('/api/submissions/' + editingSubId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+      body: JSON.stringify({ results: editingSubResults }),
+    });
+    if (!r.ok) throw new Error();
+    closeSubEditModal();
+    loadSubmissions();
+  } catch { alert('保存に失敗しました'); }
+}
+
+function closeSubEditModal() {
+  document.getElementById('sub-edit-modal').classList.add('hidden');
+  editingSubId = null;
+  editingSubResults = [];
+}
+
+async function deleteSubmission(id) {
+  if (!confirm('この回答記録を削除しますか？')) return;
+  try {
+    const r = await fetch('/api/submissions/' + id, { method: 'DELETE', headers: { Authorization: authHeader } });
+    if (!r.ok) throw new Error();
+    loadSubmissions();
+  } catch { alert('削除に失敗しました'); }
+}
+
 // ========== Utils ==========
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -916,6 +1019,7 @@ function formatDate(d) {
 
 document.getElementById('edit-modal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
 document.getElementById('delete-modal').addEventListener('click', function(e) { if (e.target === this) closeDeleteModal(); });
+document.getElementById('sub-edit-modal').addEventListener('click', function(e) { if (e.target === this) closeSubEditModal(); });
 </script>
 </body>
 </html>
