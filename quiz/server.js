@@ -67,10 +67,17 @@ function cleanManualText(text) {
   const lines = text.split('\n')
     .map(l => l.trim())
     .filter(l => {
-      if (!l || l.length < 5) return false;
+      if (!l || l.length < 8) return false;
+      // URLを除外
       if (/^https?:\/\//.test(l)) return false;
-      if (/^[□■●○◆◇▶▼▲►◄→←・\-=_\*\/\\|#\s]+$/.test(l)) return false;
-      if (/^\d+$/.test(l)) return false;
+      // メタデータ行を除外（Update:, Exported:, Created:など）
+      if (/^(Update|Exported|Created|Modified|Author|Date|Version)[:：]/i.test(l)) return false;
+      // 記号だけの行を除外
+      if (/^[□■●○◆◇▶▼▲►◄→←・\-=_\*\/\\|#\s□■●○◆◇▶▼▲►◄→←・]+$/.test(l)) return false;
+      // 数字だけの行を除外
+      if (/^[\d\s/]+$/.test(l)) return false;
+      // 日付パターンを除外
+      if (/^\d{4}[.\/\-]\d{2}[.\/\-]\d{2}/.test(l)) return false;
       return true;
     });
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').substring(0, 4000);
@@ -106,6 +113,12 @@ app.post('/api/generate', async (req, res) => {
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEYが設定されていません' });
 
   const cleanedText = cleanManualText(manualText);
+  console.log('Cleaned text length:', cleanedText.length);
+  console.log('Cleaned text preview:', cleanedText.substring(0, 300));
+
+  if (cleanedText.length < 50) {
+    return res.status(400).json({ error: 'マニュアルの内容が少なすぎます。もっと内容のあるテキストを貼り付けてください' });
+  }
 
   const prompt = `Read the following manual text and create ${count} quiz questions for staff training.
 
@@ -162,9 +175,13 @@ Write questions in Japanese. Return ONLY a JSON array, no other text:
         q['答え'] != null ? q['答え'] :
         q['正解'] != null ? q['正解'] : '';
       const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
-      console.log('Normalized Q:', JSON.stringify({ type, question: String(questionText).substring(0, 40), answer }));
       return { type, question: questionText, options, answer, explanation };
-    });
+    }).filter(q => q.question && String(q.question).trim().length > 0);
+
+    if (questions.length === 0) {
+      return res.status(500).json({ error: 'AIが問題を生成できませんでした。テキストの内容を充実させてください' });
+    }
+
     res.json({ questions });
   } catch (err) {
     console.error('Groq error:', err.response?.data || err.message);
