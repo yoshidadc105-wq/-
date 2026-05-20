@@ -8,16 +8,13 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background: #f0fdf4; color: #14532d; min-height: 100vh; }
 
-  /* Screens */
   .screen { display: none; min-height: 100vh; flex-direction: column; }
   .screen.active { display: flex; }
 
-  /* Header */
   .app-header { background: #16a34a; color: #fff; padding: 14px 20px; text-align: center; box-shadow: 0 2px 8px rgba(22,163,74,0.25); }
   .app-header .logo { font-size: 1.3rem; font-weight: 800; }
   .app-header .sub { font-size: 0.82rem; opacity: 0.85; margin-top: 2px; }
 
-  /* Name Screen */
   #screen-name { align-items: center; justify-content: center; }
   .name-card { background: #fff; border-radius: 20px; padding: 40px 32px; box-shadow: 0 8px 32px rgba(22,163,74,0.13); width: 100%; max-width: 420px; margin: 20px; text-align: center; }
   .name-card .icon { font-size: 3rem; margin-bottom: 12px; }
@@ -27,9 +24,8 @@
   .name-card input:focus { border-color: #16a34a; }
   .name-card .btn-start { margin-top: 16px; width: 100%; padding: 14px; background: #16a34a; color: #fff; border: none; border-radius: 10px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: background .2s; }
   .name-card .btn-start:hover { background: #15803d; }
-  .name-card .btn-start:disabled { background: #86efac; cursor: not-allowed; }
+  .name-card .btn-start:disabled { background: #86efac; cursor: not-allowed; pointer-events: none; }
 
-  /* Set List Screen */
   #screen-sets { background: #f0fdf4; }
   #screen-sets .content { padding: 20px; flex: 1; }
   #screen-sets h2 { font-size: 1.1rem; font-weight: 700; color: #14532d; margin-bottom: 16px; }
@@ -41,7 +37,6 @@
   .set-card .arrow { float: right; font-size: 1.3rem; color: #16a34a; }
   .staff-badge { display: inline-block; background: #dcfce7; color: #16a34a; border-radius: 20px; padding: 3px 12px; font-size: 0.82rem; font-weight: 600; margin-bottom: 12px; }
 
-  /* Quiz Screen */
   #screen-quiz { background: #f0fdf4; }
   .quiz-top { background: #fff; border-bottom: 2px solid #bbf7d0; padding: 12px 20px; flex-shrink: 0; }
   .quiz-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: #6b7280; font-weight: 600; }
@@ -61,7 +56,6 @@
     text-align: center; font-family: inherit; font-weight: 600;
   }
 
-  /* TrueFalse */
   .tf-buttons { display: flex; gap: 16px; justify-content: center; margin-top: 8px; }
   .tf-btn { flex: 1; max-width: 160px; padding: 20px 12px; font-size: 2.2rem; border: 3px solid transparent; border-radius: 14px; cursor: pointer; background: #f8fffe; transition: border-color .15s, background .15s, transform .1s; font-family: inherit; }
   .tf-btn:hover { transform: scale(1.04); }
@@ -69,7 +63,6 @@
   .tf-btn.selected-false { border-color: #dc2626; background: #fee2e2; }
   .tf-btn .tf-label { font-size: 0.85rem; font-weight: 700; margin-top: 4px; display: block; }
 
-  /* Choice */
   .choice-list { display: grid; gap: 10px; }
   .choice-btn { width: 100%; padding: 14px 16px; text-align: left; border: 2px solid #bbf7d0; border-radius: 10px; background: #fff; cursor: pointer; font-size: 0.95rem; font-family: inherit; color: #14532d; font-weight: 500; transition: border-color .15s, background .15s; display: flex; align-items: center; gap: 10px; }
   .choice-btn:hover { border-color: #16a34a; background: #f0fdf4; }
@@ -77,10 +70,8 @@
   .choice-key { font-weight: 800; background: #dcfce7; color: #16a34a; border-radius: 6px; padding: 2px 8px; font-size: 0.85rem; flex-shrink: 0; }
   .choice-btn.selected .choice-key { background: #16a34a; color: #fff; }
 
-  /* Fill */
   .fill-hint { font-size: 0.82rem; color: #6b7280; margin-bottom: 12px; background: #f0fdf4; padding: 8px 12px; border-radius: 8px; }
 
-  /* Sort */
   .sort-list { display: grid; gap: 10px; }
   .sort-item { display: flex; align-items: center; gap: 10px; background: #fff; border: 2px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; }
   .sort-item .sort-num { font-weight: 800; color: #16a34a; min-width: 24px; font-size: 0.9rem; }
@@ -90,13 +81,11 @@
   .sort-arrow:hover { background: #bbf7d0; }
   .sort-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  /* Next Button */
   .quiz-nav { padding: 0 20px 24px; flex-shrink: 0; }
   .btn-next { width: 100%; padding: 15px; background: #16a34a; color: #fff; border: none; border-radius: 12px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: background .2s; font-family: inherit; }
   .btn-next:hover { background: #15803d; }
-  .btn-next:disabled { background: #86efac; cursor: not-allowed; }
+  .btn-next:disabled { background: #86efac; cursor: not-allowed; pointer-events: none; opacity: 0.6; }
 
-  /* Result Screen */
   #screen-result { background: #f0fdf4; }
   .result-content { padding: 20px; flex: 1; }
   .score-card { background: #fff; border-radius: 20px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 20px rgba(22,163,74,0.13); margin-bottom: 24px; }
@@ -124,7 +113,6 @@
   .btn-outline { width: 100%; padding: 13px; background: #fff; color: #16a34a; border: 2px solid #16a34a; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background .15s; font-family: inherit; }
   .btn-outline:hover { background: #dcfce7; }
 
-  /* Spinner */
   .spinner-wrap { display: flex; align-items: center; justify-content: center; padding: 40px; gap: 12px; color: #16a34a; font-weight: 600; }
   .spinner { width: 32px; height: 32px; border: 4px solid #bbf7d0; border-top-color: #16a34a; border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -142,7 +130,6 @@
 </head>
 <body>
 
-<!-- Screen: Name Entry -->
 <div id="screen-name" class="screen active">
   <div class="app-header">
     <div class="logo">🦷 のびのび歯科</div>
@@ -159,7 +146,6 @@
   </div>
 </div>
 
-<!-- Screen: Quiz Set List -->
 <div id="screen-sets" class="screen">
   <div class="app-header">
     <div class="logo">🦷 のびのび歯科</div>
@@ -172,7 +158,6 @@
   </div>
 </div>
 
-<!-- Screen: Quiz -->
 <div id="screen-quiz" class="screen">
   <div class="quiz-top">
     <div class="quiz-meta">
@@ -189,7 +174,6 @@
   </div>
 </div>
 
-<!-- Screen: Result -->
 <div id="screen-result" class="screen">
   <div class="app-header">
     <div class="logo">🦷 のびのび歯科</div>
@@ -211,7 +195,6 @@
 </div>
 
 <script>
-// ========== State ==========
 let staffName = '';
 let allSets = [];
 let currentSet = null;
@@ -220,13 +203,9 @@ let currentQIndex = 0;
 let userAnswers = [];
 let sortOrder = [];
 
-// ========== Helpers ==========
 function esc(str) {
   return String(str == null ? '' : str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function toArray(v) {
@@ -251,16 +230,10 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
-// ========== Name Screen ==========
 const nameInput = document.getElementById('staff-name-input');
 const startBtn = document.getElementById('start-btn');
-
-nameInput.addEventListener('input', function () {
-  startBtn.disabled = !this.value.trim();
-});
-nameInput.addEventListener('keydown', function (e) {
-  if (e.key === 'Enter' && this.value.trim()) startApp();
-});
+nameInput.addEventListener('input', function () { startBtn.disabled = !this.value.trim(); });
+nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && this.value.trim()) startApp(); });
 startBtn.addEventListener('click', startApp);
 
 function startApp() {
@@ -271,7 +244,6 @@ function startApp() {
   loadSets();
 }
 
-// ========== Set List ==========
 async function loadSets() {
   const grid = document.getElementById('sets-grid');
   grid.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -281,7 +253,6 @@ async function loadSets() {
     allSets = await r.json();
     renderSets();
   } catch (e) {
-    console.error('loadSets error:', e);
     grid.innerHTML = '<div class="alert alert-error">クイズの読み込みに失敗しました。しばらくしてから再度お試しください。</div>';
   }
 }
@@ -299,27 +270,17 @@ function renderSets() {
       <div class="meta">📝 ${toArray(s.questions).length}問</div>
     </div>
   `).join('') + '</div>';
-
   grid.querySelectorAll('.set-card').forEach(card => {
-    card.addEventListener('click', function () {
-      startQuiz(parseInt(this.dataset.idx, 10));
-    });
+    card.addEventListener('click', function () { startQuiz(parseInt(this.dataset.idx, 10)); });
   });
 }
 
-// ========== Quiz ==========
 function startQuiz(idx) {
   const set = allSets[idx];
   if (!set) return;
   currentSet = set;
-  currentQuestions = toArray(set.questions).map(q => ({
-    ...q,
-    options: toArray(q.options),
-  }));
-  if (!currentQuestions.length) {
-    alert('この問題セットには問題がありません');
-    return;
-  }
+  currentQuestions = toArray(set.questions).map(q => ({ ...q, options: toArray(q.options) }));
+  if (!currentQuestions.length) { alert('この問題セットには問題がありません'); return; }
   currentQIndex = 0;
   userAnswers = new Array(currentQuestions.length).fill(null);
   document.getElementById('quiz-title-label').textContent = set.manualName || set.name || '—';
@@ -339,7 +300,6 @@ function renderQuestion() {
 
   const btnNext = document.getElementById('btn-next');
   btnNext.textContent = currentQIndex === total - 1 ? '結果を見る 🎯' : '次へ →';
-  btnNext.disabled = (userAnswers[currentQIndex] === null);
 
   const typeLabels = { truefalse: '○×問題', choice: '選択問題', fill: '穴埋め問題', sort: '並び替え問題' };
   const typeBadges = { truefalse: 'badge-truefalse', choice: 'badge-choice', fill: 'badge-fill', sort: 'badge-sort' };
@@ -350,9 +310,7 @@ function renderQuestion() {
   if (q.type === 'fill') {
     html += `<div class="fill-hint">空欄（___）に当てはまる言葉を入力してください</div>`;
     const blanks = (q.question || '').split('___').length - 1;
-    const savedFill = Array.isArray(userAnswers[currentQIndex])
-      ? userAnswers[currentQIndex]
-      : new Array(blanks).fill('');
+    const savedFill = Array.isArray(userAnswers[currentQIndex]) ? userAnswers[currentQIndex] : new Array(blanks).fill('');
     const parts = (q.question || '').split('___');
     let rendered = '';
     parts.forEach((part, i) => {
@@ -382,6 +340,8 @@ function renderQuestion() {
   } else if (q.type === 'sort') {
     if (userAnswers[currentQIndex] === null) {
       sortOrder = shuffle(opts);
+      // 並び替え問題は初期順序を回答として設定（次へボタンを最初から押せる）
+      userAnswers[currentQIndex] = [...sortOrder];
     } else {
       sortOrder = [...userAnswers[currentQIndex]];
     }
@@ -391,15 +351,14 @@ function renderQuestion() {
   const card = document.getElementById('question-card');
   card.innerHTML = html;
 
+  // next button state after rendering
+  btnNext.disabled = (userAnswers[currentQIndex] === null);
+
   if (q.type === 'fill') {
-    card.querySelectorAll('.fill-input').forEach(input => {
-      input.addEventListener('input', onFillInput);
-    });
+    card.querySelectorAll('.fill-input').forEach(input => input.addEventListener('input', onFillInput));
   } else if (q.type === 'truefalse') {
     card.querySelectorAll('.tf-btn').forEach(btn => {
-      btn.addEventListener('click', function () {
-        selectTF(this.dataset.val);
-      });
+      btn.addEventListener('click', function () { selectTF(this.dataset.val); });
     });
   } else if (q.type === 'choice') {
     attachChoiceEvents(card);
@@ -416,9 +375,7 @@ function attachChoiceEvents(container) {
       const optionText = opts[idx];
       userAnswers[currentQIndex] = optionText;
       document.getElementById('btn-next').disabled = false;
-      container.querySelectorAll('.choice-btn').forEach((b, i) => {
-        b.classList.toggle('selected', i === idx);
-      });
+      container.querySelectorAll('.choice-btn').forEach((b, i) => b.classList.toggle('selected', i === idx));
     });
   });
 }
@@ -472,15 +429,13 @@ function onFillInput() {
 }
 
 function nextQuestion() {
+  // 安全ガード: 未回答なら進まない
+  if (userAnswers[currentQIndex] === null) return;
+
   const q = currentQuestions[currentQIndex];
   if (q.type === 'fill') {
     const inputs = document.querySelectorAll('.fill-input');
-    if (inputs.length) {
-      userAnswers[currentQIndex] = Array.from(inputs).map(i => i.value);
-    }
-  }
-  if (q.type === 'sort' && userAnswers[currentQIndex] === null) {
-    userAnswers[currentQIndex] = [...sortOrder];
+    if (inputs.length) userAnswers[currentQIndex] = Array.from(inputs).map(i => i.value);
   }
 
   if (currentQIndex < currentQuestions.length - 1) {
@@ -491,7 +446,6 @@ function nextQuestion() {
   }
 }
 
-// ========== Result ==========
 async function submitAndShowResult() {
   const answersObj = {};
   currentQuestions.forEach((q, i) => {
@@ -557,22 +511,14 @@ async function submitAndShowResult() {
 function formatAnswerDisplay(q, ans) {
   if (ans === null || ans === undefined) return '（未回答）';
   const type = q.type || '';
-  if (type === 'truefalse') {
-    return String(ans) === 'true' ? '⭕ 正しい' : '❌ 誤り';
-  } else if (type === 'choice') {
-    return esc(String(ans));
-  } else if (type === 'fill') {
-    return esc(Array.isArray(ans) ? ans.join(' / ') : String(ans));
-  } else if (type === 'sort') {
-    return esc(Array.isArray(ans) ? ans.join(' → ') : String(ans));
-  }
+  if (type === 'truefalse') return String(ans) === 'true' ? '⭕ 正しい' : '❌ 誤り';
+  if (type === 'choice') return esc(String(ans));
+  if (type === 'fill') return esc(Array.isArray(ans) ? ans.join(' / ') : String(ans));
+  if (type === 'sort') return esc(Array.isArray(ans) ? ans.join(' → ') : String(ans));
   return esc(String(ans));
 }
 
-// ========== Navigation ==========
-document.getElementById('btn-back-to-sets').addEventListener('click', function () {
-  showScreen('sets');
-});
+document.getElementById('btn-back-to-sets').addEventListener('click', function () { showScreen('sets'); });
 </script>
 </body>
 </html>
