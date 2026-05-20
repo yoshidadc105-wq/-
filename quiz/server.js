@@ -88,13 +88,18 @@ function checkAuth(req, res) {
   return true;
 }
 
-// Normalize answer for flexible fill comparison (ignore spaces, punctuation, case)
+// Normalize answer for flexible fill comparison
 function normalizeAns(s) {
   return String(s == null ? '' : s)
     .trim()
     .toLowerCase()
+    // katakana → hiragana (Unicode offset 0x60)
+    .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    // full-width alphanumeric → half-width
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    // remove spaces and common punctuation
     .replace(/[\s　]+/g, '')
-    .replace(/[、。，．・〜～]/g, '');
+    .replace(/[、。，．・〜～ー]/g, '');
 }
 
 function extractJsonArray(text) {
