@@ -14,7 +14,8 @@ const MANUAL_API_KEY = process.env.MANUAL_API_KEY || '';
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '10mb' }));
 
-const DATA_DIR = path.join(__dirname, 'data');
+// DATA_DIR環境変数で永続ディスクのパスを指定できる
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const SETS_FILE = path.join(DATA_DIR, 'quiz-sets.json');
 const SUBS_FILE = path.join(DATA_DIR, 'submissions.json');
 
@@ -68,15 +69,10 @@ function cleanManualText(text) {
     .map(l => l.trim())
     .filter(l => {
       if (!l || l.length < 8) return false;
-      // URLを除外
       if (/^https?:\/\//.test(l)) return false;
-      // メタデータ行を除外（Update:, Exported:, Created:など）
       if (/^(Update|Exported|Created|Modified|Author|Date|Version)[:：]/i.test(l)) return false;
-      // 記号だけの行を除外
-      if (/^[□■●○◆◇▶▼▲►◄→←・\-=_\*\/\\|#\s□■●○◆◇▶▼▲►◄→←・]+$/.test(l)) return false;
-      // 数字だけの行を除外
+      if (/^[□■●○◆◇▶▼▲►◄→←・\-=_\*\/\\|#\s]+$/.test(l)) return false;
       if (/^[\d\s/]+$/.test(l)) return false;
-      // 日付パターンを除外
       if (/^\d{4}[.\/\-]\d{2}[.\/\-]\d{2}/.test(l)) return false;
       return true;
     });
@@ -114,7 +110,6 @@ app.post('/api/generate', async (req, res) => {
 
   const cleanedText = cleanManualText(manualText);
   console.log('Cleaned text length:', cleanedText.length);
-  console.log('Cleaned text preview:', cleanedText.substring(0, 300));
 
   if (cleanedText.length < 50) {
     return res.status(400).json({ error: 'マニュアルの内容が少なすぎます。もっと内容のあるテキストを貼り付けてください' });
@@ -145,43 +140,26 @@ Write questions in Japanese. Return ONLY a JSON array, no other text:
         ],
         temperature: 0.7,
       },
-      {
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
-        timeout: 60000,
-      }
+      { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
     );
     const text = response.data.choices[0].message.content;
-    console.log('Groq raw response:', text.substring(0, 500));
     const jsonStr = extractJsonArray(text);
     if (!jsonStr) throw new Error('JSON配列が見つかりませんでした');
     const parsed = JSON.parse(jsonStr);
     const raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
-    console.log('First raw question keys:', raw[0] ? Object.keys(raw[0]) : 'none');
     const questions = raw.map(q => {
-      const questionText =
-        q.question || q.text || q.content || q.question_text ||
-        q['問題'] || q['問題文'] || q['質問'] || '';
-      const explanation =
-        q.explanation || q.reason || q.description ||
-        q['解説'] || q['説明'] || '';
-      let options = q.options || q.choices || q.selections || q['選択肢'] || [];
-      if (!Array.isArray(options)) {
-        options = (options && typeof options === 'object') ? Object.values(options) : [];
-      }
-      const answer =
-        q.answer != null ? q.answer :
-        q.correct_answer != null ? q.correct_answer :
-        q.correct != null ? q.correct :
-        q['答え'] != null ? q['答え'] :
-        q['正解'] != null ? q['正解'] : '';
-      const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
+      const questionText = q.question || q.text || q.content || q.question_text || q['問題'] || q['問題文'] || q['質問'] || '';
+      const explanation = q.explanation || q.reason || q['解説'] || q['説明'] || '';
+      let options = q.options || q.choices || q['選択肢'] || [];
+      if (!Array.isArray(options)) options = (options && typeof options === 'object') ? Object.values(options) : [];
+      const answer = q.answer != null ? q.answer : q.correct_answer != null ? q.correct_answer : q['答え'] != null ? q['答え'] : q['正解'] != null ? q['正解'] : '';
+      const type = q.type || q['タイプ'] || 'truefalse';
       return { type, question: questionText, options, answer, explanation };
     }).filter(q => q.question && String(q.question).trim().length > 0);
 
     if (questions.length === 0) {
       return res.status(500).json({ error: 'AIが問題を生成できませんでした。テキストの内容を充実させてください' });
     }
-
     res.json({ questions });
   } catch (err) {
     console.error('Groq error:', err.response?.data || err.message);
@@ -244,10 +222,7 @@ app.post('/api/sets/:id/submit', (req, res) => {
       const user = Array.isArray(userAnswer) ? userAnswer : [];
       isCorrect = JSON.stringify(correct) === JSON.stringify(user);
     }
-    return {
-      questionId: q.id, type: q.type, question: q.question,
-      userAnswer, correctAnswer: q.answer, isCorrect, explanation: q.explanation,
-    };
+    return { questionId: q.id, type: q.type, question: q.question, userAnswer, correctAnswer: q.answer, isCorrect, explanation: q.explanation };
   });
 
   const score = results.filter(r => r.isCorrect).length;
@@ -276,8 +251,7 @@ app.get('/api/manual-list', async (req, res) => {
   if (!MANUAL_API_URL || !MANUAL_API_KEY) return res.status(503).json({ error: 'マニュアル連携が設定されていません' });
   try {
     const r = await axios.get(`${MANUAL_API_URL}/api/quiz/manuals`, {
-      headers: { 'x-quiz-api-key': MANUAL_API_KEY },
-      timeout: 10000,
+      headers: { 'x-quiz-api-key': MANUAL_API_KEY }, timeout: 10000,
     });
     res.json(r.data);
   } catch (err) {
@@ -290,8 +264,7 @@ app.get('/api/manual-text/:id', async (req, res) => {
   if (!MANUAL_API_URL || !MANUAL_API_KEY) return res.status(503).json({ error: 'マニュアル連携が設定されていません' });
   try {
     const r = await axios.get(`${MANUAL_API_URL}/api/quiz/manuals/${req.params.id}/text`, {
-      headers: { 'x-quiz-api-key': MANUAL_API_KEY },
-      timeout: 30000,
+      headers: { 'x-quiz-api-key': MANUAL_API_KEY }, timeout: 30000,
     });
     res.json(r.data);
   } catch (err) {
@@ -301,14 +274,4 @@ app.get('/api/manual-text/:id', async (req, res) => {
 
 app.get('/health', (_, res) => res.send('OK'));
 
-app.get('/debug-files', (_, res) => {
-  try {
-    const pub = path.join(__dirname, 'public');
-    const files = fs.readdirSync(pub);
-    res.json({ publicPath: pub, files });
-  } catch (e) {
-    res.json({ error: e.message, cwd: __dirname, cwdFiles: fs.readdirSync(__dirname) });
-  }
-});
-
-app.listen(PORT, () => console.log(`クイズサーバー起動: port=${PORT}`));
+app.listen(PORT, () => console.log(`クイズサーバー起動: port=${PORT}, data=${DATA_DIR}`));
