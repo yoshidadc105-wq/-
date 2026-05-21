@@ -1,0 +1,17 @@
+{
+  "name": "マニュアルシステム",
+  "short_name": "マニュアル",
+  "description": "社内マニュアルシステム",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b6fd4",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
