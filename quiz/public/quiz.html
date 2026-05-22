@@ -15,13 +15,12 @@
   .app-header .logo { font-size: 1.3rem; font-weight: 800; }
   .app-header .sub { font-size: 0.82rem; opacity: 0.85; margin-top: 2px; }
 
-  /* Name Screen */
   #screen-name { align-items: center; justify-content: center; }
   .name-card { background: #fff; border-radius: 20px; padding: 40px 32px; box-shadow: 0 8px 32px rgba(22,163,74,0.13); width: 100%; max-width: 420px; margin: 20px; text-align: center; }
   .name-card .icon { font-size: 3rem; margin-bottom: 12px; }
   .name-card h1 { font-size: 1.4rem; font-weight: 800; color: #14532d; margin-bottom: 6px; }
   .name-card p { font-size: 0.9rem; color: #6b7280; margin-bottom: 24px; }
-  .name-card select { width: 100%; padding: 14px 16px; border: 2px solid #bbf7d0; border-radius: 10px; font-size: 1.05rem; outline: none; transition: border-color .2s; font-family: inherit; background: #fff; color: #14532d; appearance: none; cursor: pointer; }
+  .name-card select { width: 100%; padding: 14px 16px; border: 2px solid #bbf7d0; border-radius: 10px; font-size: 1.05rem; text-align: center; outline: none; transition: border-color .2s; font-family: inherit; background: #fff; color: #14532d; appearance: none; cursor: pointer; }
   .name-card select:focus { border-color: #16a34a; }
   .name-card .select-wrap { position: relative; }
   .name-card .select-wrap::after { content: '▼'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #16a34a; font-size: 0.8rem; pointer-events: none; }
@@ -30,7 +29,6 @@
   .name-card .btn-start:disabled { background: #86efac; cursor: not-allowed; pointer-events: none; }
   .name-loading { font-size: 0.85rem; color: #6b7280; margin-top: 8px; }
 
-  /* Set List Screen */
   #screen-sets { background: #f0fdf4; }
   #screen-sets .content { padding: 20px; flex: 1; }
   #screen-sets h2 { font-size: 1.1rem; font-weight: 700; color: #14532d; margin-bottom: 16px; }
@@ -42,7 +40,6 @@
   .set-card .arrow { float: right; font-size: 1.3rem; color: #16a34a; }
   .staff-badge { display: inline-block; background: #dcfce7; color: #16a34a; border-radius: 20px; padding: 3px 12px; font-size: 0.82rem; font-weight: 600; margin-bottom: 12px; }
 
-  /* Quiz Screen */
   #screen-quiz { background: #f0fdf4; }
   .quiz-top { background: #fff; border-bottom: 2px solid #bbf7d0; padding: 12px 20px; flex-shrink: 0; }
   .quiz-top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -65,7 +62,6 @@
     text-align: center; font-family: inherit; font-weight: 600;
   }
 
-  /* TrueFalse */
   .tf-buttons { display: flex; gap: 16px; justify-content: center; margin-top: 8px; }
   .tf-btn { flex: 1; max-width: 160px; padding: 20px 12px; font-size: 2.2rem; border: 3px solid transparent; border-radius: 14px; cursor: pointer; background: #f8fffe; transition: border-color .15s, background .15s, transform .1s; font-family: inherit; }
   .tf-btn:hover { transform: scale(1.04); }
@@ -73,7 +69,6 @@
   .tf-btn.selected-false { border-color: #dc2626; background: #fee2e2; }
   .tf-btn .tf-label { font-size: 0.85rem; font-weight: 700; margin-top: 4px; display: block; }
 
-  /* Choice */
   .choice-list { display: grid; gap: 10px; }
   .choice-btn { width: 100%; padding: 14px 16px; text-align: left; border: 2px solid #bbf7d0; border-radius: 10px; background: #fff; cursor: pointer; font-size: 0.95rem; font-family: inherit; color: #14532d; font-weight: 500; transition: border-color .15s, background .15s; display: flex; align-items: center; gap: 10px; }
   .choice-btn:hover { border-color: #16a34a; background: #f0fdf4; }
@@ -81,10 +76,8 @@
   .choice-key { font-weight: 800; background: #dcfce7; color: #16a34a; border-radius: 6px; padding: 2px 8px; font-size: 0.85rem; flex-shrink: 0; }
   .choice-btn.selected .choice-key { background: #16a34a; color: #fff; }
 
-  /* Fill */
   .fill-hint { font-size: 0.82rem; color: #6b7280; margin-bottom: 12px; background: #f0fdf4; padding: 8px 12px; border-radius: 8px; }
 
-  /* Sort */
   .sort-hint { font-size: 0.82rem; color: #92400e; margin-bottom: 12px; background: #fef9c3; padding: 8px 12px; border-radius: 8px; }
   .sort-list { display: grid; gap: 10px; }
   .sort-item { display: flex; align-items: center; gap: 10px; background: #fff; border: 2px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; }
@@ -95,13 +88,11 @@
   .sort-arrow:hover { background: #bbf7d0; }
   .sort-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  /* Next Button */
   .quiz-nav { padding: 0 20px 24px; flex-shrink: 0; }
   .btn-next { width: 100%; padding: 15px; background: #16a34a; color: #fff; border: none; border-radius: 12px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: background .2s; font-family: inherit; }
   .btn-next:hover { background: #15803d; }
   .btn-next:disabled { background: #86efac; cursor: not-allowed; pointer-events: none; opacity: 0.6; }
 
-  /* Result Screen */
   #screen-result { background: #f0fdf4; }
   .result-content { padding: 20px; flex: 1; }
   .score-card { background: #fff; border-radius: 20px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 20px rgba(22,163,74,0.13); margin-bottom: 24px; }
@@ -146,7 +137,6 @@
 </head>
 <body>
 
-<!-- Screen: Name Entry -->
 <div id="screen-name" class="screen active">
   <div class="app-header">
     <div class="logo">🦷 のびのび歯科</div>
@@ -168,7 +158,6 @@
   </div>
 </div>
 
-<!-- Screen: Quiz Set List -->
 <div id="screen-sets" class="screen">
   <div class="app-header">
     <div class="logo">🦷 のびのび歯科</div>
@@ -181,7 +170,6 @@
   </div>
 </div>
 
-<!-- Screen: Quiz -->
 <div id="screen-quiz" class="screen">
   <div class="quiz-top">
     <div class="quiz-top-row">
@@ -201,7 +189,6 @@
   </div>
 </div>
 
-<!-- Screen: Result -->
 <div id="screen-result" class="screen">
   <div class="app-header">
     <div class="logo">🦷 のびのび歯科</div>
@@ -258,7 +245,6 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
-// ========== Name Screen ==========
 const nameInput = document.getElementById('staff-name-input');
 const startBtn = document.getElementById('start-btn');
 
@@ -298,7 +284,6 @@ function startApp() {
 
 loadStaffList();
 
-// ========== Set List ==========
 async function loadSets() {
   const grid = document.getElementById('sets-grid');
   grid.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -331,7 +316,6 @@ function renderSets() {
   });
 }
 
-// ========== Quiz ==========
 function startQuiz(idx) {
   const set = allSets[idx];
   if (!set) return;
@@ -520,7 +504,6 @@ function nextQuestion() {
   }
 }
 
-// ========== Result ==========
 async function submitAndShowResult() {
   const answersObj = {};
   currentQuestions.forEach((q, i) => {
@@ -552,7 +535,7 @@ async function submitAndShowResult() {
     document.getElementById('score-msg').textContent =
       pct >= 90 ? '🎉 素晴らしい！' :
       pct >= 70 ? '👍 よくできました！' :
-      pct >= 50 ? '💪 もう少し頑張りましょう！' :
+      pct >= 50 ? '💪 もう少し頭張りましょう！' :
                   '📚 もう一度復習してみましょう';
 
     document.getElementById('result-list').innerHTML = (serverResult.results || []).map((r, i) => {
