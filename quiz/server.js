@@ -147,25 +147,7 @@ app.post('/api/generate', async (req, res) => {
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEYが設定されていません' });
 
-  const prompt = `以下のマニュアルテキストを読んで、スタッフ研修用のクイズを${count}問作成してください。
-
-マニュアルテキスト:
-${manualText}
-
-問題タイプを混ぜて作成してください:
-- truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）
-- choice: 4択問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト
-- fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）
-- sort: 手順並び替え問題。以下のルールを必ず守ること:
-  * questionは「〇〇の手順を正しい順番に並べてください」という形式
-  * optionsは3〜5個の手順ステップの配列（各ステップは独立した短い行動）
-  * 各ステップはカンマで区切らず、別々の配列要素にすること
-  * answerはoptionsと同じ配列（正しい順番で）
-  * 悪い例: options:["手袋をつける,消毒する","準備する"]
-  * 良い例: options:["手洗いをする","手袋をつける","消毒する","患者に説明する"]
-
-日本語で問題を作成してください。JSONの配列のみを返してください（他のテキストは不要）:
-[{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]`;
+  const prompt = `以下のマニュアルテキストを読んで、スタッフ研修用のクイズを${count}問作成してください。\n\nマニュアルテキスト:\n${manualText}\n\n問題タイプを混ぜて作成してください:\n- truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）\n- choice: 4择問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト\n- fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）\n- sort: 手順並び替え問題。以下のルールを必ず守ること:\n  * questionは「『○』の手順を正しい順番に並べてください」という形式\n  * optionsは3～5個の手順ステップの配列（各ステップは独立した短い行動）\n  * 各ステップはカンマで区切らず、別々の配列要素にすること\n  * answerはoptionsと同じ配列（正しい順番で）\n  * 悪い例: options:["手袋をつける,消毒する","準備する"]\n  * 良い例: options:["手洗いをする","手袋をつける","消毒する","患者に説明する"]\n\n日本語で問題を作成してください。JSONの配列のみを返してください（他のテキストは不要）:\n[{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]`;
 
   try {
     const response = await axios.post(
@@ -198,7 +180,6 @@ ${manualText}
       if (!Array.isArray(options)) {
         options = (options && typeof options === 'object') ? Object.values(options) : [];
       }
-      // Fix sort options that may have been comma-joined into single strings
       const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
       if (type === 'sort' && options.length > 0) {
         const expanded = [];
@@ -220,7 +201,6 @@ ${manualText}
         q.correct != null ? q.correct :
         q['答え'] != null ? q['答え'] :
         q['正解'] != null ? q['正解'] : '';
-      // For sort type, answer should match options
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
     }).filter(q => q.question && String(q.question).trim().length > 0);
@@ -376,6 +356,8 @@ app.get('/api/manual-text/:id', async (req, res) => {
   }
 });
 
+app.get('/admin', (_, res) => res.redirect('/quiz-admin.html'));
+app.get('/quiz', (_, res) => res.redirect('/quiz.html'));
 app.get('/health', (_, res) => res.send('OK'));
 
 app.listen(PORT, () => console.log(`クイズサーバー起動: port=${PORT}`));
