@@ -144,6 +144,26 @@ function extractJsonArray(text) {
   return null;
 }
 
+// Strip metadata lines added by manual export tools (URLs, timestamps, author info)
+function cleanManualText(text) {
+  return text
+    .split('\n')
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return false;
+      if (/^https?:\/\//i.test(t)) return false;
+      if (/^View online/i.test(t)) return false;
+      if (/^Update\s*[::：]/i.test(t)) return false;
+      if (/^Exported\s*[::：]/i.test(t)) return false;
+      if (/^Created\s*[::：]/i.test(t)) return false;
+      if (/^Author\s*[::：]/i.test(t)) return false;
+      if (/^\d{4}\.\d{2}\.\d{2}/.test(t)) return false;
+      return true;
+    })
+    .join('\n')
+    .trim();
+}
+
 // ========== Routes ==========
 app.get('/api/sets', async (req, res) => {
   if (!checkAuth(req, res)) return;
@@ -170,10 +190,14 @@ app.post('/api/generate', async (req, res) => {
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEYが設定されていません' });
 
-  const prompt = `以下のマニュアルテキストを読んで、スタッフ研修用のクイズを${count}問作成してください。
+  const cleanedText = cleanManualText(manualText);
+  if (!cleanedText) return res.status(400).json({ error: 'マニュアルテキストに有効な内容がありません' });
+
+  const prompt = `以下のマニュアルテキストだけを根拠にして、スタッフ研修用のクイズを${count}問作成してください。
+マニュアルに書かれていない情報（会社設立年・代表者名・住所など）は絶対に使わないでください。
 
 マニュアルテキスト:
-${manualText}
+${cleanedText}
 
 問題タイプを混ぜて作成してください:
 - truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）
@@ -196,7 +220,7 @@ ${manualText}
       {
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'あなたはクイズ作成AIです。有効なJSON配列のみを返してください。説明やコメントは不要です。並び替え問題のoptionsは必ず個別の配列要素にしてください。カンマ区切りの文字列は使わないでください。' },
+          { role: 'system', content: 'あなたはクイズ作成AIです。提供されたマニュアルテキストの内容だけを根拠に問題を作成してください。マニュアルに記載されていない情報は絶対に使わないでください。有効なJSON配列のみを返してください。説明やコメントは不要です。並び替え問題のoptionsは必ず個別の配列要素にしてください。カンマ区切りの文字列は使わないでください。' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.5,
