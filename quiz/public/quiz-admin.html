@@ -143,6 +143,15 @@
   .type-fill { background: #d1fae5; color: #065f46; }
   .type-sort { background: #fef3c7; color: #92400e; }
 
+  /* Manual Create Tab */
+  .manual-create-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .manual-ref-card { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; }
+  .manual-edit-col { display: flex; flex-direction: column; gap: 0; }
+
+  @media (max-width: 800px) {
+    .manual-create-grid { grid-template-columns: 1fr; }
+    .manual-ref-card { position: static; max-height: 260px; }
+  }
   @media (max-width: 600px) {
     .tab-content { padding: 12px; }
     .set-item { flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -171,6 +180,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('sets')">📋 クイズ一覧</button>
     <button class="tab-btn" onclick="switchTab('generate')">✨ AI生成</button>
+    <button class="tab-btn" onclick="switchTab('manual')">✏️ 手動作成</button>
     <button class="tab-btn" onclick="switchTab('submissions')">📊 回答記録</button>
     <button class="tab-btn" onclick="switchTab('staff')">👤 回答者</button>
   </div>
@@ -233,6 +243,47 @@
         <button class="btn btn-success btn-lg" onclick="saveGeneratedSet()">💾 保存する</button>
       </div>
       <div id="generated-questions"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Manual Create -->
+  <div id="tab-manual" class="tab-content">
+    <div class="manual-create-grid">
+      <!-- Left: Manual reference -->
+      <div class="card manual-ref-card">
+        <div class="card-header"><h2>マニュアル参照</h2></div>
+        <div class="form-group">
+          <label>マニュアルシステムから選ぶ</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="mc-manual-select" style="flex:1;" onchange="onMcManualSelect()">
+              <option value="">— マニュアルを選択してください —</option>
+            </select>
+            <button class="btn btn-secondary" onclick="loadMcManualList()" id="mc-manual-load-btn">📂 読み込む</button>
+          </div>
+          <div id="mc-manual-status" style="font-size:0.82rem;margin-top:6px;color:#6b7280;"></div>
+        </div>
+        <div class="form-group">
+          <label>テキストを直接貼り付け</label>
+          <textarea id="mc-manual-text" placeholder="マニュアルテキストをここに貼り付けると参照しながら問題を作れます…" style="min-height:300px;background:#f8f7ff;font-size:0.85rem;line-height:1.7;"></textarea>
+        </div>
+      </div>
+
+      <!-- Right: Question editor -->
+      <div class="manual-edit-col">
+        <div class="card">
+          <div class="card-header"><h2>問題を作成する</h2></div>
+          <div class="form-group">
+            <label>マニュアル名</label>
+            <input type="text" id="mc-name" placeholder="例: ホワイトニング手順マニュアル">
+          </div>
+        </div>
+        <div id="mc-questions"></div>
+        <div style="display:flex;gap:10px;margin-top:4px;margin-bottom:16px;">
+          <button class="btn btn-secondary" style="flex:1;" onclick="addMcQuestion()">＋ 問題を追加</button>
+          <button class="btn btn-success btn-lg" style="flex:1;" onclick="saveMcSet()">💾 保存する</button>
+        </div>
+        <div id="mc-save-status"></div>
+      </div>
     </div>
   </div>
 
@@ -357,13 +408,14 @@ function doLogout() {
 
 // ========== Tabs ==========
 function switchTab(name) {
-  const names = ['sets', 'generate', 'submissions', 'staff'];
+  const names = ['sets', 'generate', 'manual', 'submissions', 'staff'];
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', names[i] === name));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'sets') loadSets();
   if (name === 'submissions') loadSubmissions();
   if (name === 'staff') loadStaffTab();
+  if (name === 'manual') initMcTab();
 }
 
 // ========== Sets Tab ==========
@@ -397,7 +449,7 @@ function renderSets() {
       <div class="set-item-actions">
         <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '⛔ 停止' : '✅ 公開'}</button>
         <button class="btn btn-secondary" onclick="openEditModal('${id}')">✏️ 編集</button>
-        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')">🗑 削除</button>
+        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')" >🗑 削除</button>
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -923,6 +975,116 @@ async function onManualSelect() {
   } catch (e) {
     status.style.color = '#dc2626';
     status.textContent = 'テキスト取得失敗: ' + e.message;
+  }
+}
+
+// ========== Manual Create Tab ==========
+let mcManualList = [];
+let mcInitialized = false;
+
+function initMcTab() {
+  if (mcInitialized) return;
+  mcInitialized = true;
+  // Start with one empty question
+  addMcQuestion();
+}
+
+async function loadMcManualList() {
+  const btn = document.getElementById('mc-manual-load-btn');
+  const status = document.getElementById('mc-manual-status');
+  const sel = document.getElementById('mc-manual-select');
+  btn.disabled = true;
+  status.textContent = '読み込み中…';
+  status.style.color = '#6b7280';
+  try {
+    const r = await fetch('/api/manual-list', { headers: { Authorization: authHeader } });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
+    mcManualList = await r.json();
+    sel.innerHTML = '<option value="">— マニュアルを選択してください —</option>';
+    let lastMain = null, lastSub = null, group = null;
+    mcManualList.forEach(m => {
+      const mainCat = m.main_category || 'カテゴリなし';
+      const subCat = (m.sub_category && m.sub_category !== m.main_category) ? m.sub_category : null;
+      if (mainCat !== lastMain) {
+        if (group) sel.appendChild(group);
+        group = document.createElement('optgroup');
+        group.label = '━━ ' + mainCat + ' ━━';
+        lastMain = mainCat; lastSub = null;
+      }
+      if (subCat && subCat !== lastSub) {
+        const sep = document.createElement('option');
+        sep.disabled = true; sep.textContent = '  ▸ ' + subCat; sep.style.color = '#6b7280';
+        group.appendChild(sep); lastSub = subCat;
+      }
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = (subCat ? '　　' : '　') + m.title;
+      group.appendChild(opt);
+    });
+    if (group) sel.appendChild(group);
+    status.textContent = `${mcManualList.length}件読み込みました`;
+    status.style.color = '#16a34a';
+  } catch (e) {
+    status.textContent = '読み込み失敗: ' + e.message;
+    status.style.color = '#dc2626';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function onMcManualSelect() {
+  const sel = document.getElementById('mc-manual-select');
+  const id = sel.value;
+  if (!id) return;
+  const manual = mcManualList.find(m => String(m.id) === String(id));
+  if (!manual) return;
+  const status = document.getElementById('mc-manual-status');
+  status.style.color = '#4f46e5';
+  status.textContent = `「${manual.title}」を取得中…`;
+  try {
+    const r = await fetch('/api/manual-text/' + id, { headers: { Authorization: authHeader } });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
+    const data = await r.json();
+    document.getElementById('mc-manual-text').value = data.text || '';
+    if (!document.getElementById('mc-name').value) {
+      document.getElementById('mc-name').value = data.title || manual.title;
+    }
+    status.textContent = `✅ 「${data.title || manual.title}」を読み込みました`;
+    status.style.color = '#16a34a';
+  } catch (e) {
+    status.textContent = 'テキスト取得失敗: ' + e.message;
+    status.style.color = '#dc2626';
+  }
+}
+
+function addMcQuestion() {
+  const container = document.getElementById('mc-questions');
+  const idx = container.children.length;
+  appendQuestionEditor(container, { type: 'truefalse', question: '', options: [], answer: 'true', explanation: '' }, idx);
+}
+
+async function saveMcSet() {
+  const name = document.getElementById('mc-name').value.trim();
+  if (!name) { alert('マニュアル名を入力してください'); return; }
+  const questions = collectEditQuestions('mc-questions');
+  if (!questions.length) { alert('問題を1問以上追加してください'); return; }
+  const statusEl = document.getElementById('mc-save-status');
+  try {
+    const r = await fetch('/api/sets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+      body: JSON.stringify({ manualName: name, questions })
+    });
+    if (!r.ok) throw new Error();
+    statusEl.innerHTML = '<div class="alert alert-success">✅ クイズセットを保存しました！</div>';
+    // Clear questions and name
+    document.getElementById('mc-questions').innerHTML = '';
+    document.getElementById('mc-name').value = '';
+    mcInitialized = false;
+    addMcQuestion();
+    setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+  } catch {
+    statusEl.innerHTML = '<div class="alert alert-error">保存に失敗しました</div>';
   }
 }
 
