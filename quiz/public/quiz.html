@@ -21,7 +21,7 @@
   .name-card .icon { font-size: 3rem; margin-bottom: 12px; }
   .name-card h1 { font-size: 1.4rem; font-weight: 800; color: #14532d; margin-bottom: 6px; }
   .name-card p { font-size: 0.9rem; color: #6b7280; margin-bottom: 24px; }
-  .name-card select { width: 100%; padding: 14px 16px; border: 2px solid #bbf7d0; border-radius: 10px; font-size: 1.05rem; text-align: center; outline: none; transition: border-color .2s; font-family: inherit; background: #fff; color: #14532d; appearance: none; cursor: pointer; }
+  .name-card select { width: 100%; padding: 14px 16px; border: 2px solid #bbf7d0; border-radius: 10px; font-size: 1.05rem; outline: none; transition: border-color .2s; font-family: inherit; background: #fff; color: #14532d; appearance: none; cursor: pointer; }
   .name-card select:focus { border-color: #16a34a; }
   .name-card .select-wrap { position: relative; }
   .name-card .select-wrap::after { content: '▼'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #16a34a; font-size: 0.8rem; pointer-events: none; }
@@ -149,7 +149,7 @@
 <!-- Screen: Name Entry -->
 <div id="screen-name" class="screen active">
   <div class="app-header">
-    <div class="logo">🦺 のびのび歯科</div>
+    <div class="logo">🦷 のびのび歯科</div>
     <div class="sub">スタッフクイズ</div>
   </div>
   <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:20px;">
@@ -171,7 +171,7 @@
 <!-- Screen: Quiz Set List -->
 <div id="screen-sets" class="screen">
   <div class="app-header">
-    <div class="logo">🦺 のびのび歯科</div>
+    <div class="logo">🦷 のびのび歯科</div>
     <div class="sub">スタッフクイズ</div>
   </div>
   <div class="content">
@@ -204,7 +204,7 @@
 <!-- Screen: Result -->
 <div id="screen-result" class="screen">
   <div class="app-header">
-    <div class="logo">🦺 のびのび歯科</div>
+    <div class="logo">🦷 のびのび歯科</div>
     <div class="sub">クイズ結果</div>
   </div>
   <div class="result-content">
@@ -416,7 +416,6 @@ function renderQuestion() {
   const card = document.getElementById('question-card');
   card.innerHTML = html;
 
-  // Set disabled state after rendering
   if (q.type === 'sort') {
     btnNext.disabled = false;
   } else if (q.type === 'fill') {
@@ -424,7 +423,6 @@ function renderQuestion() {
     card.querySelectorAll('.fill-input').forEach(input => {
       input.addEventListener('input', onFillInput);
     });
-    // Check initial state
     const inputs = card.querySelectorAll('.fill-input');
     if (inputs.length > 0) {
       btnNext.disabled = Array.from(inputs).some(i => !i.value.trim());

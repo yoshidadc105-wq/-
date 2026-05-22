@@ -95,6 +95,7 @@
   .badge-yellow { background: #fef9c3; color: #ca8a04; }
   .badge-red { background: #fee2e2; color: #dc2626; }
 
+  /* Submission detail */
   .sub-detail-toggle { background: #e0e7ff; border: none; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; cursor: pointer; color: #4f46e5; font-weight: 600; white-space: nowrap; font-family: inherit; }
   .sub-detail-body { display: none; margin-top: 8px; }
   .sub-detail-body.open { display: block; }
@@ -103,6 +104,7 @@
   .sub-detail-correct { color: #16a34a; }
   .sub-detail-wrong { color: #dc2626; }
 
+  /* Staff tab */
   .staff-group { background: #fff; border: 2px solid #e0e7ff; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
   .staff-group-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background .15s; }
   .staff-group-header:hover { background: #f8f7ff; }
@@ -141,6 +143,7 @@
   .type-fill { background: #d1fae5; color: #065f46; }
   .type-sort { background: #fef3c7; color: #92400e; }
 
+  /* Manual Create Tab */
   .manual-create-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
   .manual-ref-card { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; }
   .manual-edit-col { display: flex; flex-direction: column; gap: 0; }
@@ -160,7 +163,7 @@
 
 <div id="login-screen">
   <div class="login-card">
-    <div class="logo">🦺 のびのび歯科</div>
+    <div class="logo">🦷 のびのび歯科</div>
     <div class="subtitle">クイズ管理システム</div>
     <input type="password" id="password-input" placeholder="管理者パスワード" autocomplete="current-password">
     <button onclick="doLogin()">ログイン</button>
@@ -170,18 +173,19 @@
 
 <div id="app">
   <header>
-    <div class="title">🦺 のびのび歯科 クイズ管理</div>
+    <div class="title">🦷 のびのび歯科 クイズ管理</div>
     <button onclick="doLogout()">ログアウト</button>
   </header>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('sets')">&#128203; クイズ一覧</button>
-    <button class="tab-btn" onclick="switchTab('generate')">&#10024; AI生成</button>
-    <button class="tab-btn" onclick="switchTab('manual')">&#9999;&#65039; 手動作成</button>
-    <button class="tab-btn" onclick="switchTab('submissions')">&#128202; 回答記録</button>
-    <button class="tab-btn" onclick="switchTab('staff')">&#128100; 回答者</button>
+    <button class="tab-btn active" onclick="switchTab('sets')">📋 クイズ一覧</button>
+    <button class="tab-btn" onclick="switchTab('generate')">✨ AI生成</button>
+    <button class="tab-btn" onclick="switchTab('manual')">✏️ 手動作成</button>
+    <button class="tab-btn" onclick="switchTab('submissions')">📊 回答記録</button>
+    <button class="tab-btn" onclick="switchTab('staff')">👤 回答者</button>
   </div>
 
+  <!-- Tab: Quiz Sets -->
   <div id="tab-sets" class="tab-content active">
     <div class="card">
       <div class="card-header">
@@ -192,6 +196,7 @@
     </div>
   </div>
 
+  <!-- Tab: AI Generation -->
   <div id="tab-generate" class="tab-content">
     <div class="card">
       <div class="card-header"><h2>AIでクイズを生成する</h2></div>
@@ -241,8 +246,10 @@
     </div>
   </div>
 
+  <!-- Tab: Manual Create -->
   <div id="tab-manual" class="tab-content">
     <div class="manual-create-grid">
+      <!-- Left: Manual reference -->
       <div class="card manual-ref-card">
         <div class="card-header"><h2>マニュアル参照</h2></div>
         <div class="form-group">
@@ -260,6 +267,8 @@
           <textarea id="mc-manual-text" placeholder="マニュアルテキストをここに貼り付けると参照しながら問題を作れます…" style="min-height:300px;background:#f8f7ff;font-size:0.85rem;line-height:1.7;"></textarea>
         </div>
       </div>
+
+      <!-- Right: Question editor -->
       <div class="manual-edit-col">
         <div class="card">
           <div class="card-header"><h2>問題を作成する</h2></div>
@@ -278,6 +287,7 @@
     </div>
   </div>
 
+  <!-- Tab: Submissions -->
   <div id="tab-submissions" class="tab-content">
     <div class="card">
       <div class="card-header">
@@ -288,16 +298,8 @@
     </div>
   </div>
 
+  <!-- Tab: Staff -->
   <div id="tab-staff" class="tab-content">
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-header"><h2>スタッフ登録</h2></div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <input type="text" id="staff-name-reg" placeholder="スタッフ名を入力" style="flex:1;padding:10px 14px;border:2px solid #e0e7ff;border-radius:8px;font-size:0.95rem;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')addStaffMember()">
-        <button class="btn btn-primary" onclick="addStaffMember()">＋ 追加</button>
-      </div>
-      <div id="staff-reg-status" style="font-size:0.85rem;margin-bottom:8px;"></div>
-      <div id="staff-reg-list"><div class="spinner-wrap" style="padding:16px;"><div class="spinner"></div></div></div>
-    </div>
     <div class="card">
       <div class="card-header">
         <h2>回答者別記録</h2>
@@ -308,6 +310,7 @@
   </div>
 </div>
 
+<!-- Edit Modal -->
 <div class="modal-overlay hidden" id="edit-modal">
   <div class="modal">
     <div class="modal-header">
@@ -329,6 +332,7 @@
   </div>
 </div>
 
+<!-- Submission Edit Modal -->
 <div class="modal-overlay hidden" id="sub-edit-modal">
   <div class="modal" style="max-width:640px;">
     <div class="modal-header">
@@ -347,6 +351,7 @@
   </div>
 </div>
 
+<!-- Delete Confirm Modal -->
 <div class="modal-overlay hidden" id="delete-modal">
   <div class="modal" style="max-width:400px;">
     <div class="modal-header">
@@ -371,6 +376,7 @@ let generatedQuestions = [];
 let editingSetId = null;
 let deletingSetId = null;
 
+// ========== Auth ==========
 function doLogin() {
   const pw = document.getElementById('password-input').value;
   if (!pw) { document.getElementById('login-error').textContent = 'パスワードを入力してください'; return; }
@@ -382,7 +388,6 @@ function doLogin() {
         document.getElementById('app').style.display = 'flex';
         document.getElementById('app').style.flexDirection = 'column';
         loadSets();
-        loadStaffRegistration();
       } else {
         document.getElementById('login-error').textContent = 'パスワードが違います';
         authHeader = '';
@@ -401,6 +406,7 @@ function doLogout() {
   document.getElementById('login-error').textContent = '';
 }
 
+// ========== Tabs ==========
 function switchTab(name) {
   const names = ['sets', 'generate', 'manual', 'submissions', 'staff'];
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', names[i] === name));
@@ -408,10 +414,11 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'sets') loadSets();
   if (name === 'submissions') loadSubmissions();
-  if (name === 'staff') { loadStaffRegistration(); loadStaffTab(); }
+  if (name === 'staff') loadStaffTab();
   if (name === 'manual') initMcTab();
 }
 
+// ========== Sets Tab ==========
 async function loadSets() {
   const el = document.getElementById('sets-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -442,7 +449,7 @@ function renderSets() {
       <div class="set-item-actions">
         <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '⛔ 停止' : '✅ 公開'}</button>
         <button class="btn btn-secondary" onclick="openEditModal('${id}')">✏️ 編集</button>
-        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')">&#128465; 削除</button>
+        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}'))">🗑 削除</button>
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -462,6 +469,7 @@ async function toggleActive(id, currentActive) {
   }
 }
 
+// ========== Edit Modal ==========
 function openEditModal(id) {
   const set = currentSets.find(s => (s._id||s.id) === id);
   if (!set) return;
@@ -502,6 +510,7 @@ async function saveEdit() {
   }
 }
 
+// ========== Delete Modal ==========
 function openDeleteModal(id, name) {
   deletingSetId = id;
   document.getElementById('delete-set-name').textContent = name;
@@ -520,6 +529,7 @@ async function confirmDelete() {
   } catch { alert('削除に失敗しました'); }
 }
 
+// ========== Generate Tab ==========
 async function generateQuestions() {
   const text = document.getElementById('manual-text').value.trim();
   const name = document.getElementById('manual-name').value.trim();
@@ -582,6 +592,7 @@ async function saveGeneratedSet() {
   } catch { alert('保存に失敗しました'); }
 }
 
+// ========== Question Editor ==========
 function appendQuestionEditor(container, q, idx) {
   const div = document.createElement('div');
   div.className = 'question-editor';
@@ -607,8 +618,8 @@ function buildQuestionEditorHTML(q, idx) {
       <div>
         <label>問題タイプ</label>
         <select class="q-type-select">
-          <option value="truefalse" ${q.type==='truefalse'?'selected':''}>&#9675;×（正誤）</option>
-          <option value="choice" ${q.type==='choice'?'selected':''}>&#x9078;&#x629E;&#x80A2;（ABCD）</option>
+          <option value="truefalse" ${q.type==='truefalse'?'selected':''}>○×（正誤）</option>
+          <option value="choice" ${q.type==='choice'?'selected':''}>選択肢（ABCD）</option>
           <option value="fill" ${q.type==='fill'?'selected':''}>穴埋め</option>
           <option value="sort" ${q.type==='sort'?'selected':''}>並び替え</option>
         </select>
@@ -633,8 +644,8 @@ function updateTypeFields(editorDiv, q) {
     container.innerHTML = `
       <label>正解</label>
       <select class="q-answer-select">
-        <option value="true" ${q.answer==='true'||q.answer===true?'selected':''}>&#9675;（正しい）</option>
-        <option value="false" ${q.answer==='false'||q.answer===false?'selected':''}>&#x00d7;（誤り）</option>
+        <option value="true" ${q.answer==='true'||q.answer===true?'selected':''}>○（正しい）</option>
+        <option value="false" ${q.answer==='false'||q.answer===false?'selected':''}>×（誤り）</option>
       </select>`;
   } else if (type === 'choice') {
     const opts = q.options && q.options.length ? q.options : ['', '', '', ''];
@@ -751,6 +762,7 @@ function collectEditQuestions(containerId) {
   return questions;
 }
 
+// ========== Submissions Tab ==========
 async function loadSubmissions() {
   const el = document.getElementById('submissions-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -776,7 +788,7 @@ async function loadSubmissions() {
           <td><span class="badge ${badgeClass}">${score}/${total} (${pct}%)</span></td>
           <td>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="sub-detail-toggle" onclick="toggleSubDetail('sub-${idx}')">&#35443;&#32048; &#9662;</button>
+              <button class="sub-detail-toggle" onclick="toggleSubDetail('sub-${idx}')">詳細 ▾</button>
               <button class="sub-detail-toggle" style="background:#e0e7ff;color:#4f46e5;" onclick="openSubEditModal('${s.id}')">✏️ 修正</button>
               <button class="sub-detail-toggle" style="background:#fee2e2;color:#dc2626;" onclick="deleteSubmission('${s.id}')">🗑</button>
             </div>
@@ -817,60 +829,7 @@ function formatAnsText(type, ans) {
   return esc(String(ans));
 }
 
-async function loadStaffRegistration() {
-  const el = document.getElementById('staff-reg-list');
-  try {
-    const r = await fetch('/api/staff', { headers: { Authorization: authHeader } });
-    if (!r.ok) throw new Error();
-    const staff = await r.json();
-    if (!staff.length) {
-      el.innerHTML = '<div style="color:#9ca3af;font-size:0.85rem;padding:8px 0;">まだスタッフが登録されていません</div>';
-      return;
-    }
-    el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + staff.map(s =>
-      `<div style="display:flex;align-items:center;gap:6px;background:#f0f0ff;border:1.5px solid #e0e7ff;border-radius:20px;padding:5px 10px 5px 14px;font-size:0.88rem;font-weight:600;color:#1e1b4b;">
-        ${esc(s.name)}
-        <button onclick="deleteStaffMember('${s.id}')" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:1rem;line-height:1;padding:0 2px;" title="削除">✕</button>
-      </div>`
-    ).join('') + '</div>';
-  } catch {
-    el.innerHTML = '<div style="color:#dc2626;font-size:0.85rem;">読み込みに失敗しました</div>';
-  }
-}
-
-async function addStaffMember() {
-  const input = document.getElementById('staff-name-reg');
-  const statusEl = document.getElementById('staff-reg-status');
-  const name = input.value.trim();
-  if (!name) return;
-  try {
-    const r = await fetch('/api/staff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-      body: JSON.stringify({ name }),
-    });
-    const data = await r.json();
-    if (!r.ok) { statusEl.style.color = '#dc2626'; statusEl.textContent = data.error || 'エラーが発生しました'; return; }
-    input.value = '';
-    statusEl.style.color = '#16a34a';
-    statusEl.textContent = `✅ 「${name}」を追加しました`;
-    setTimeout(() => { statusEl.textContent = ''; }, 2000);
-    loadStaffRegistration();
-  } catch {
-    statusEl.style.color = '#dc2626';
-    statusEl.textContent = '追加に失敗しました';
-  }
-}
-
-async function deleteStaffMember(id) {
-  if (!confirm('このスタッフを削除しますか？')) return;
-  try {
-    const r = await fetch('/api/staff/' + id, { method: 'DELETE', headers: { Authorization: authHeader } });
-    if (!r.ok) throw new Error();
-    loadStaffRegistration();
-  } catch { alert('削除に失敗しました'); }
-}
-
+// ========== Staff Tab ==========
 async function loadStaffTab() {
   const el = document.getElementById('staff-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -882,6 +841,7 @@ async function loadStaffTab() {
       el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>まだ回答記録がありません</p></div>';
       return;
     }
+    // Group by staffName
     const groups = {};
     subs.forEach(s => {
       const name = s.staffName || '不明';
@@ -892,6 +852,7 @@ async function loadStaffTab() {
     el.innerHTML = sorted.map(([name, records]) => {
       const totalSessions = records.length;
       const avgPct = Math.round(records.reduce((acc, s) => acc + (s.total ? s.score / s.total * 100 : 0), 0) / totalSessions);
+      const safeName = name.replace(/'/g, "\\'");
       return `<div class="staff-group">
         <div class="staff-group-header" onclick="toggleStaffGroup('sg-${encodeURIComponent(name)}')">
           <div>
@@ -911,7 +872,7 @@ async function loadStaffTab() {
               <div class="h-meta">${formatDate(s.submittedAt||s.createdAt)} ／ ${esc(s.manualName||'不明')}</div>
               <div class="h-score">
                 <span class="badge ${badgeClass}">${score}/${total} (${pct}%)</span>
-                <button class="sub-detail-toggle" style="margin-left:8px;" onclick="toggleStaffDetail('${detailId}')">&#35443;&#32048; &#9662;</button>
+                <button class="sub-detail-toggle" style="margin-left:8px;" onclick="toggleStaffDetail('${detailId}')">詳細 ▾</button>
               </div>
               <div class="h-details" id="${detailId}">
                 ${(s.results||[]).map((r, ri) => {
@@ -943,6 +904,7 @@ function toggleStaffDetail(id) {
   if (el) el.classList.toggle('open');
 }
 
+// ========== Manual Integration ==========
 let manualList = [];
 
 async function loadManualList() {
@@ -1016,12 +978,14 @@ async function onManualSelect() {
   }
 }
 
+// ========== Manual Create Tab ==========
 let mcManualList = [];
 let mcInitialized = false;
 
 function initMcTab() {
   if (mcInitialized) return;
   mcInitialized = true;
+  // Start with one empty question
   addMcQuestion();
 }
 
@@ -1103,7 +1067,7 @@ async function saveMcSet() {
   const name = document.getElementById('mc-name').value.trim();
   if (!name) { alert('マニュアル名を入力してください'); return; }
   const questions = collectEditQuestions('mc-questions');
-  if (!questions.length) { alert('問題を１問以上追加してください'); return; }
+  if (!questions.length) { alert('問題を1問以上追加してください'); return; }
   const statusEl = document.getElementById('mc-save-status');
   try {
     const r = await fetch('/api/sets', {
@@ -1113,6 +1077,7 @@ async function saveMcSet() {
     });
     if (!r.ok) throw new Error();
     statusEl.innerHTML = '<div class="alert alert-success">✅ クイズセットを保存しました！</div>';
+    // Clear questions and name
     document.getElementById('mc-questions').innerHTML = '';
     document.getElementById('mc-name').value = '';
     mcInitialized = false;
@@ -1123,6 +1088,7 @@ async function saveMcSet() {
   }
 }
 
+// ========== Submission Edit ==========
 let editingSubId = null;
 let editingSubResults = [];
 
@@ -1202,6 +1168,7 @@ async function deleteSubmission(id) {
   } catch { alert('削除に失敗しました'); }
 }
 
+// ========== Utils ==========
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
