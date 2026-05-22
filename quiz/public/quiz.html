@@ -21,11 +21,14 @@
   .name-card .icon { font-size: 3rem; margin-bottom: 12px; }
   .name-card h1 { font-size: 1.4rem; font-weight: 800; color: #14532d; margin-bottom: 6px; }
   .name-card p { font-size: 0.9rem; color: #6b7280; margin-bottom: 24px; }
-  .name-card input { width: 100%; padding: 14px 16px; border: 2px solid #bbf7d0; border-radius: 10px; font-size: 1.05rem; text-align: center; outline: none; transition: border-color .2s; font-family: inherit; }
-  .name-card input:focus { border-color: #16a34a; }
+  .name-card select { width: 100%; padding: 14px 16px; border: 2px solid #bbf7d0; border-radius: 10px; font-size: 1.05rem; outline: none; transition: border-color .2s; font-family: inherit; background: #fff; color: #14532d; appearance: none; cursor: pointer; }
+  .name-card select:focus { border-color: #16a34a; }
+  .name-card .select-wrap { position: relative; }
+  .name-card .select-wrap::after { content: '▼'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #16a34a; font-size: 0.8rem; pointer-events: none; }
   .name-card .btn-start { margin-top: 16px; width: 100%; padding: 14px; background: #16a34a; color: #fff; border: none; border-radius: 10px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: background .2s; }
   .name-card .btn-start:hover { background: #15803d; }
-  .name-card .btn-start:disabled { background: #86efac; cursor: not-allowed; }
+  .name-card .btn-start:disabled { background: #86efac; cursor: not-allowed; pointer-events: none; }
+  .name-loading { font-size: 0.85rem; color: #6b7280; margin-top: 8px; }
 
   /* Set List Screen */
   #screen-sets { background: #f0fdf4; }
@@ -153,8 +156,13 @@
     <div class="name-card">
       <div class="icon">👩‍⚕️</div>
       <h1>スタッフクイズ</h1>
-      <p>お名前を入力してクイズを始めてください</p>
-      <input type="text" id="staff-name-input" placeholder="例: 田中 花子" maxlength="30" autocomplete="name">
+      <p>お名前を選んでクイズを始めてください</p>
+      <div class="select-wrap">
+        <select id="staff-name-input">
+          <option value="">— お名前を選択してください —</option>
+        </select>
+      </div>
+      <div class="name-loading" id="name-loading">読み込み中…</div>
       <button class="btn-start" id="start-btn" disabled>クイズ一覧へ →</button>
     </div>
   </div>
@@ -254,17 +262,41 @@ function showScreen(name) {
 const nameInput = document.getElementById('staff-name-input');
 const startBtn = document.getElementById('start-btn');
 
-nameInput.addEventListener('input', function () { startBtn.disabled = !this.value.trim(); });
-nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && this.value.trim()) startApp(); });
+nameInput.addEventListener('change', function () { startBtn.disabled = !this.value; });
 startBtn.addEventListener('click', startApp);
 
+async function loadStaffList() {
+  const loadingEl = document.getElementById('name-loading');
+  try {
+    const r = await fetch('/api/staff/public');
+    if (!r.ok) throw new Error();
+    const staff = await r.json();
+    nameInput.innerHTML = '<option value="">— お名前を選択してください —</option>';
+    if (staff.length === 0) {
+      loadingEl.textContent = 'スタッフが登録されていません。管理者にお問い合わせください。';
+    } else {
+      staff.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = s.name;
+        nameInput.appendChild(opt);
+      });
+      loadingEl.textContent = '';
+    }
+  } catch {
+    loadingEl.textContent = '読み込みに失敗しました。ページを更新してください。';
+  }
+}
+
 function startApp() {
-  staffName = nameInput.value.trim();
+  staffName = nameInput.value;
   if (!staffName) return;
   document.getElementById('staff-badge').textContent = '👤 ' + staffName;
   showScreen('sets');
   loadSets();
 }
+
+loadStaffList();
 
 // ========== Set List ==========
 async function loadSets() {
@@ -384,7 +416,6 @@ function renderQuestion() {
   const card = document.getElementById('question-card');
   card.innerHTML = html;
 
-  // Set disabled state after rendering
   if (q.type === 'sort') {
     btnNext.disabled = false;
   } else if (q.type === 'fill') {
@@ -392,7 +423,6 @@ function renderQuestion() {
     card.querySelectorAll('.fill-input').forEach(input => {
       input.addEventListener('input', onFillInput);
     });
-    // Check initial state
     const inputs = card.querySelectorAll('.fill-input');
     if (inputs.length > 0) {
       btnNext.disabled = Array.from(inputs).some(i => !i.value.trim());
