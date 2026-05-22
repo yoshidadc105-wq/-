@@ -449,7 +449,7 @@ function renderSets() {
       <div class="set-item-actions">
         <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '⛔ 停止' : '✅ 公開'}</button>
         <button class="btn btn-secondary" onclick="openEditModal('${id}')">✏️ 編集</button>
-        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')" >🗑 削除</button>
+        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}'))">🗑 削除</button>
       </div>
     </div>`;
   }).join('') + '</div>';
