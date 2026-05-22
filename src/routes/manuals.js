@@ -8,7 +8,9 @@ const { requireLogin, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-const UPLOAD_DIR = path.join(os.homedir(), 'ManualSystemData', 'uploads');
+const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemData');
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 // PDF アップロード設定
 const storage = multer.diskStorage({
@@ -24,13 +26,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('PDFファイルのみアップロードできます'));
-    }
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('PDFファイルのみアップロードできます'));
   }
 });
 
@@ -63,7 +62,7 @@ const uploadImage = multer({
   }
 });
 
-// マニュアル一覧取得（検索・フィルタ対応）
+// マニュアル一覧取得
 router.get('/', requireLogin, (req, res) => {
   const { search, category_id, type, page = 1, limit = 20 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -86,7 +85,6 @@ router.get('/', requireLogin, (req, res) => {
   }
 
   const where = conditions.join(' AND ');
-
   const total = db.prepare(`SELECT COUNT(*) as count FROM manuals m WHERE ${where}`).get(...params).count;
 
   const manuals = db.prepare(`
@@ -124,16 +122,13 @@ router.get('/:id', requireLogin, (req, res) => {
 
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
 
-  // 閲覧履歴を記録
   db.prepare(`INSERT INTO view_history (manual_id, user_id) VALUES (?, ?)`).run(manual.id, req.session.userId);
-
   res.json(manual);
 });
 
 // リッチテキストマニュアル作成
 router.post('/text', requireLogin, (req, res) => {
   const { title, description, content, category_id } = req.body;
-
   if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
   if (!content) return res.status(400).json({ error: '本文は必須です' });
 
@@ -194,9 +189,8 @@ router.put('/:id/pdf', requireLogin, upload.single('pdf'), (req, res) => {
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
 
-  // 古いファイルを削除
   if (manual.file_path) {
-    const oldPath = path.join(UPLOAD_DIR, manual.file_path);
+    const oldPath = path.join(UPLOAD_DIR, path.basename(manual.file_path));
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
   }
 
