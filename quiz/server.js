@@ -170,7 +170,25 @@ app.post('/api/generate', async (req, res) => {
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEYが設定されていません' });
 
-  const prompt = `以下のマニュアルテキストを読んで、スタッフ研修用のクイズを${count}問作成してください。\n\nマニュアルテキスト:\n${manualText}\n\n問題タイプを混ぜて作成してください:\n- truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）\n- choice: 4択問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト\n- fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）\n- sort: 手順並び替え問題。以下のルールを必ず守ること:\n  * questionは「〇〇の手順を正しい順番に並べてください」という形式\n  * optionsは3〜5個の手順ステップの配列（各ステップは独立した短い行動）\n  * 各ステップはカンマで区切らず、別々の配列要素にすること\n  * answerはoptionsと同じ配列（正しい順番で）\n  * 悪い例: options:["手袋をつける,消毒する","準備する"]\n  * 良い例: options:["手洗いをする","手袋をつける","消毒する","患者に説明する"]\n\n日本語で問題を作成してください。JSONの配列のみを返してください（他のテキストは不要）:\n[{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]`;
+  const prompt = `以下のマニュアルテキストを読んで、スタッフ研修用のクイズを${count}問作成してください。
+
+マニュアルテキスト:
+${manualText}
+
+問題タイプを混ぜて作成してください:
+- truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）
+- choice: 4択問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト
+- fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）
+- sort: 手順並び替え問題。以下のルールを必ず守ること:
+  * questionは「〇〇の手順を正しい順番に並べてください」という形式
+  * optionsは3〜5個の手順ステップの配列（各ステップは独立した短い行動）
+  * 各ステップはカンマで区切らず、別々の配列要素にすること
+  * answerはoptionsと同じ配列（正しい順番で）
+  * 悪い例: options:["手袋をつける,消毒する","準備する"]
+  * 良い例: options:["手洗いをする","手袋をつける","消毒する","患者に説明する"]
+
+日本語で問題を作成してください。JSONの配列のみを返してください（他のテキストは不要）:
+[{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]`;
 
   try {
     const response = await axios.post(
@@ -381,6 +399,14 @@ app.delete('/api/staff/:id', async (req, res) => {
   const filtered = staff.filter(s => s.id !== req.params.id);
   if (filtered.length === staff.length) return res.status(404).json({ error: '見つかりません' });
   await saveStaff(filtered);
+  res.json({ ok: true });
+});
+
+app.put('/api/staff', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staff } = req.body;
+  if (!Array.isArray(staff)) return res.status(400).json({ error: 'staffが必要です' });
+  await saveStaff(staff);
   res.json({ ok: true });
 });
 

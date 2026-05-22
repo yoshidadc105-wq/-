@@ -95,6 +95,7 @@
   .badge-yellow { background: #fef9c3; color: #ca8a04; }
   .badge-red { background: #fee2e2; color: #dc2626; }
 
+  /* Submission detail */
   .sub-detail-toggle { background: #e0e7ff; border: none; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; cursor: pointer; color: #4f46e5; font-weight: 600; white-space: nowrap; font-family: inherit; }
   .sub-detail-body { display: none; margin-top: 8px; }
   .sub-detail-body.open { display: block; }
@@ -103,6 +104,7 @@
   .sub-detail-correct { color: #16a34a; }
   .sub-detail-wrong { color: #dc2626; }
 
+  /* Staff tab */
   .staff-group { background: #fff; border: 2px solid #e0e7ff; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
   .staff-group-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background .15s; }
   .staff-group-header:hover { background: #f8f7ff; }
@@ -141,6 +143,7 @@
   .type-fill { background: #d1fae5; color: #065f46; }
   .type-sort { background: #fef3c7; color: #92400e; }
 
+  /* Manual Create Tab */
   .manual-create-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
   .manual-ref-card { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; }
   .manual-edit-col { display: flex; flex-direction: column; gap: 0; }
@@ -175,11 +178,11 @@
   </header>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('sets')">&#x1F4CB; クイズ一覧</button>
-    <button class="tab-btn" onclick="switchTab('generate')">&#x2728; AI生成</button>
-    <button class="tab-btn" onclick="switchTab('manual')">&#x270F;&#xFE0F; 手動作成</button>
-    <button class="tab-btn" onclick="switchTab('submissions')">&#x1F4CA; 回答記録</button>
-    <button class="tab-btn" onclick="switchTab('staff')">&#x1F464; 回答者</button>
+    <button class="tab-btn active" onclick="switchTab('sets')">📋 クイズ一覧</button>
+    <button class="tab-btn" onclick="switchTab('generate')">✨ AI生成</button>
+    <button class="tab-btn" onclick="switchTab('manual')">✏️ 手動作成</button>
+    <button class="tab-btn" onclick="switchTab('submissions')">📊 回答記録</button>
+    <button class="tab-btn" onclick="switchTab('staff')">👤 回答者</button>
   </div>
 
   <!-- Tab: Quiz Sets -->
@@ -187,7 +190,7 @@
     <div class="card">
       <div class="card-header">
         <h2>クイズセット一覧</h2>
-        <button class="btn btn-secondary" onclick="loadSets()">&#x1F504; 更新</button>
+        <button class="btn btn-secondary" onclick="loadSets()">🔄 更新</button>
       </div>
       <div id="sets-list"><div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div></div>
     </div>
@@ -203,7 +206,7 @@
           <select id="manual-select" style="flex:1;" onchange="onManualSelect()">
             <option value="">— マニュアルを選択してください —</option>
           </select>
-          <button class="btn btn-secondary" onclick="loadManualList()" id="manual-load-btn">&#x1F4C2; 一覧を読み込む</button>
+          <button class="btn btn-secondary" onclick="loadManualList()" id="manual-load-btn">📂 一覧を読み込む</button>
         </div>
         <div id="manual-load-status" style="font-size:0.82rem;margin-top:6px;color:#6b7280;"></div>
       </div>
@@ -214,7 +217,7 @@
       </div>
       <div class="form-group">
         <label for="manual-text">マニュアルテキスト</label>
-        <textarea id="manual-text" placeholder="クイズの元となるテキストを貴り付けてください…"></textarea>
+        <textarea id="manual-text" placeholder="クイズの元となるテキストを貼り付けてください…"></textarea>
       </div>
       <div class="form-group">
         <label for="q-count">問題数</label>
@@ -231,13 +234,13 @@
           <option value="10">10問</option>
         </select>
       </div>
-      <button class="btn btn-primary btn-lg" onclick="generateQuestions()">&#x2728; AIで生成する</button>
+      <button class="btn btn-primary btn-lg" onclick="generateQuestions()">✨ AIで生成する</button>
     </div>
     <div id="generate-status"></div>
     <div id="generated-questions-wrap" style="display:none;">
       <div class="card-header" style="margin-top:8px;">
         <h2 style="font-size:1.1rem;font-weight:700;color:#312e81;">生成された問題</h2>
-        <button class="btn btn-success btn-lg" onclick="saveGeneratedSet()">&#x1F4BE; 保存する</button>
+        <button class="btn btn-success btn-lg" onclick="saveGeneratedSet()">💾 保存する</button>
       </div>
       <div id="generated-questions"></div>
     </div>
@@ -246,6 +249,7 @@
   <!-- Tab: Manual Create -->
   <div id="tab-manual" class="tab-content">
     <div class="manual-create-grid">
+      <!-- Left: Manual reference -->
       <div class="card manual-ref-card">
         <div class="card-header"><h2>マニュアル参照</h2></div>
         <div class="form-group">
@@ -254,15 +258,17 @@
             <select id="mc-manual-select" style="flex:1;" onchange="onMcManualSelect()">
               <option value="">— マニュアルを選択してください —</option>
             </select>
-            <button class="btn btn-secondary" onclick="loadMcManualList()" id="mc-manual-load-btn">&#x1F4C2; 読み込む</button>
+            <button class="btn btn-secondary" onclick="loadMcManualList()" id="mc-manual-load-btn">📂 読み込む</button>
           </div>
           <div id="mc-manual-status" style="font-size:0.82rem;margin-top:6px;color:#6b7280;"></div>
         </div>
         <div class="form-group">
-          <label>テキストを直接貴り付け</label>
-          <textarea id="mc-manual-text" placeholder="マニュアルテキストをここに貴り付けると参照しながら問題を作れます…" style="min-height:300px;background:#f8f7ff;font-size:0.85rem;line-height:1.7;"></textarea>
+          <label>テキストを直接貼り付け</label>
+          <textarea id="mc-manual-text" placeholder="マニュアルテキストをここに貼り付けると参照しながら問題を作れます…" style="min-height:300px;background:#f8f7ff;font-size:0.85rem;line-height:1.7;"></textarea>
         </div>
       </div>
+
+      <!-- Right: Question editor -->
       <div class="manual-edit-col">
         <div class="card">
           <div class="card-header"><h2>問題を作成する</h2></div>
@@ -274,7 +280,7 @@
         <div id="mc-questions"></div>
         <div style="display:flex;gap:10px;margin-top:4px;margin-bottom:16px;">
           <button class="btn btn-secondary" style="flex:1;" onclick="addMcQuestion()">＋ 問題を追加</button>
-          <button class="btn btn-success btn-lg" style="flex:1;" onclick="saveMcSet()">&#x1F4BE; 保存する</button>
+          <button class="btn btn-success btn-lg" style="flex:1;" onclick="saveMcSet()">💾 保存する</button>
         </div>
         <div id="mc-save-status"></div>
       </div>
@@ -286,7 +292,7 @@
     <div class="card">
       <div class="card-header">
         <h2>回答記録</h2>
-        <button class="btn btn-secondary" onclick="loadSubmissions()">&#x1F504; 更新</button>
+        <button class="btn btn-secondary" onclick="loadSubmissions()">🔄 更新</button>
       </div>
       <div id="submissions-list"><div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div></div>
     </div>
@@ -306,7 +312,7 @@
     <div class="card">
       <div class="card-header">
         <h2>回答者別記録</h2>
-        <button class="btn btn-secondary" onclick="loadStaffTab()">&#x1F504; 更新</button>
+        <button class="btn btn-secondary" onclick="loadStaffTab()">🔄 更新</button>
       </div>
       <div id="staff-list"><div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div></div>
     </div>
@@ -318,7 +324,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2>クイズセットを編集</h2>
-      <button class="modal-close" onclick="closeEditModal()">&#x00D7;</button>
+      <button class="modal-close" onclick="closeEditModal()">×</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -340,7 +346,7 @@
   <div class="modal" style="max-width:640px;">
     <div class="modal-header">
       <h2>回答記録を修正</h2>
-      <button class="modal-close" onclick="closeSubEditModal()">&#x00D7;</button>
+      <button class="modal-close" onclick="closeSubEditModal()">×</button>
     </div>
     <div class="modal-body">
       <div id="sub-edit-info" style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;"></div>
@@ -359,7 +365,7 @@
   <div class="modal" style="max-width:400px;">
     <div class="modal-header">
       <h2>削除の確認</h2>
-      <button class="modal-close" onclick="closeDeleteModal()">&#x00D7;</button>
+      <button class="modal-close" onclick="closeDeleteModal()">×</button>
     </div>
     <div class="modal-body">
       <p>このクイズセットを削除してもよいですか？この操作は取り消せません。</p>
@@ -379,6 +385,7 @@ let generatedQuestions = [];
 let editingSetId = null;
 let deletingSetId = null;
 
+// ========== Auth ==========
 function doLogin() {
   const pw = document.getElementById('password-input').value;
   if (!pw) { document.getElementById('login-error').textContent = 'パスワードを入力してください'; return; }
@@ -409,6 +416,7 @@ function doLogout() {
   document.getElementById('login-error').textContent = '';
 }
 
+// ========== Tabs ==========
 function switchTab(name) {
   const names = ['sets', 'generate', 'manual', 'submissions', 'staff'];
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', names[i] === name));
@@ -420,6 +428,7 @@ function switchTab(name) {
   if (name === 'manual') initMcTab();
 }
 
+// ========== Sets Tab ==========
 async function loadSets() {
   const el = document.getElementById('sets-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -436,7 +445,7 @@ async function loadSets() {
 function renderSets() {
   const el = document.getElementById('sets-list');
   if (!currentSets.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#x1F4ED;</div><p>クイズセットがありません。「AI生成」タブから作成してください。</p></div>';
+    el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>クイズセットがありません。「AI生成」タブから作成してください。</p></div>';
     return;
   }
   el.innerHTML = '<div class="set-list">' + currentSets.map(s => {
@@ -448,9 +457,9 @@ function renderSets() {
         <p>${(s.questions||[]).length}問 ／ 作成: ${formatDate(s.createdAt)}</p>
       </div>
       <div class="set-item-actions">
-        <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '&#x26D4; 停止' : '&#x2705; 公開'}</button>
-        <button class="btn btn-secondary" onclick="openEditModal('${id}')">&#x270F;&#xFE0F; 編集</button>
-        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')">&#x1F5D1; 削除</button>
+        <button class="btn ${isActive ? 'btn-warning' : 'btn-success'}" onclick="toggleActive('${id}', ${isActive})">${isActive ? '⛔ 停止' : '✅ 公開'}</button>
+        <button class="btn btn-secondary" onclick="openEditModal('${id}')">✏️ 編集</button>
+        <button class="btn btn-danger" onclick="openDeleteModal('${id}', '${esc(s.manualName||s.name||'')}')">🗑 削除</button>
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -470,6 +479,7 @@ async function toggleActive(id, currentActive) {
   }
 }
 
+// ========== Edit Modal ==========
 function openEditModal(id) {
   const set = currentSets.find(s => (s._id||s.id) === id);
   if (!set) return;
@@ -510,6 +520,7 @@ async function saveEdit() {
   }
 }
 
+// ========== Delete Modal ==========
 function openDeleteModal(id, name) {
   deletingSetId = id;
   document.getElementById('delete-set-name').textContent = name;
@@ -528,6 +539,7 @@ async function confirmDelete() {
   } catch { alert('削除に失敗しました'); }
 }
 
+// ========== Generate Tab ==========
 async function generateQuestions() {
   const text = document.getElementById('manual-text').value.trim();
   const name = document.getElementById('manual-name').value.trim();
@@ -582,7 +594,7 @@ async function saveGeneratedSet() {
       body: JSON.stringify({ manualName: name, questions })
     });
     if (!r.ok) throw new Error();
-    document.getElementById('generate-status').innerHTML = '<div class="alert alert-success">&#x2705; クイズセットを保存しました！</div>';
+    document.getElementById('generate-status').innerHTML = '<div class="alert alert-success">✅ クイズセットを保存しました！</div>';
     document.getElementById('generated-questions-wrap').style.display = 'none';
     document.getElementById('manual-text').value = '';
     document.getElementById('manual-name').value = '';
@@ -590,6 +602,7 @@ async function saveGeneratedSet() {
   } catch { alert('保存に失敗しました'); }
 }
 
+// ========== Question Editor ==========
 function appendQuestionEditor(container, q, idx) {
   const div = document.createElement('div');
   div.className = 'question-editor';
@@ -759,6 +772,7 @@ function collectEditQuestions(containerId) {
   return questions;
 }
 
+// ========== Submissions Tab ==========
 async function loadSubmissions() {
   const el = document.getElementById('submissions-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -767,7 +781,7 @@ async function loadSubmissions() {
     if (!r.ok) throw new Error();
     const subs = await r.json();
     if (!subs.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">&#x1F4ED;</div><p>まだ回答記録がありません</p></div>';
+      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>まだ回答記録がありません</p></div>';
       return;
     }
     el.innerHTML = `<div class="table-wrap"><table>
@@ -785,8 +799,8 @@ async function loadSubmissions() {
           <td>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               <button class="sub-detail-toggle" onclick="toggleSubDetail('sub-${idx}')">詳細 ▾</button>
-              <button class="sub-detail-toggle" style="background:#e0e7ff;color:#4f46e5;" onclick="openSubEditModal('${s.id}')">&#x270F;&#xFE0F; 修正</button>
-              <button class="sub-detail-toggle" style="background:#fee2e2;color:#dc2626;" onclick="deleteSubmission('${s.id}')">&#x1F5D1;</button>
+              <button class="sub-detail-toggle" style="background:#e0e7ff;color:#4f46e5;" onclick="openSubEditModal('${s.id}')">✏️ 修正</button>
+              <button class="sub-detail-toggle" style="background:#fee2e2;color:#dc2626;" onclick="deleteSubmission('${s.id}')">🗑</button>
             </div>
             <div class="sub-detail-body" id="sub-${idx}">
               ${buildSubDetailHtml(s)}
@@ -825,25 +839,51 @@ function formatAnsText(type, ans) {
   return esc(String(ans));
 }
 
+// ========== Staff Registration ==========
+let _staffList = [];
+
 async function loadStaffRegistration() {
   const el = document.getElementById('staff-reg-list');
   try {
     const r = await fetch('/api/staff', { headers: { Authorization: authHeader } });
     if (!r.ok) throw new Error();
-    const staff = await r.json();
-    if (!staff.length) {
-      el.innerHTML = '<div style="color:#9ca3af;font-size:0.85rem;padding:8px 0;">まだスタッフが登録されていません</div>';
-      return;
-    }
-    el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + staff.map(s =>
-      `<div style="display:flex;align-items:center;gap:6px;background:#f0f0ff;border:1.5px solid #e0e7ff;border-radius:20px;padding:5px 10px 5px 14px;font-size:0.88rem;font-weight:600;color:#1e1b4b;">
-        ${esc(s.name)}
-        <button onclick="deleteStaffMember('${s.id}')" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:1rem;line-height:1;padding:0 2px;" title="削除">✕</button>
-      </div>`
-    ).join('') + '</div>';
+    _staffList = await r.json();
+    renderStaffRegList();
   } catch {
     el.innerHTML = '<div style="color:#dc2626;font-size:0.85rem;">読み込みに失敗しました</div>';
   }
+}
+
+function renderStaffRegList() {
+  const el = document.getElementById('staff-reg-list');
+  if (!_staffList.length) {
+    el.innerHTML = '<div style="color:#9ca3af;font-size:0.85rem;padding:8px 0;">まだスタッフが登録されていません</div>';
+    return;
+  }
+  el.innerHTML = '<div style="display:grid;gap:6px;">' + _staffList.map((s, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;background:#f0f0ff;border:1.5px solid #e0e7ff;border-radius:10px;padding:8px 10px;font-size:0.9rem;font-weight:600;color:#1e1b4b;">
+      <div style="display:flex;flex-direction:column;gap:2px;margin-right:2px;">
+        <button onclick="moveStaff(${i}, -1)" style="background:${i===0?'#f3f4f6':'#e0e7ff'};border:none;border-radius:4px;padding:1px 6px;cursor:${i===0?'default':'pointer'};color:${i===0?'#c0c0c0':'#4f46e5'};font-size:0.7rem;line-height:1.4;" ${i===0?'disabled':''}>▲</button>
+        <button onclick="moveStaff(${i}, 1)" style="background:${i===_staffList.length-1?'#f3f4f6':'#e0e7ff'};border:none;border-radius:4px;padding:1px 6px;cursor:${i===_staffList.length-1?'default':'pointer'};color:${i===_staffList.length-1?'#c0c0c0':'#4f46e5'};font-size:0.7rem;line-height:1.4;" ${i===_staffList.length-1?'disabled':''}>▼</button>
+      </div>
+      <span style="flex:1;">${esc(s.name)}</span>
+      <button onclick="deleteStaffMember('${s.id}')" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:1rem;line-height:1;padding:0 4px;" title="削除">✕</button>
+    </div>`
+  ).join('') + '</div>';
+}
+
+async function moveStaff(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= _staffList.length) return;
+  [_staffList[idx], _staffList[newIdx]] = [_staffList[newIdx], _staffList[idx]];
+  renderStaffRegList();
+  try {
+    await fetch('/api/staff', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+      body: JSON.stringify({ staff: _staffList }),
+    });
+  } catch { /* 失敗してもUIは更新済み */ }
 }
 
 async function addStaffMember() {
@@ -863,7 +903,8 @@ async function addStaffMember() {
     statusEl.style.color = '#16a34a';
     statusEl.textContent = `✅ 「${name}」を追加しました`;
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
-    loadStaffRegistration();
+    _staffList.push(data);
+    renderStaffRegList();
   } catch {
     statusEl.style.color = '#dc2626';
     statusEl.textContent = '追加に失敗しました';
@@ -875,10 +916,12 @@ async function deleteStaffMember(id) {
   try {
     const r = await fetch('/api/staff/' + id, { method: 'DELETE', headers: { Authorization: authHeader } });
     if (!r.ok) throw new Error();
-    loadStaffRegistration();
+    _staffList = _staffList.filter(s => s.id !== id);
+    renderStaffRegList();
   } catch { alert('削除に失敗しました'); }
 }
 
+// ========== Staff Tab ==========
 async function loadStaffTab() {
   const el = document.getElementById('staff-list');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div> 読み込み中…</div>';
@@ -887,9 +930,10 @@ async function loadStaffTab() {
     if (!r.ok) throw new Error();
     const subs = await r.json();
     if (!subs.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">&#x1F4ED;</div><p>まだ回答記録がありません</p></div>';
+      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>まだ回答記録がありません</p></div>';
       return;
     }
+    // Group by staffName
     const groups = {};
     subs.forEach(s => {
       const name = s.staffName || '不明';
@@ -903,7 +947,7 @@ async function loadStaffTab() {
       return `<div class="staff-group">
         <div class="staff-group-header" onclick="toggleStaffGroup('sg-${encodeURIComponent(name)}')">
           <div>
-            <div class="staff-name-label">&#x1F464; ${esc(name)}</div>
+            <div class="staff-name-label">👤 ${esc(name)}</div>
             <div class="staff-stats">${totalSessions}回受験 ／ 平均スコア ${avgPct}%</div>
           </div>
           <span class="staff-toggle-icon">▾</span>
@@ -951,6 +995,7 @@ function toggleStaffDetail(id) {
   if (el) el.classList.toggle('open');
 }
 
+// ========== Manual Integration ==========
 let manualList = [];
 
 async function loadManualList() {
@@ -964,7 +1009,9 @@ async function loadManualList() {
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
     manualList = await r.json();
     sel.innerHTML = '<option value="">— マニュアルを選択してください —</option>';
-    let lastMain = null, lastSub = null, group = null;
+    let lastMain = null;
+    let lastSub = null;
+    let group = null;
     manualList.forEach(m => {
       const mainCat = m.main_category || 'カテゴリなし';
       const subCat = (m.sub_category && m.sub_category !== m.main_category) ? m.sub_category : null;
@@ -972,12 +1019,16 @@ async function loadManualList() {
         if (group) sel.appendChild(group);
         group = document.createElement('optgroup');
         group.label = '━━ ' + mainCat + ' ━━';
-        lastMain = mainCat; lastSub = null;
+        lastMain = mainCat;
+        lastSub = null;
       }
       if (subCat && subCat !== lastSub) {
         const sep = document.createElement('option');
-        sep.disabled = true; sep.textContent = '  ▸ ' + subCat; sep.style.color = '#6b7280';
-        group.appendChild(sep); lastSub = subCat;
+        sep.disabled = true;
+        sep.textContent = '  ▸ ' + subCat;
+        sep.style.color = '#6b7280';
+        group.appendChild(sep);
+        lastSub = subCat;
       }
       const opt = document.createElement('option');
       opt.value = m.id;
@@ -1018,12 +1069,14 @@ async function onManualSelect() {
   }
 }
 
+// ========== Manual Create Tab ==========
 let mcManualList = [];
 let mcInitialized = false;
 
 function initMcTab() {
   if (mcInitialized) return;
   mcInitialized = true;
+  // Start with one empty question
   addMcQuestion();
 }
 
@@ -1114,7 +1167,8 @@ async function saveMcSet() {
       body: JSON.stringify({ manualName: name, questions })
     });
     if (!r.ok) throw new Error();
-    statusEl.innerHTML = '<div class="alert alert-success">&#x2705; クイズセットを保存しました！</div>';
+    statusEl.innerHTML = '<div class="alert alert-success">✅ クイズセットを保存しました！</div>';
+    // Clear questions and name
     document.getElementById('mc-questions').innerHTML = '';
     document.getElementById('mc-name').value = '';
     mcInitialized = false;
@@ -1125,6 +1179,7 @@ async function saveMcSet() {
   }
 }
 
+// ========== Submission Edit ==========
 let editingSubId = null;
 let editingSubResults = [];
 
@@ -1204,6 +1259,7 @@ async function deleteSubmission(id) {
   } catch { alert('削除に失敗しました'); }
 }
 
+// ========== Utils ==========
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
