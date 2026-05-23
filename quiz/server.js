@@ -201,28 +201,20 @@ app.post('/api/generate', async (req, res) => {
 
   const keyTerms = extractKeyTerms(cleanedText);
 
-  const prompt = `以下のマニュアルテキストから、${count}問のクイズをJSON配列で作成してください。
+  const prompt = `以下のマニュアルテキストの内容だけを根拠にして、クイズを${count}問作成してください。マニュアルに書かれていない情報は使わないでください。
 
 マニュアルテキスト:
----
 ${cleanedText}
----
 
-キーワード（問題文・選択肢に必ず1つ以上含めること）: ${keyTerms}
+重要キーワード（問題文か選択肢に必ず含めること）: ${keyTerms}
 
-ルール:
-- 上のマニュアルに書かれた具体的な内容・手順・物品・数値だけを使うこと
-- マニュアルに書かれていない情報は使わないこと
-- 同じ問題パターンを繰り返さないこと（多様な問題を作ること）
-- ${count}問すべて異なる内容・異なる形式にすること
+問題タイプを混ぜて作成してください:
+- truefalse: ○×問題。answerは"true"または"false"
+- choice: 4択問題。optionsは4つの選択肢配列、answerは正解テキスト
+- fill: 穴埋め問題。問題文に___を使う、answerは答えの配列
+- sort: 手順並び替え。questionは「〇〇の手順を正しい順番に並べてください」形式、optionsは3〜5ステップの配列、answerはoptionsと同じ順の配列
 
-問題タイプ（なるべく混ぜること）:
-- "truefalse": answerは"true"または"false"
-- "choice": optionsは4つの配列、answerは正解のテキスト
-- "fill": 問題文に___、answerは答えの配列
-- "sort": questionは「〇〇の手順を正しい順番に並べてください」、optionsは3〜5ステップ、answerはoptionsと同じ順の配列
-
-[`;
+{"questions": [{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]}`;
 
   try {
     const response = await axios.post(
@@ -230,20 +222,17 @@ ${cleanedText}
       {
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'あなたはJSON生成専用AIです。ユーザーが指定したマニュアルテキストの内容に基づいてクイズのJSON配列を生成します。マニュアルに書かれていない内容は絶対に使いません。説明文・コメント・前置きは一切出力しません。JSON配列の続き（{から始まる要素）のみを出力します。' },
+          { role: 'system', content: 'あなたはクイズ作成AIです。提供されたマニュアルテキストの内容だけを根拠に問題を作成してください。マニュアルに記載されていない情報は使わないでください。必ず{"questions":[...]}形式のJSONのみを返してください。' },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.1,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
       },
       { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
     );
     const rawContent = response.data.choices[0].message.content;
-    // Prompt ends with "[" so prepend it; AI continues from there
-    const text = rawContent.trimStart().startsWith('[') ? rawContent : '[' + rawContent;
     console.log('Groq raw response:', rawContent.substring(0, 500));
-    const jsonStr = extractJsonArray(text);
-    if (!jsonStr) throw new Error('JSON配列が見つかりませんでした');
-    const parsed = JSON.parse(jsonStr);
+    const parsed = JSON.parse(rawContent);
     const raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
 
     const questions = raw.map(q => {
