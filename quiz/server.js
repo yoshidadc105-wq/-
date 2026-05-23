@@ -164,6 +164,13 @@ app.get('/api/sets/public', async (req, res) => {
   res.json(sets);
 });
 
+function extractKeyTerms(text) {
+  const terms = new Set();
+  (text.match(/[ァ-ヶー]{2,}/g) || []).forEach(t => terms.add(t));
+  (text.match(/[一-鿿][一-鿿぀-ゟ]{1,}/g) || []).forEach(t => terms.add(t));
+  return [...terms].slice(0, 25).join('、');
+}
+
 function cleanManualText(text) {
   return text
     .split('\n')
@@ -192,14 +199,23 @@ app.post('/api/generate', async (req, res) => {
   const cleanedText = cleanManualText(manualText);
   if (!cleanedText) return res.status(400).json({ error: 'マニュアルテキストに有効な内容がありません' });
 
-  const prompt = `【厳守事項】以下に示す「マニュアルテキスト」に書かれた内容だけを使って問題を${count}問作成してください。マニュアルに一切記載されていない事柄（食事・会社情報・一般常識など）は絶対に使わないでください。マニュアルの文章をそのまま引用・言い換えた問題のみ作成してください。
+  const keyTerms = extractKeyTerms(cleanedText);
 
-マニュアルテキスト（このテキストの内容だけを使うこと）:
+  const prompt = `【厳守事項】以下の「マニュアルテキスト」に書かれた内容だけを使って問題を${count}問作成してください。
+
+マニュアルテキスト:
 ---
 ${cleanedText}
 ---
 
-上記テキストの内容を直接根拠とした問題を${count}問、以下のタイプで作成してください:
+【必須ルール】
+1. 上のマニュアルテキストに書かれた具体的な手順・動作・物品名だけを根拠に問題を作ること
+2. 「社員」「業務」「このマニュアルの目的」など抽象的・一般的な表現は使わないこと
+3. 問題文または選択肢に必ず以下のキーワードのうち少なくとも1つを含めること:
+   ${keyTerms}
+4. マニュアルに書かれていない情報（食事・会社情報・一般常識・職場ルール等）は絶対に使わないこと
+
+問題タイプ（以下のタイプで作成）:
 - truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）
 - choice: 4択問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト
 - fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）
