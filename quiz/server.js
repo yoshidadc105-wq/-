@@ -201,32 +201,28 @@ app.post('/api/generate', async (req, res) => {
 
   const keyTerms = extractKeyTerms(cleanedText);
 
-  const prompt = `【厳守事項】以下の「マニュアルテキスト」に書かれた内容だけを使って問題を${count}問作成してください。
+  const prompt = `以下のマニュアルテキストから、${count}問のクイズをJSON配列で作成してください。
 
 マニュアルテキスト:
 ---
 ${cleanedText}
 ---
 
-【必須ルール】
-1. 上のマニュアルテキストに書かれた具体的な手順・動作・物品名だけを根拠に問題を作ること
-2. 「社員」「業務」「このマニュアルの目的」など抽象的・一般的な表現は使わないこと
-3. 問題文または選択肢に必ず以下のキーワードのうち少なくとも1つを含めること:
-   ${keyTerms}
-4. マニュアルに書かれていない情報（食事・会社情報・一般常識・職場ルール等）は絶対に使わないこと
+キーワード（問題文・選択肢に必ず1つ以上含めること）: ${keyTerms}
 
-問題タイプ（以下のタイプで作成）:
-- truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）
-- choice: 4択問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト
-- fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）
-- sort: 手順並び替え問題。以下のルールを必ず守ること:
-  * questionは「〇〇の手順を正しい順番に並べてください」という形式
-  * optionsは3〜5個の手順ステップの配列（各ステップは独立した短い行動）
-  * 各ステップはカンマで区切らず、別々の配列要素にすること
-  * answerはoptionsと同じ配列（正しい順番で）
+ルール:
+- 上のマニュアルに書かれた具体的な内容・手順・物品・数値だけを使うこと
+- マニュアルに書かれていない情報は使わないこと
+- 同じ問題パターンを繰り返さないこと（多様な問題を作ること）
+- ${count}問すべて異なる内容・異なる形式にすること
 
-JSONの配列のみを返してください（説明文・コメント不要）:
-[{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]`;
+問題タイプ（なるべく混ぜること）:
+- "truefalse": answerは"true"または"false"
+- "choice": optionsは4つの配列、answerは正解のテキスト
+- "fill": 問題文に___、answerは答えの配列
+- "sort": questionは「〇〇の手順を正しい順番に並べてください」、optionsは3〜5ステップ、answerはoptionsと同じ順の配列
+
+[`;
 
   try {
     const response = await axios.post(
@@ -234,15 +230,17 @@ JSONの配列のみを返してください（説明文・コメント不要）:
       {
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'あなたはクイズ作成AIです。ユーザーが提供した「マニュアルテキスト」の文章に書かれた内容だけを使って問題を作成してください。マニュアルに書かれていないこと（食事・会社情報・一般的な職場ルール・常識など）は絶対に使わないでください。マニュアルの文を直接引用または言い換えた問題のみ作成してください。有効なJSON配列のみを返してください。説明やコメントは不要です。並び替え問題のoptionsは必ず個別の配列要素にしてください。' },
+          { role: 'system', content: 'あなたはJSON生成専用AIです。ユーザーが指定したマニュアルテキストの内容に基づいてクイズのJSON配列を生成します。マニュアルに書かれていない内容は絶対に使いません。説明文・コメント・前置きは一切出力しません。JSON配列の続き（{から始まる要素）のみを出力します。' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
       },
       { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
     );
-    const text = response.data.choices[0].message.content;
-    console.log('Groq raw response:', text.substring(0, 500));
+    const rawContent = response.data.choices[0].message.content;
+    // Prompt ends with "[" so prepend it; AI continues from there
+    const text = rawContent.trimStart().startsWith('[') ? rawContent : '[' + rawContent;
+    console.log('Groq raw response:', rawContent.substring(0, 500));
     const jsonStr = extractJsonArray(text);
     if (!jsonStr) throw new Error('JSON配列が見つかりませんでした');
     const parsed = JSON.parse(jsonStr);
