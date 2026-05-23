@@ -144,40 +144,6 @@ function extractJsonArray(text) {
   return null;
 }
 
-// Strip metadata lines added by manual export tools (URLs, timestamps, author info)
-function cleanManualText(text) {
-  return text
-    .split('\n')
-    .filter(line => {
-      const t = line.trim();
-      if (!t) return false;
-      if (/^https?:\/\//i.test(t)) return false;
-      if (/^View online/i.test(t)) return false;
-      if (/^Update\s*[::：]/i.test(t)) return false;
-      if (/^Exported\s*[::：]/i.test(t)) return false;
-      if (/^Created\s*[::：]/i.test(t)) return false;
-      if (/^Author\s*[::：]/i.test(t)) return false;
-      if (/^\d{4}\.\d{2}\.\d{2}/.test(t)) return false;
-      return true;
-    })
-    .join('\n')
-    .trim();
-}
-
-// Check if a generated question is actually based on the manual text.
-// Uses 3-char sliding window since Japanese has no word delimiters.
-function isRelevantToManual(questionText, answerText, manualText) {
-  const combined = String(questionText || '') + (Array.isArray(answerText) ? answerText.join('') : String(answerText || ''));
-  // Skip 3-char chunks that are pure common particles/auxiliaries
-  const skip = /^[はがをにでもてのやなとかいうしすたれるこそどあけせさなにをでのはがもてるしたれこそどあ]+$/;
-  for (let i = 0; i <= combined.length - 3; i++) {
-    const chunk = combined.slice(i, i + 3);
-    if (skip.test(chunk)) continue;
-    if (manualText.includes(chunk)) return true;
-  }
-  return false;
-}
-
 // ========== Routes ==========
 app.get('/api/sets', async (req, res) => {
   if (!checkAuth(req, res)) return;
@@ -197,6 +163,25 @@ app.get('/api/sets/public', async (req, res) => {
     }));
   res.json(sets);
 });
+
+function cleanManualText(text) {
+  return text
+    .split('\n')
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return false;
+      if (/^https?:\/\//i.test(t)) return false;
+      if (/^View online/i.test(t)) return false;
+      if (/^Update\s*[:：]/i.test(t)) return false;
+      if (/^Exported\s*[:：]/i.test(t)) return false;
+      if (/^Created\s*[:：]/i.test(t)) return false;
+      if (/^Author\s*[:：]/i.test(t)) return false;
+      if (/^\d{4}\.\d{2}\.\d{2}/.test(t)) return false;
+      return true;
+    })
+    .join('\n')
+    .trim();
+}
 
 app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
@@ -284,13 +269,9 @@ ${cleanedText}
       // For sort type, answer should match options
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
-    }).filter(q => {
-      if (!q.question || !String(q.question).trim().length) return false;
-      // Discard questions with no 3-char overlap with the manual text
-      return isRelevantToManual(q.question, q.answer, cleanedText);
-    });
+    }).filter(q => q.question && String(q.question).trim().length > 0);
 
-    if (!questions.length) return res.status(500).json({ error: 'マニュアルの内容に基づいた問題を生成できませんでした。マニュアルテキストをご確認のうえ、もう一度お試しください。' });
+    if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。もう一度お試しください。' });
     res.json({ questions });
   } catch (err) {
     console.error('Groq error:', err.response?.data || err.message);
