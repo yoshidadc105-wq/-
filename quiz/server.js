@@ -164,6 +164,18 @@ function cleanManualText(text) {
     .trim();
 }
 
+// Check if a generated question is actually based on the manual text
+function isRelevantToManual(questionText, answerText, manualText) {
+  const combined = String(questionText || '') + ' ' + (Array.isArray(answerText) ? answerText.join(' ') : String(answerText || ''));
+  // Extract tokens of 2+ chars, skip pure numbers
+  const tokens = combined
+    .replace(/[？！。、「」『』【】・～〜\s\-_\/]/g, ' ')
+    .split(' ')
+    .filter(w => w.length >= 2 && !/^[０-９0-9一二三四五六七八九十百千万]+$/.test(w));
+  if (!tokens.length) return true;
+  return tokens.some(token => manualText.includes(token));
+}
+
 // ========== Routes ==========
 app.get('/api/sets', async (req, res) => {
   if (!checkAuth(req, res)) return;
@@ -270,9 +282,13 @@ ${cleanedText}
       // For sort type, answer should match options
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
-    }).filter(q => q.question && String(q.question).trim().length > 0);
+    }).filter(q => {
+      if (!q.question || !String(q.question).trim().length) return false;
+      // Discard questions that have no word overlap with the manual text
+      return isRelevantToManual(q.question, q.answer, cleanedText);
+    });
 
-    if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。もう一度お試しください。' });
+    if (!questions.length) return res.status(500).json({ error: 'マニュアルの内容に基づいた問題を生成できませんでした。マニュアルテキストをご確認のうえ、もう一度お試しください。' });
     res.json({ questions });
   } catch (err) {
     console.error('Groq error:', err.response?.data || err.message);
