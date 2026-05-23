@@ -164,16 +164,18 @@ function cleanManualText(text) {
     .trim();
 }
 
-// Check if a generated question is actually based on the manual text
+// Check if a generated question is actually based on the manual text.
+// Uses 3-char sliding window since Japanese has no word delimiters.
 function isRelevantToManual(questionText, answerText, manualText) {
-  const combined = String(questionText || '') + ' ' + (Array.isArray(answerText) ? answerText.join(' ') : String(answerText || ''));
-  // Extract tokens of 2+ chars, skip pure numbers
-  const tokens = combined
-    .replace(/[？！。、「」『』【】・～〜\s\-_\/]/g, ' ')
-    .split(' ')
-    .filter(w => w.length >= 2 && !/^[０-９0-9一二三四五六七八九十百千万]+$/.test(w));
-  if (!tokens.length) return true;
-  return tokens.some(token => manualText.includes(token));
+  const combined = String(questionText || '') + (Array.isArray(answerText) ? answerText.join('') : String(answerText || ''));
+  // Skip 3-char chunks that are pure common particles/auxiliaries
+  const skip = /^[はがをにでもてのやなとかいうしすたれるこそどあけせさなにをでのはがもてるしたれこそどあ]+$/;
+  for (let i = 0; i <= combined.length - 3; i++) {
+    const chunk = combined.slice(i, i + 3);
+    if (skip.test(chunk)) continue;
+    if (manualText.includes(chunk)) return true;
+  }
+  return false;
 }
 
 // ========== Routes ==========
@@ -284,7 +286,7 @@ ${cleanedText}
       return { type, question: questionText, options, answer: finalAnswer, explanation };
     }).filter(q => {
       if (!q.question || !String(q.question).trim().length) return false;
-      // Discard questions that have no word overlap with the manual text
+      // Discard questions with no 3-char overlap with the manual text
       return isRelevantToManual(q.question, q.answer, cleanedText);
     });
 
