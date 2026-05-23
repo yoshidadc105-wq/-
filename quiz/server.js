@@ -8,6 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'admin';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const MANUAL_API_URL = process.env.MANUAL_API_URL || '';
 const MANUAL_API_KEY = process.env.MANUAL_API_KEY || '';
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -111,16 +112,12 @@ function checkAuth(req, res) {
   return true;
 }
 
-// Normalize answer for flexible fill comparison
 function normalizeAns(s) {
   return String(s == null ? '' : s)
     .trim()
     .toLowerCase()
-    // katakana → hiragana (Unicode offset 0x60)
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
-    // full-width alphanumeric → half-width
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    // remove spaces and common punctuation
     .replace(/[\s　]+/g, '')
     .replace(/[、。，．・〜～ー]/g, '');
 }
@@ -194,7 +191,7 @@ app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { manualText, count = 5 } = req.body;
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
-  if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEYが設定されていません' });
+  if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: 'API_KEYが設定されていません（GEMINI_API_KEYを設定してください）' });
 
   const cleanedText = cleanManualText(manualText);
   if (!cleanedText) return res.status(400).json({ error: 'マニュアルテキストに有効な内容がありません' });
@@ -217,23 +214,41 @@ ${cleanedText}
 {"questions": [{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]}`;
 
   try {
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: 'あなたはクイズ作成AIです。提供されたマニュアルテキストの内容だけを根拠に問題を作成してください。マニュアルに記載されていない情報は使わないでください。必ず{"questions":[...]}形式のJSONのみを返してください。' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      },
-      { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
-    );
-    const rawContent = response.data.choices[0].message.content;
-    console.log('Groq raw response:', rawContent.substring(0, 500));
-    const parsed = JSON.parse(rawContent);
-    const raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
+    let raw = [];
+
+    if (GEMINI_API_KEY) {
+      const gRes = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
+        },
+        { timeout: 60000 }
+      );
+      const rawContent = gRes.data.candidates[0].content.parts[0].text;
+      console.log('Gemini raw response:', rawContent.substring(0, 500));
+      const parsed = JSON.parse(rawContent);
+      raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
+    } else {
+      const gqRes = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: 'あなたはクイズ作成AIです。マニュアルテキストの内容だけを根拠に問題を作成してください。{"questions":[...]}形式のJSONのみ返してください。' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.3,
+        },
+        { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
+      );
+      const rawContent = gqRes.data.choices[0].message.content;
+      console.log('Groq raw response:', rawContent.substring(0, 500));
+      const jsonStr = extractJsonArray(rawContent);
+      if (!jsonStr) throw new Error('JSON配列が見つかりませんでした');
+      const parsed = JSON.parse(jsonStr);
+      raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
+    }
 
     const questions = raw.map(q => {
       const questionText =
@@ -246,7 +261,6 @@ ${cleanedText}
       if (!Array.isArray(options)) {
         options = (options && typeof options === 'object') ? Object.values(options) : [];
       }
-      // Fix sort options that may have been comma-joined into single strings
       const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
       if (type === 'sort' && options.length > 0) {
         const expanded = [];
@@ -268,7 +282,6 @@ ${cleanedText}
         q.correct != null ? q.correct :
         q['答え'] != null ? q['答え'] :
         q['正解'] != null ? q['正解'] : '';
-      // For sort type, answer should match options
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
     }).filter(q => q.question && String(q.question).trim().length > 0);
@@ -276,7 +289,7 @@ ${cleanedText}
     if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。もう一度お試しください。' });
     res.json({ questions });
   } catch (err) {
-    console.error('Groq error:', err.response?.data || err.message);
+    console.error('AI generate error:', err.response?.data || err.message);
     res.status(500).json({ error: 'AI生成エラー: ' + (err.response?.data?.error?.message || err.message) });
   }
 });
