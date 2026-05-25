@@ -5,6 +5,7 @@ export default function ReceiveStockPage() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [expiryDate, setExpiryDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -24,10 +25,11 @@ export default function ReceiveStockPage() {
     setError('');
     setSubmitting(true);
     try {
-      await api.receiveProduct(selected.id, quantity);
+      await api.receiveProduct(selected.id, quantity, null, expiryDate || undefined);
       setSuccess(true);
       setSelected(null);
       setQuantity(1);
+      setExpiryDate('');
       setSearch('');
       const updated = await api.getProducts();
       setProducts(updated);
@@ -64,7 +66,7 @@ export default function ReceiveStockPage() {
               <div
                 key={p.id}
                 className="card"
-                onClick={() => { setSelected(p); setQuantity(1); setError(''); }}
+                onClick={() => { setSelected(p); setQuantity(1); setExpiryDate(''); setError(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
               >
                 {p.photo_path ? (
@@ -116,6 +118,20 @@ export default function ReceiveStockPage() {
                 }}
               >＋</button>
             </div>
+          </div>
+
+          {/* Optional expiry date */}
+          <div>
+            <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>
+              使用期限（任意・YYYY-MM形式）
+            </label>
+            <input
+              type="text"
+              value={expiryDate}
+              onChange={e => setExpiryDate(e.target.value)}
+              placeholder="例: 2025-12"
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+            />
           </div>
 
           {error && (

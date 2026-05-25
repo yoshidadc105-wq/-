@@ -33,6 +33,24 @@ router.get('/:id', authMiddleware, (req, res) => {
   res.json(product);
 });
 
+// ロット一覧
+router.get('/:id/lots', authMiddleware, (req, res) => {
+  const lots = db.prepare('SELECT * FROM product_lots WHERE product_id = ? ORDER BY expiry_date ASC').all(req.params.id);
+  res.json(lots);
+});
+
+// ロット追加
+router.post('/:id/lots', authMiddleware, (req, res) => {
+  const { expiry_date, quantity } = req.body;
+  if (!quantity || quantity <= 0) return res.status(400).json({ error: '数量を正しく入力してください' });
+
+  const result = db.prepare(
+    'INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES (?, ?, ?)'
+  ).run(req.params.id, expiry_date || null, parseInt(quantity));
+
+  res.json({ id: result.lastInsertRowid, message: 'ロットを追加しました' });
+});
+
 // 写真からGoogle Vision APIで商品情報を読み取る（JSON受け取り）
 router.post('/scan', authMiddleware, async (req, res) => {
   const { base64, filename } = req.body;
@@ -101,29 +119,29 @@ router.post('/scan', authMiddleware, async (req, res) => {
 
 // 商品登録
 router.post('/', authMiddleware, upload.single('photo'), (req, res) => {
-  const { name, maker, item_code, stock, alert_threshold, photo_path } = req.body;
+  const { name, maker, item_code, stock, alert_threshold, photo_path, category } = req.body;
   if (!name) return res.status(400).json({ error: '商品名は必須です' });
 
   const photoPath = req.file ? `/uploads/${req.file.filename}` : (photo_path || null);
 
   const result = db.prepare(
-    'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(name, maker || null, item_code || null, parseInt(stock) || 0, parseInt(alert_threshold) || 5, photoPath);
+    'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path, category) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(name, maker || null, item_code || null, parseInt(stock) || 0, parseInt(alert_threshold) || 5, photoPath, category || null);
 
   res.json({ id: result.lastInsertRowid, message: '商品を登録しました' });
 });
 
 // 商品更新
 router.put('/:id', authMiddleware, upload.single('photo'), (req, res) => {
-  const { name, maker, item_code, alert_threshold } = req.body;
+  const { name, maker, item_code, alert_threshold, category } = req.body;
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!product) return res.status(404).json({ error: '商品が見つかりません' });
 
   const photoPath = req.file ? `/uploads/${req.file.filename}` : product.photo_path;
 
   db.prepare(
-    'UPDATE products SET name=?, maker=?, item_code=?, alert_threshold=?, photo_path=? WHERE id=?'
-  ).run(name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, req.params.id);
+    'UPDATE products SET name=?, maker=?, item_code=?, alert_threshold=?, photo_path=?, category=? WHERE id=?'
+  ).run(name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, category !== undefined ? category : product.category, req.params.id);
 
   res.json({ message: '商品を更新しました' });
 });

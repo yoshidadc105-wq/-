@@ -14,6 +14,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/inventory', require('./routes/inventory'));
+app.use('/api/lots', require('./routes/lots'));
+app.use('/api/import', require('./routes/import'));
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

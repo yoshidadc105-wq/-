@@ -7,6 +7,7 @@ import UseProductPage from './pages/UseProductPage';
 import ReceiveStockPage from './pages/ReceiveStockPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import Layout from './components/Layout';
+import ImportPage from './pages/ImportPage';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/use" element={<UseProductPage />} />
           <Route path="/receive" element={<ReceiveStockPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/import" element={<ImportPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

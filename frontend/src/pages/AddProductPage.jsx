@@ -8,7 +8,7 @@ export default function AddProductPage() {
   const [photoPath, setPhotoPath] = useState('');
   const [scanning, setScanning] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [form, setForm] = useState({ name: '', maker: '', item_code: '', stock: '0', alert_threshold: '5' });
+  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -160,6 +160,7 @@ export default function AddProductPage() {
         <Field label="商品名 *" value={form.name} onChange={v => setForm(p => ({ ...p, name: v }))} placeholder="例: グラスアイオノマーセメント" />
         <Field label="メーカー" value={form.maker} onChange={v => setForm(p => ({ ...p, maker: v }))} placeholder="例: GC" />
         <Field label="品番" value={form.item_code} onChange={v => setForm(p => ({ ...p, item_code: v }))} placeholder="例: ABC-1234" />
+        <Field label="カテゴリ" value={form.category} onChange={v => setForm(p => ({ ...p, category: v }))} placeholder="例: グローブ・衛生用品" />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="現在の在庫数" value={form.stock} onChange={v => setForm(p => ({ ...p, stock: v }))} type="number" min="0" />

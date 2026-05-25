@@ -42,6 +42,13 @@ export const api = {
   deleteProduct: (id) => request('DELETE', `/products/${id}`),
 
   useProduct: (product_id, quantity, note) => request('POST', '/inventory/use', { product_id, quantity, note }),
-  receiveProduct: (product_id, quantity, note) => request('POST', '/inventory/receive', { product_id, quantity, note }),
+  receiveProduct: (product_id, quantity, note, expiry_date) => request('POST', '/inventory/receive', { product_id, quantity, note, expiry_date }),
   getUsageLogs: (product_id) => request('GET', `/inventory/usage/${product_id}`),
+
+  getLots: (productId) => request('GET', `/products/${productId}/lots`),
+  addLot: (productId, data) => request('POST', `/products/${productId}/lots`, data),
+  deleteLot: (lotId) => request('DELETE', `/lots/${lotId}`),
+  getHistory: (productId) => request('GET', `/inventory/history/${productId}`),
+  importPreview: (data) => request('POST', '/import/preview', data),
+  importExecute: (data) => request('POST', '/import/execute', data),
 };

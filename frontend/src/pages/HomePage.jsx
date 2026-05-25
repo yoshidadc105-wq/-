@@ -7,6 +7,7 @@ export default function HomePage() {
   const [lowStock, setLowStock] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('すべて');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,9 +16,13 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = products.filter(p =>
-    p.name.includes(search) || (p.maker || '').includes(search)
-  );
+  const categories = ['すべて', ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort()];
+
+  const filtered = products.filter(p => {
+    const matchSearch = p.name.includes(search) || (p.maker || '').includes(search);
+    const matchCategory = selectedCategory === 'すべて' || p.category === selectedCategory;
+    return matchSearch && matchCategory;
+  });
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><div className="spinner" /></div>;
 
@@ -42,9 +47,41 @@ export default function HomePage() {
         style={{ background: 'white' }}
       />
 
+      {/* Category filter pills */}
+      {categories.length > 1 && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          paddingBottom: 4,
+          WebkitOverflowScrolling: 'touch',
+        }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              style={{
+                flexShrink: 0,
+                padding: '6px 14px',
+                borderRadius: 20,
+                fontSize: 13,
+                fontWeight: selectedCategory === cat ? 700 : 400,
+                background: selectedCategory === cat ? '#2563eb' : '#f1f5f9',
+                color: selectedCategory === cat ? 'white' : '#475569',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-          {search ? '該当する商品がありません' : '商品が登録されていません'}
+          {search || selectedCategory !== 'すべて' ? '該当する商品がありません' : '商品が登録されていません'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -89,6 +126,21 @@ function ProductCard({ product, onClick }) {
         </div>
         {product.maker && (
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{product.maker}</div>
+        )}
+        {product.category && (
+          <div style={{ marginTop: 4 }}>
+            <span style={{
+              display: 'inline-block',
+              background: '#ede9fe',
+              color: '#6d28d9',
+              fontSize: 11,
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 10,
+            }}>
+              {product.category}
+            </span>
+          </div>
         )}
         <div style={{ marginTop: 6 }}>
           {isEmpty

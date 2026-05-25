@@ -6,6 +6,7 @@ const navItems = [
   { path: '/use', label: '使用', icon: '✂️' },
   { path: '/receive', label: '入荷', icon: '📥' },
   { path: '/add', label: '商品追加', icon: '➕' },
+  { path: '/import', label: '取込', icon: '📋' },
 ];
 
 export default function Layout({ children, user, onLogout }) {
