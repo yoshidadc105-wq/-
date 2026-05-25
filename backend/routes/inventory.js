@@ -4,6 +4,28 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
+// 全商品の統合履歴
+router.get('/history', authMiddleware, async (req, res) => {
+  const { rows: useLogs } = await pool.query(`
+    SELECT ul.id, ul.product_id, ul.quantity, u.display_name, ul.logged_at, 'use' as type, NULL as expiry_date, p.name as product_name
+    FROM usage_logs ul
+    LEFT JOIN users u ON ul.user_id = u.id
+    LEFT JOIN products p ON ul.product_id = p.id
+    ORDER BY ul.logged_at DESC
+    LIMIT 200
+  `);
+  const { rows: stockLogs } = await pool.query(`
+    SELECT sl.id, sl.product_id, sl.quantity, u.display_name, sl.logged_at, 'receive' as type, sl.expiry_date, p.name as product_name
+    FROM stock_logs sl
+    LEFT JOIN users u ON sl.user_id = u.id
+    LEFT JOIN products p ON sl.product_id = p.id
+    ORDER BY sl.logged_at DESC
+    LIMIT 200
+  `);
+  const combined = [...useLogs, ...stockLogs].sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at)).slice(0, 200);
+  res.json(combined);
+});
+
 // 使用記録（在庫を減らす）- FIFO lot deduction
 router.post('/use', authMiddleware, async (req, res) => {
   const { product_id, quantity, note } = req.body;

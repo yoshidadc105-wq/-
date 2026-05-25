@@ -51,6 +51,7 @@ export const api = {
   addLot: (productId, data) => request('POST', `/products/${productId}/lots`, data),
   deleteLot: (lotId) => request('DELETE', `/lots/${lotId}`),
   getHistory: (productId) => request('GET', `/inventory/history/${productId}`),
+  getAllHistory: () => request('GET', '/inventory/history'),
   importPreview: (data) => request('POST', '/import/preview', data),
   importExecute: (data) => request('POST', '/import/execute', data),
 };
