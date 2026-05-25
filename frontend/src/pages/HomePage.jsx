@@ -5,6 +5,7 @@ import { api } from '../api';
 export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [lowStock, setLowStock] = useState([]);
+  const [expiring, setExpiring] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('すべて');
@@ -16,8 +17,8 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   const load = useCallback(() => {
-    return Promise.all([api.getProducts(), api.getLowStock()])
-      .then(([all, low]) => { setProducts(all); setLowStock(low); })
+    return Promise.all([api.getProducts(), api.getLowStock(), api.getExpiring()])
+      .then(([all, low, exp]) => { setProducts(all); setLowStock(low); setExpiring(exp); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -77,6 +78,18 @@ export default function HomePage() {
             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 14 }}>
               <span>{p.name}</span>
               <span className="badge-danger">残{p.stock}個</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {expiring.length > 0 && (
+        <div style={{ background: '#fff7ed', border: '1px solid #fb923c', borderRadius: 12, padding: 14 }}>
+          <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 8 }}>🗓️ 期限切れ間近 ({expiring.length}件)</div>
+          {expiring.map((p, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 14 }}>
+              <span>{p.name}</span>
+              <span style={{ color: '#ea580c', fontWeight: 600 }}>{p.expiry_date}</span>
             </div>
           ))}
         </div>

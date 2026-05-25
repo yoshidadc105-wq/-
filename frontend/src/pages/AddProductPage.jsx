@@ -168,7 +168,6 @@ export default function AddProductPage() {
           <Field label="アラート閾値" value={form.alert_threshold} onChange={v => setForm(p => ({ ...p, alert_threshold: v }))} type="number" min="0" />
         </div>
         <Field label="使用期限（任意・YYYY-MM形式）" value={form.expiry_date} onChange={v => setForm(p => ({ ...p, expiry_date: v }))} placeholder="例: 2025-12" />
-        <Field label="発注先URL（任意）" value={form.supplier_url} onChange={v => setForm(p => ({ ...p, supplier_url: v }))} placeholder="例: https://www.feed.jp/..." />
 
         {error && (
           <div style={{ background: '#fee2e2', color: '#dc2626', padding: 12, borderRadius: 8, fontSize: 14 }}>

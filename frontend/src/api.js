@@ -37,6 +37,7 @@ export const api = {
 
   getProducts: () => request('GET', '/products'),
   getLowStock: () => request('GET', '/products/low-stock'),
+  getExpiring: () => request('GET', '/products/expiring'),
   getProduct: (id) => request('GET', `/products/${id}`),
   scanProduct: (data) => request('POST', '/products/scan', data),
   createProduct: (formData) => request('POST', '/products', formData),
