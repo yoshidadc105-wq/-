@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'admin';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const MANUAL_API_URL = process.env.MANUAL_API_URL || '';
 const MANUAL_API_KEY = process.env.MANUAL_API_KEY || '';
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -112,12 +113,16 @@ function checkAuth(req, res) {
   return true;
 }
 
+// Normalize answer for flexible fill comparison
 function normalizeAns(s) {
   return String(s == null ? '' : s)
     .trim()
     .toLowerCase()
+    // katakana → hiragana (Unicode offset 0x60)
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    // full-width alphanumeric → half-width
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    // remove spaces and common punctuation
     .replace(/[\s　]+/g, '')
     .replace(/[、。，．・〜～ー]/g, '');
 }
@@ -191,32 +196,44 @@ app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { manualText, count = 5 } = req.body;
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
-  if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: 'API_KEYが設定されていません（GEMINI_API_KEYを設定してください）' });
+  if (!OPENROUTER_API_KEY && !GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: 'API_KEYが設定されていません（OPENROUTER_API_KEYを設定してください）' });
 
   const cleanedText = cleanManualText(manualText);
   if (!cleanedText) return res.status(400).json({ error: 'マニュアルテキストに有効な内容がありません' });
 
   const keyTerms = extractKeyTerms(cleanedText);
 
-  const prompt = `以下のマニュアルテキストの内容だけを根拠にして、クイズを${count}問作成してください。マニュアルに書かれていない情報は使わないでください。
-
-マニュアルテキスト:
-${cleanedText}
-
-重要キーワード（問題文か選択肢に必ず含めること）: ${keyTerms}
-
-問題タイプを混ぜて作成してください:
-- truefalse: ○×問題。answerは"true"または"false"
-- choice: 4択問題。optionsは4つの選択肢配列、answerは正解テキスト
-- fill: 穴埋め問題。問題文に___を使う、answerは答えの配列
-- sort: 手順並び替え。questionは「〇〇の手順を正しい順番に並べてください」形式、optionsは3〜5ステップの配列、answerはoptionsと同じ順の配列
-
-{"questions": [{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]}`;
+  const prompt = `以下のマニュアルテキストの内容だけを根拠にして、クイズを${count}問作成してください。マニュアルに書かれていない情報は使わないでください。\n\nマニュアルテキスト:\n${cleanedText}\n\n重要キーワード（問題文か選択肢に必ず含めること）: ${keyTerms}\n\n問題タイプを混ぜて作成してください:\n- truefalse: ○×問題。answerは"true"または"false"\n- choice: 4択問題。optionsは4つの選択肢配列、answerは正解テキスト\n- fill: 穴埋め問題。問題文に___を使う、answerは答えの配列\n- sort: 手順並び替え。questionは「〇〇の手順を正しい順番に並べてください」形式、optionsは3〜5ステップの配列、answerはoptionsと同じ順の配列\n\n{"questions": [{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]}`;
 
   try {
     let raw = [];
 
-    if (GEMINI_API_KEY) {
+    if (OPENROUTER_API_KEY) {
+      const orRes = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: 'google/gemini-2.0-flash:free',
+          messages: [
+            { role: 'system', content: 'あなたはクイズ作成AIです。与えられたマニュアルテキストの内容だけを根拠に問題を作成してください。{"questions":[...]}形式のJSONのみ返してください。' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://nobinobi-quiz.onrender.com',
+            'X-Title': 'Nobinobi Quiz',
+          },
+          timeout: 60000,
+        }
+      );
+      const rawContent = orRes.data.choices[0].message.content;
+      console.log('OpenRouter raw response:', rawContent.substring(0, 500));
+      const parsed = JSON.parse(rawContent);
+      raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
+    } else if (GEMINI_API_KEY) {
       const gRes = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
@@ -261,6 +278,7 @@ ${cleanedText}
       if (!Array.isArray(options)) {
         options = (options && typeof options === 'object') ? Object.values(options) : [];
       }
+      // Fix sort options that may have been comma-joined into single strings
       const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
       if (type === 'sort' && options.length > 0) {
         const expanded = [];
@@ -282,6 +300,7 @@ ${cleanedText}
         q.correct != null ? q.correct :
         q['答え'] != null ? q['答え'] :
         q['正解'] != null ? q['正解'] : '';
+      // For sort type, answer should match options
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
     }).filter(q => q.question && String(q.question).trim().length > 0);
