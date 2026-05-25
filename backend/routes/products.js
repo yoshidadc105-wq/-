@@ -121,17 +121,26 @@ router.post('/scan', authMiddleware, async (req, res) => {
 
 // 商品登録
 router.post('/', authMiddleware, upload.single('photo'), async (req, res) => {
-  const { name, maker, item_code, stock, alert_threshold, photo_path, category } = req.body;
+  const { name, maker, item_code, stock, alert_threshold, photo_path, category, expiry_date } = req.body;
   if (!name) return res.status(400).json({ error: '商品名は必須です' });
 
   const photoPath = req.file ? `/uploads/${req.file.filename}` : (photo_path || null);
+  const stockQty = parseInt(stock) || 0;
 
   const result = await pool.query(
     'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path, category) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-    [name, maker || null, item_code || null, parseInt(stock) || 0, parseInt(alert_threshold) || 5, photoPath, category || null]
+    [name, maker || null, item_code || null, stockQty, parseInt(alert_threshold) || 5, photoPath, category || null]
   );
 
-  res.json({ id: result.rows[0].id, message: '商品を登録しました' });
+  const productId = result.rows[0].id;
+  if (expiry_date && stockQty > 0) {
+    await pool.query(
+      'INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES ($1, $2, $3)',
+      [productId, expiry_date, stockQty]
+    );
+  }
+
+  res.json({ id: productId, message: '商品を登録しました' });
 });
 
 // 商品更新

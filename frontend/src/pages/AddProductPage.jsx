@@ -8,7 +8,7 @@ export default function AddProductPage() {
   const [photoPath, setPhotoPath] = useState('');
   const [scanning, setScanning] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5' });
+  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -166,6 +166,7 @@ export default function AddProductPage() {
           <Field label="現在の在庫数" value={form.stock} onChange={v => setForm(p => ({ ...p, stock: v }))} type="number" min="0" />
           <Field label="アラート閾値" value={form.alert_threshold} onChange={v => setForm(p => ({ ...p, alert_threshold: v }))} type="number" min="0" />
         </div>
+        <Field label="使用期限（任意・YYYY-MM形式）" value={form.expiry_date} onChange={v => setForm(p => ({ ...p, expiry_date: v }))} placeholder="例: 2025-12" />
 
         {error && (
           <div style={{ background: '#fee2e2', color: '#dc2626', padding: 12, borderRadius: 8, fontSize: 14 }}>
