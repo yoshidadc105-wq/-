@@ -8,6 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'admin';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const MANUAL_API_URL = process.env.MANUAL_API_URL || '';
 const MANUAL_API_KEY = process.env.MANUAL_API_KEY || '';
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -15,7 +16,6 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '10mb' }));
 
-// ========== Storage (MongoDB with file fallback) ==========
 const DATA_DIR = path.join(__dirname, 'data');
 const SETS_FILE = path.join(DATA_DIR, 'quiz-sets.json');
 const SUBS_FILE = path.join(DATA_DIR, 'submissions.json');
@@ -101,7 +101,6 @@ async function saveStaff(data) {
   fs.writeFileSync(path.join(DATA_DIR, 'staff.json'), JSON.stringify(data, null, 2));
 }
 
-// ========== Helpers ==========
 function checkAuth(req, res) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Basic ')) { res.status(401).json({ error: 'unauthorized' }); return false; }
@@ -121,7 +120,6 @@ function normalizeAns(s) {
     .replace(/[、。，．・〜～ー]/g, '');
 }
 
-// ========== Routes ==========
 app.get('/api/sets', async (req, res) => {
   if (!checkAuth(req, res)) return;
   res.json(await loadSets());
@@ -145,7 +143,7 @@ app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { manualText, count = 5 } = req.body;
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEYが設定されていません' });
+  if (!GROQ_API_KEY && !GEMINI_API_KEY) return res.status(500).json({ error: 'API_KEYが設定されていません' });
 
   const prompt = `以下のマニュアルテキストから、スタッフ向け理解度確認クイズを${count}問作成してください。
 
@@ -167,16 +165,32 @@ ${manualText}
 ]`;
 
   try {
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
-      { contents: [{ parts: [{ text: prompt }] }] },
-      { timeout: 30000 }
-    );
-    const text = response.data.candidates[0].content.parts[0].text;
-    console.log('Gemini response:', text.substring(0, 300));
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    let responseText;
+    if (GROQ_API_KEY) {
+      const groqRes = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'llama-4-scout-17b-16e-instruct',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+        },
+        { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
+      );
+      responseText = groqRes.data.choices[0].message.content;
+    } else {
+      const geminiRes = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+        { contents: [{ parts: [{ text: prompt }] }] },
+        { timeout: 30000 }
+      );
+      responseText = geminiRes.data.candidates[0].content.parts[0].text;
+    }
+    console.log('AI response:', responseText.substring(0, 300));
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/) || responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('JSON形式の回答が見つかりませんでした');
-    const raw = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
+    const raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
 
     const questions = raw.map(q => {
       const questionText = q.question || q.text || q['問題'] || q['問題文'] || '';
@@ -208,7 +222,7 @@ ${manualText}
     if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。もう一度お試しください。' });
     res.json({ questions });
   } catch (err) {
-    console.error('Gemini error:', err.response?.data || err.message);
+    console.error('AI error:', err.response?.data || err.message);
     res.status(500).json({ error: 'AI生成エラー: ' + (err.response?.data?.error?.message || err.message) });
   }
 });
