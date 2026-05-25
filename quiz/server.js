@@ -113,16 +113,12 @@ function checkAuth(req, res) {
   return true;
 }
 
-// Normalize answer for flexible fill comparison
 function normalizeAns(s) {
   return String(s == null ? '' : s)
     .trim()
     .toLowerCase()
-    // katakana → hiragana (Unicode offset 0x60)
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
-    // full-width alphanumeric → half-width
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    // remove spaces and common punctuation
     .replace(/[\s　]+/g, '')
     .replace(/[、。，．・〜～ー]/g, '');
 }
@@ -212,7 +208,7 @@ app.post('/api/generate', async (req, res) => {
       const orRes = await axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
-          model: 'google/gemini-2.0-flash:free',
+          model: 'deepseek/deepseek-chat-v3-0324:free',
           messages: [
             { role: 'system', content: 'あなたはクイズ作成AIです。与えられたマニュアルテキストの内容だけを根拠に問題を作成してください。{"questions":[...]}形式のJSONのみ返してください。' },
             { role: 'user', content: prompt },
@@ -278,7 +274,6 @@ app.post('/api/generate', async (req, res) => {
       if (!Array.isArray(options)) {
         options = (options && typeof options === 'object') ? Object.values(options) : [];
       }
-      // Fix sort options that may have been comma-joined into single strings
       const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
       if (type === 'sort' && options.length > 0) {
         const expanded = [];
@@ -300,7 +295,6 @@ app.post('/api/generate', async (req, res) => {
         q.correct != null ? q.correct :
         q['答え'] != null ? q['答え'] :
         q['正解'] != null ? q['正解'] : '';
-      // For sort type, answer should match options
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
     }).filter(q => q.question && String(q.question).trim().length > 0);
