@@ -26,6 +26,20 @@ router.get('/low-stock', authMiddleware, async (req, res) => {
   res.json(rows);
 });
 
+// 使用期限間近商品
+router.get('/expiring', authMiddleware, async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT DISTINCT p.id, p.name, p.maker, p.photo_path, pl.expiry_date
+    FROM products p
+    JOIN product_lots pl ON pl.product_id = p.id
+    WHERE pl.quantity > 0
+      AND pl.expiry_date IS NOT NULL
+      AND pl.expiry_date <= to_char(CURRENT_DATE + INTERVAL '30 days', 'YYYY-MM')
+    ORDER BY pl.expiry_date ASC
+  `);
+  res.json(rows);
+});
+
 // 商品詳細
 router.get('/:id', authMiddleware, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
@@ -121,15 +135,15 @@ router.post('/scan', authMiddleware, async (req, res) => {
 
 // 商品登録
 router.post('/', authMiddleware, upload.single('photo'), async (req, res) => {
-  const { name, maker, item_code, stock, alert_threshold, photo_path, category, expiry_date } = req.body;
+  const { name, maker, item_code, stock, alert_threshold, photo_path, category, expiry_date, supplier_url } = req.body;
   if (!name) return res.status(400).json({ error: '商品名は必須です' });
 
   const photoPath = req.file ? `/uploads/${req.file.filename}` : (photo_path || null);
   const stockQty = parseInt(stock) || 0;
 
   const result = await pool.query(
-    'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path, category) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-    [name, maker || null, item_code || null, stockQty, parseInt(alert_threshold) || 5, photoPath, category || null]
+    'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path, category, supplier_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+    [name, maker || null, item_code || null, stockQty, parseInt(alert_threshold) || 5, photoPath, category || null, supplier_url || null]
   );
 
   const productId = result.rows[0].id;
@@ -145,7 +159,7 @@ router.post('/', authMiddleware, upload.single('photo'), async (req, res) => {
 
 // 商品更新
 router.put('/:id', authMiddleware, upload.single('photo'), async (req, res) => {
-  const { name, maker, item_code, alert_threshold, category } = req.body;
+  const { name, maker, item_code, alert_threshold, category, supplier_url } = req.body;
   const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
   const product = rows[0];
   if (!product) return res.status(404).json({ error: '商品が見つかりません' });
@@ -153,8 +167,8 @@ router.put('/:id', authMiddleware, upload.single('photo'), async (req, res) => {
   const photoPath = req.file ? `/uploads/${req.file.filename}` : product.photo_path;
 
   await pool.query(
-    'UPDATE products SET name=$1, maker=$2, item_code=$3, alert_threshold=$4, photo_path=$5, category=$6 WHERE id=$7',
-    [name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, category !== undefined ? category : product.category, req.params.id]
+    'UPDATE products SET name=$1, maker=$2, item_code=$3, alert_threshold=$4, photo_path=$5, category=$6, supplier_url=$7 WHERE id=$8',
+    [name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, category !== undefined ? category : product.category, supplier_url !== undefined ? supplier_url : product.supplier_url, req.params.id]
   );
 
   res.json({ message: '商品を更新しました' });

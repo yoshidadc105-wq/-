@@ -64,6 +64,10 @@ async function initDb() {
     );
   `);
 
+  try {
+    await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_url TEXT');
+  } catch (e) {}
+
   // Create default admin user if not exists
   const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);
   if (rows.length === 0) {
