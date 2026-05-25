@@ -8,7 +8,7 @@ export default function AddProductPage() {
   const [photoPath, setPhotoPath] = useState('');
   const [scanning, setScanning] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '' });
+  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '', supplier_url: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -161,12 +161,14 @@ export default function AddProductPage() {
         <Field label="メーカー" value={form.maker} onChange={v => setForm(p => ({ ...p, maker: v }))} placeholder="例: GC" />
         <Field label="品番" value={form.item_code} onChange={v => setForm(p => ({ ...p, item_code: v }))} placeholder="例: ABC-1234" />
         <Field label="カテゴリ" value={form.category} onChange={v => setForm(p => ({ ...p, category: v }))} placeholder="例: グローブ・衛生用品" />
+        <Field label="発注先URL（任意）" value={form.supplier_url} onChange={v => setForm(p => ({ ...p, supplier_url: v }))} placeholder="例: https://www.feed.jp/..." />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="現在の在庫数" value={form.stock} onChange={v => setForm(p => ({ ...p, stock: v }))} type="number" min="0" />
           <Field label="アラート閾値" value={form.alert_threshold} onChange={v => setForm(p => ({ ...p, alert_threshold: v }))} type="number" min="0" />
         </div>
         <Field label="使用期限（任意・YYYY-MM形式）" value={form.expiry_date} onChange={v => setForm(p => ({ ...p, expiry_date: v }))} placeholder="例: 2025-12" />
+        <Field label="発注先URL（任意）" value={form.supplier_url} onChange={v => setForm(p => ({ ...p, supplier_url: v }))} placeholder="例: https://www.feed.jp/..." />
 
         {error && (
           <div style={{ background: '#fee2e2', color: '#dc2626', padding: 12, borderRadius: 8, fontSize: 14 }}>
