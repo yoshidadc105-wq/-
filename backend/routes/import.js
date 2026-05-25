@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../database');
+const { pool } = require('../database');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -24,22 +24,24 @@ router.post('/preview', authMiddleware, (req, res) => {
 });
 
 // 取込実行
-router.post('/execute', authMiddleware, (req, res) => {
+router.post('/execute', authMiddleware, async (req, res) => {
   const products = req.body;
   if (!Array.isArray(products)) return res.status(400).json({ error: '配列で送信してください' });
 
   let count = 0;
   for (const p of products) {
     if (!p.name) continue;
-    const result = db.prepare(
-      'INSERT INTO products (name, maker, item_code, category, stock, alert_threshold) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(p.name, p.maker || null, p.item_code || null, p.category || null, parseInt(p.stock) || 0, parseInt(p.alert_threshold) || 5);
+    const result = await pool.query(
+      'INSERT INTO products (name, maker, item_code, category, stock, alert_threshold) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+      [p.name, p.maker || null, p.item_code || null, p.category || null, parseInt(p.stock) || 0, parseInt(p.alert_threshold) || 5]
+    );
 
     // If expiry_date provided, add a lot
-    if (p.expiry_date && result.lastInsertRowid) {
+    const newId = result.rows[0].id;
+    if (p.expiry_date && newId) {
       const qty = parseInt(p.stock) || 0;
       if (qty > 0) {
-        db.prepare('INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES (?, ?, ?)').run(result.lastInsertRowid, p.expiry_date, qty);
+        await pool.query('INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES ($1, $2, $3)', [newId, p.expiry_date, qty]);
       }
     }
     count++;

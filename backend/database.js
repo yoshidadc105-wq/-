@@ -1,69 +1,78 @@
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-const db = new DatabaseSync(path.join(__dirname, 'inventory.db'));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+});
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    display_name TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    maker TEXT,
-    item_code TEXT,
-    stock INTEGER NOT NULL DEFAULT 0,
-    alert_threshold INTEGER DEFAULT 5,
-    photo_path TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS usage_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER NOT NULL,
-    quantity INTEGER NOT NULL,
-    user_id INTEGER,
-    note TEXT,
-    logged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS stock_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER NOT NULL,
-    quantity INTEGER NOT NULL,
-    expiry_date TEXT,
-    user_id INTEGER,
-    note TEXT,
-    logged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS product_lots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER NOT NULL,
-    expiry_date TEXT,
-    quantity INTEGER NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id)
-  );
-`);
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
-// Add category column to products if not exists
-try {
-  db.exec('ALTER TABLE products ADD COLUMN category TEXT');
-} catch (e) {
-  // Column already exists, ignore
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      maker TEXT,
+      item_code TEXT,
+      stock INTEGER DEFAULT 0,
+      alert_threshold INTEGER DEFAULT 5,
+      photo_path TEXT,
+      category TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER REFERENCES products(id),
+      quantity INTEGER NOT NULL,
+      user_id INTEGER REFERENCES users(id),
+      note TEXT,
+      logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS stock_logs (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER REFERENCES products(id),
+      quantity INTEGER NOT NULL,
+      expiry_date TEXT,
+      user_id INTEGER REFERENCES users(id),
+      note TEXT,
+      logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_lots (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER REFERENCES products(id),
+      expiry_date TEXT,
+      quantity INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Create default admin user if not exists
+  const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);
+  if (rows.length === 0) {
+    const hashed = bcrypt.hashSync('admin1234', 10);
+    await pool.query(
+      'INSERT INTO users (username, password, display_name) VALUES ($1, $2, $3)',
+      ['admin', hashed, '管理者']
+    );
+  }
 }
 
-const existing = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
-if (!existing) {
-  const hashed = bcrypt.hashSync('admin1234', 10);
-  db.prepare('INSERT INTO users (username, password, display_name) VALUES (?, ?, ?)').run('admin', hashed, '管理者');
-}
-
-module.exports = db;
+module.exports = { pool, initDb };
