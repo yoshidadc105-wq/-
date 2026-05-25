@@ -170,10 +170,9 @@ ${manualText}
       const groqRes = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
         {
-          model: 'llama-4-scout-17b-16e-instruct',
+          model: 'llama-3.3-70b-versatile',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
-          response_format: { type: 'json_object' },
         },
         { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
       );
