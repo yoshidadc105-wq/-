@@ -198,6 +198,7 @@ app.post('/api/generate', async (req, res) => {
   if (!cleanedText) return res.status(400).json({ error: 'マニュアルテキストに有効な内容がありません' });
 
   const keyTerms = extractKeyTerms(cleanedText);
+  console.log('Manual text length:', cleanedText.length, '| Key terms:', keyTerms);
 
   const prompt = `以下のマニュアルテキストの内容だけを根拠にして、クイズを${count}問作成してください。マニュアルに書かれていない情報は使わないでください。\n\nマニュアルテキスト:\n${cleanedText}\n\n重要キーワード（問題文か選択肢に必ず含めること）: ${keyTerms}\n\n問題タイプを混ぜて作成してください:\n- truefalse: ○×問題。answerは"true"または"false"\n- choice: 4択問題。optionsは4つの選択肢配列、answerは正解テキスト\n- fill: 穴埋め問題。問題文に___を使う、answerは答えの配列\n- sort: 手順並び替え。questionは「〇〇の手順を正しい順番に並べてください」形式、optionsは3〜5ステップの配列、answerはoptionsと同じ順の配列\n\n{"questions": [{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]}`;
 
@@ -208,7 +209,7 @@ app.post('/api/generate', async (req, res) => {
       const orRes = await axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
-          model: 'deepseek/deepseek-chat-v3-0324:free',
+          model: 'openai/gpt-4o-mini',
           messages: [
             { role: 'system', content: 'あなたはクイズ作成AIです。与えられたマニュアルテキストの内容だけを根拠に問題を作成してください。{"questions":[...]}形式のJSONのみ返してください。' },
             { role: 'user', content: prompt },
@@ -226,7 +227,7 @@ app.post('/api/generate', async (req, res) => {
         }
       );
       const rawContent = orRes.data.choices[0].message.content;
-      console.log('OpenRouter raw response:', rawContent.substring(0, 500));
+      console.log('OpenRouter(gpt-4o-mini) raw response:', rawContent.substring(0, 500));
       const parsed = JSON.parse(rawContent);
       raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
     } else if (GEMINI_API_KEY) {
