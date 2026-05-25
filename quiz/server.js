@@ -168,12 +168,12 @@ ${manualText}
 
   try {
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       { contents: [{ parts: [{ text: prompt }] }] },
       { timeout: 30000 }
     );
     const text = response.data.candidates[0].content.parts[0].text;
-    console.log('Gemini 1.5 flash response:', text.substring(0, 300));
+    console.log('Gemini response:', text.substring(0, 300));
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('JSON形式の回答が見つかりませんでした');
     const raw = JSON.parse(jsonMatch[0]);
