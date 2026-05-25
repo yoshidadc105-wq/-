@@ -7,9 +7,7 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'admin';
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const MANUAL_API_URL = process.env.MANUAL_API_URL || '';
 const MANUAL_API_KEY = process.env.MANUAL_API_KEY || '';
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -123,25 +121,6 @@ function normalizeAns(s) {
     .replace(/[、。，．・〜～ー]/g, '');
 }
 
-function extractJsonArray(text) {
-  const start = text.indexOf('[');
-  if (start === -1) return null;
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < text.length; i++) {
-    const c = text[i];
-    if (escape) { escape = false; continue; }
-    if (c === '\\' && inString) { escape = true; continue; }
-    if (c === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (c === '[' || c === '{') depth++;
-    else if (c === ']' || c === '}') {
-      depth--;
-      if (depth === 0) return text.substring(start, i + 1);
-    }
-  }
-  return null;
-}
-
 // ========== Routes ==========
 app.get('/api/sets', async (req, res) => {
   if (!checkAuth(req, res)) return;
@@ -162,120 +141,51 @@ app.get('/api/sets/public', async (req, res) => {
   res.json(sets);
 });
 
-function extractKeyTerms(text) {
-  const terms = new Set();
-  (text.match(/[ァ-ヶー]{2,}/g) || []).forEach(t => terms.add(t));
-  (text.match(/[一-鿿][一-鿿぀-ゟ]{1,}/g) || []).forEach(t => terms.add(t));
-  return [...terms].slice(0, 25).join('、');
-}
-
-function cleanManualText(text) {
-  return text
-    .split('\n')
-    .filter(line => {
-      const t = line.trim();
-      if (!t) return false;
-      if (/^https?:\/\//i.test(t)) return false;
-      if (/^View online/i.test(t)) return false;
-      if (/^Update\s*[:：]/i.test(t)) return false;
-      if (/^Exported\s*[:：]/i.test(t)) return false;
-      if (/^Created\s*[:：]/i.test(t)) return false;
-      if (/^Author\s*[:：]/i.test(t)) return false;
-      if (/^\d{4}\.\d{2}\.\d{2}/.test(t)) return false;
-      return true;
-    })
-    .join('\n')
-    .trim();
-}
-
 app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { manualText, count = 5 } = req.body;
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
-  if (!OPENROUTER_API_KEY && !GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: 'API_KEYが設定されていません（OPENROUTER_API_KEYを設定してください）' });
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEYが設定されていません' });
 
-  const cleanedText = cleanManualText(manualText);
-  if (!cleanedText) return res.status(400).json({ error: 'マニュアルテキストに有効な内容がありません' });
+  const prompt = `以下のマニュアルテキストから、スタッフ向け理解度確認クイズを${count}問作成してください。
 
-  const keyTerms = extractKeyTerms(cleanedText);
-  console.log('Manual text length:', cleanedText.length, '| Key terms:', keyTerms);
+【問題の種類】4種類からランダムに選んでください：
+1. truefalse（マルバツ）: 文章が正しいか間違いかを問う
+2. choice（選択式）: 4択問題
+3. fill（穴埋め）: 文章の___に入る言葉を問う（___は1～2個）
+4. sort（並び替え）: 手順を正しい順番に並べる（手順が明確な場合のみ）
 
-  const prompt = `以下のマニュアルテキストの内容だけを根拠にして、クイズを${count}問作成してください。マニュアルに書かれていない情報は使わないでください。\n\nマニュアルテキスト:\n${cleanedText}\n\n重要キーワード（問題文か選択肢に必ず含めること）: ${keyTerms}\n\n問題タイプを混ぜて作成してください:\n- truefalse: ○×問題。answerは"true"または"false"\n- choice: 4択問題。optionsは4つの選択肢配列、answerは正解テキスト\n- fill: 穴埋め問題。問題文に___を使う、answerは答えの配列\n- sort: 手順並び替え。questionは「〇〇の手順を正しい順番に並べてください」形式、optionsは3〜5ステップの配列、answerはoptionsと同じ順の配列\n\n{"questions": [{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]}`;
+【マニュアルテキスト】
+${manualText}
+
+【出力形式】JSON配列のみ（説明文なし）:
+[
+  {"type":"truefalse","question":"問題文","options":[],"answer":"true","explanation":"解説"},
+  {"type":"choice","question":"問題文","options":["A","B","C","D"],"answer":"A","explanation":"解説"},
+  {"type":"fill","question":"___は___する。","options":[],"answer":["答1","答2"],"explanation":"解説"},
+  {"type":"sort","question":"次の手順を正しい順番に","options":["手順、1","手順、2","手順、3"],"answer":["手順、1","手順、2","手順、3"],"explanation":"解説"}
+]`;
 
   try {
-    let raw = [];
-
-    if (OPENROUTER_API_KEY) {
-      const orRes = await axios.post(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-          model: 'openai/gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'あなたはクイズ作成AIです。与えられたマニュアルテキストの内容だけを根拠に問題を作成してください。{"questions":[...]}形式のJSONのみ返してください。' },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.3,
-          response_format: { type: 'json_object' },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://nobinobi-quiz.onrender.com',
-            'X-Title': 'Nobinobi Quiz',
-          },
-          timeout: 60000,
-        }
-      );
-      const rawContent = orRes.data.choices[0].message.content;
-      console.log('OpenRouter(gpt-4o-mini) raw response:', rawContent.substring(0, 500));
-      const parsed = JSON.parse(rawContent);
-      raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
-    } else if (GEMINI_API_KEY) {
-      const gRes = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
-        },
-        { timeout: 60000 }
-      );
-      const rawContent = gRes.data.candidates[0].content.parts[0].text;
-      console.log('Gemini raw response:', rawContent.substring(0, 500));
-      const parsed = JSON.parse(rawContent);
-      raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
-    } else {
-      const gqRes = await axios.post(
-        'https://api.groq.com/openai/v1/chat/completions',
-        {
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: 'あなたはクイズ作成AIです。マニュアルテキストの内容だけを根拠に問題を作成してください。{"questions":[...]}形式のJSONのみ返してください。' },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.3,
-        },
-        { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
-      );
-      const rawContent = gqRes.data.choices[0].message.content;
-      console.log('Groq raw response:', rawContent.substring(0, 500));
-      const jsonStr = extractJsonArray(rawContent);
-      if (!jsonStr) throw new Error('JSON配列が見つかりませんでした');
-      const parsed = JSON.parse(jsonStr);
-      raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
-    }
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      { contents: [{ parts: [{ text: prompt }] }] },
+      { timeout: 30000 }
+    );
+    const text = response.data.candidates[0].content.parts[0].text;
+    console.log('Gemini 1.5 flash response:', text.substring(0, 300));
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('JSON形式の回答が見つかりませんでした');
+    const raw = JSON.parse(jsonMatch[0]);
 
     const questions = raw.map(q => {
-      const questionText =
-        q.question || q.text || q.content || q.question_text ||
-        q['問題'] || q['問題文'] || q['質問'] || '';
-      const explanation =
-        q.explanation || q.reason || q.description ||
-        q['解説'] || q['説明'] || '';
-      let options = q.options || q.choices || q.selections || q['選択肢'] || [];
+      const questionText = q.question || q.text || q['問題'] || q['問題文'] || '';
+      const explanation = q.explanation || q['解説'] || q['説明'] || '';
+      let options = q.options || q.choices || q['選択肢'] || [];
       if (!Array.isArray(options)) {
         options = (options && typeof options === 'object') ? Object.values(options) : [];
       }
-      const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
+      const type = q.type || 'truefalse';
       if (type === 'sort' && options.length > 0) {
         const expanded = [];
         options.forEach(o => {
@@ -290,12 +200,7 @@ app.post('/api/generate', async (req, res) => {
         });
         options = expanded;
       }
-      const answer =
-        q.answer != null ? q.answer :
-        q.correct_answer != null ? q.correct_answer :
-        q.correct != null ? q.correct :
-        q['答え'] != null ? q['答え'] :
-        q['正解'] != null ? q['正解'] : '';
+      const answer = q.answer != null ? q.answer : q.correct_answer != null ? q.correct_answer : q['答え'] != null ? q['答え'] : q['正解'] != null ? q['正解'] : '';
       const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
       return { type, question: questionText, options, answer: finalAnswer, explanation };
     }).filter(q => q.question && String(q.question).trim().length > 0);
@@ -303,7 +208,7 @@ app.post('/api/generate', async (req, res) => {
     if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。もう一度お試しください。' });
     res.json({ questions });
   } catch (err) {
-    console.error('AI generate error:', err.response?.data || err.message);
+    console.error('Gemini error:', err.response?.data || err.message);
     res.status(500).json({ error: 'AI生成エラー: ' + (err.response?.data?.error?.message || err.message) });
   }
 });
