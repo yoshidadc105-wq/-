@@ -206,12 +206,18 @@ export default function ProductDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
                   onClick={() => setLotQty(q => Math.max(1, q - 1))}
-                  style={{ width: 34, height: 34, borderRadius: 6, background: '#e2e8f0', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 34, height: 34, borderRadius: 6, background: '#e2e8f0', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                 >−</button>
-                <span style={{ fontSize: 20, fontWeight: 700, minWidth: 36, textAlign: 'center' }}>{lotQty}</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={lotQty}
+                  onChange={e => setLotQty(Math.max(1, parseInt(e.target.value) || 1))}
+                  style={{ width: 64, textAlign: 'center', fontSize: 18, fontWeight: 700, padding: '6px 4px', border: '1px solid #e2e8f0', borderRadius: 6 }}
+                />
                 <button
                   onClick={() => setLotQty(q => q + 1)}
-                  style={{ width: 34, height: 34, borderRadius: 6, background: '#2563eb', color: 'white', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 34, height: 34, borderRadius: 6, background: '#2563eb', color: 'white', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                 >＋</button>
               </div>
             </div>

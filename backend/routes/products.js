@@ -72,10 +72,12 @@ router.post('/:id/lots', authMiddleware, async (req, res) => {
   const { expiry_date, quantity, package_label } = req.body;
   if (!quantity || quantity <= 0) return res.status(400).json({ error: '数量を正しく入力してください' });
 
+  const qty = parseInt(quantity);
   const result = await pool.query(
     'INSERT INTO product_lots (product_id, expiry_date, quantity, package_label) VALUES ($1, $2, $3, $4) RETURNING id',
-    [req.params.id, expiry_date || null, parseInt(quantity), package_label || null]
+    [req.params.id, expiry_date || null, qty, package_label || null]
   );
+  await pool.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [qty, req.params.id]);
 
   res.json({ id: result.rows[0].id, message: 'ロットを追加しました' });
 });

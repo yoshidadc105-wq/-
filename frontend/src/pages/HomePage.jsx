@@ -211,17 +211,23 @@ export default function HomePage() {
             )}
 
             {/* Quantity */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 20 }}>
               <button onClick={() => setQuantity(q => Math.max(1, q - 1))} style={{
                 width: 52, height: 52, borderRadius: '50%', background: '#e2e8f0',
-                fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>−</button>
-              <span style={{ fontSize: 44, fontWeight: 700, minWidth: 72, textAlign: 'center' }}>{quantity}</span>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                style={{ width: 88, textAlign: 'center', fontSize: 38, fontWeight: 700, padding: '4px', border: '1px solid #e2e8f0', borderRadius: 10 }}
+              />
               <button onClick={() => setQuantity(q => q + 1)} style={{
                 width: 52, height: 52, borderRadius: '50%',
                 background: sheet.mode === 'use' ? '#dc2626' : '#16a34a',
                 color: 'white', fontSize: 28, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>＋</button>
             </div>
 
