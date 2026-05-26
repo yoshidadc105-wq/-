@@ -8,7 +8,7 @@ export default function AddProductPage() {
   const [photoPath, setPhotoPath] = useState('');
   const [scanning, setScanning] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '', supplier_url: '', unit: '' });
+  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '', supplier_url: '', unit: '', package_label: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -181,26 +181,33 @@ export default function AddProductPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="現在の在庫数" value={form.stock} onChange={v => setForm(p => ({ ...p, stock: v }))} type="number" min="0" />
+          <div>
+            <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>単位（在庫の数え方）</label>
+            <select
+              value={form.unit}
+              onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white' }}
+            >
+              <option value="">個</option>
+              <option value="箱">箱</option>
+              <option value="袋">袋</option>
+              <option value="本">本</option>
+              <option value="枚">枚</option>
+              <option value="セット">セット</option>
+              <option value="巻">巻</option>
+            </select>
+          </div>
           <Field label="アラート閾値" value={form.alert_threshold} onChange={v => setForm(p => ({ ...p, alert_threshold: v }))} type="number" min="0" />
         </div>
-        <div>
-          <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>単位（在庫の数え方）</label>
-          <select
-            value={form.unit}
-            onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white' }}
-          >
-            <option value="">個（デフォルト）</option>
-            <option value="箱">箱</option>
-            <option value="袋">袋</option>
-            <option value="本">本</option>
-            <option value="枚">枚</option>
-            <option value="セット">セット</option>
-            <option value="巻">巻</option>
-          </select>
+
+        <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>初期在庫のロット情報</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="在庫数" value={form.stock} onChange={v => setForm(p => ({ ...p, stock: v }))} type="number" min="0" />
+            <Field label="パッケージ" value={form.package_label} onChange={v => setForm(p => ({ ...p, package_label: v }))} placeholder="例: 100枚入り" />
+          </div>
+          <Field label="使用期限（任意・YYYY-MM）" value={form.expiry_date} onChange={v => setForm(p => ({ ...p, expiry_date: v }))} placeholder="例: 2025-12" />
         </div>
-        <Field label="使用期限（任意・YYYY-MM形式）" value={form.expiry_date} onChange={v => setForm(p => ({ ...p, expiry_date: v }))} placeholder="例: 2025-12" />
 
         {error && (
           <div style={{ background: '#fee2e2', color: '#dc2626', padding: 12, borderRadius: 8, fontSize: 14 }}>
