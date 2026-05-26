@@ -26,9 +26,9 @@ router.get('/history', authMiddleware, async (req, res) => {
   res.json(combined);
 });
 
-// 使用記録（在庫を減らす）- FIFO lot deduction
+// 使用記録（在庫を減らす）
 router.post('/use', authMiddleware, async (req, res) => {
-  const { product_id, quantity, note } = req.body;
+  const { product_id, quantity, note, lot_id } = req.body;
   if (!product_id || !quantity || quantity <= 0) {
     return res.status(400).json({ error: '商品と数量を正しく入力してください' });
   }
@@ -37,21 +37,30 @@ router.post('/use', authMiddleware, async (req, res) => {
   const product = productRows[0];
   if (!product) return res.status(404).json({ error: '商品が見つかりません' });
   if (product.stock < quantity) {
-    return res.status(400).json({ error: `在庫が不足しています（現在: ${product.stock}個）` });
+    return res.status(400).json({ error: `在庫が不足しています（現在: ${product.stock}${product.unit || '個'}）` });
   }
 
-  // FIFO: deduct from lots with earliest expiry_date first
-  const { rows: lots } = await pool.query('SELECT * FROM product_lots WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC', [product_id]);
-  let remaining = parseInt(quantity);
-  for (const lot of lots) {
-    if (remaining <= 0) break;
-    const deduct = Math.min(lot.quantity, remaining);
-    await pool.query('UPDATE product_lots SET quantity = quantity - $1 WHERE id = $2', [deduct, lot.id]);
-    remaining -= deduct;
+  if (lot_id) {
+    // 指定ロットから減らす
+    const { rows: lotRows } = await pool.query('SELECT * FROM product_lots WHERE id = $1', [lot_id]);
+    const lot = lotRows[0];
+    if (!lot) return res.status(404).json({ error: 'ロットが見つかりません' });
+    if (lot.quantity < quantity) {
+      return res.status(400).json({ error: `このロットの在庫が不足しています（残: ${lot.quantity}${product.unit || '個'}）` });
+    }
+    await pool.query('UPDATE product_lots SET quantity = quantity - $1 WHERE id = $2', [quantity, lot_id]);
+  } else {
+    // FIFO: 期限が早い順に減らす
+    const { rows: lots } = await pool.query('SELECT * FROM product_lots WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC NULLS LAST', [product_id]);
+    let remaining = parseInt(quantity);
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const deduct = Math.min(lot.quantity, remaining);
+      await pool.query('UPDATE product_lots SET quantity = quantity - $1 WHERE id = $2', [deduct, lot.id]);
+      remaining -= deduct;
+    }
   }
-  // Delete empty lots
   await pool.query('DELETE FROM product_lots WHERE product_id = $1 AND quantity <= 0', [product_id]);
-
   await pool.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [quantity, product_id]);
   await pool.query('INSERT INTO usage_logs (product_id, quantity, user_id, note) VALUES ($1, $2, $3, $4)', [product_id, quantity, req.user.id, note || null]);
 
