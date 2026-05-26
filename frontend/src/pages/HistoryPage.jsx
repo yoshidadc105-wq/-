@@ -5,20 +5,31 @@ import { api } from '../api';
 export default function HistoryPage() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all' | 'use' | 'receive'
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     api.getAllHistory().then(setHistory).finally(() => setLoading(false));
   }, []);
 
-  const filtered = history.filter(h => filter === 'all' || h.type === filter);
+  const filtered = history.filter(h =>
+    (filter === 'all' || h.type === filter) &&
+    (!search || (h.product_name || '').includes(search))
+  );
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><div className="spinner" /></div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h2 style={{ fontWeight: 700, fontSize: 20 }}>履歴</h2>
+
+      <input
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="🔍  商品名で検索"
+        style={{ background: 'white' }}
+      />
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 8 }}>
