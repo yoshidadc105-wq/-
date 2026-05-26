@@ -18,6 +18,7 @@ const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
 router.get('/', authMiddleware, async (req, res) => {
   const { rows } = await pool.query(`
     SELECT p.*,
+      COALESCE(SUM(pl.quantity) FILTER (WHERE pl.quantity > 0), 0) AS stock,
       COALESCE(
         json_agg(
           json_build_object('id', pl.id, 'package_label', pl.package_label, 'expiry_date', pl.expiry_date, 'quantity', pl.quantity)
@@ -35,7 +36,14 @@ router.get('/', authMiddleware, async (req, res) => {
 
 // 在庫不足商品
 router.get('/low-stock', authMiddleware, async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM products WHERE stock <= alert_threshold ORDER BY stock ASC');
+  const { rows } = await pool.query(`
+    SELECT p.*, COALESCE(SUM(pl.quantity) FILTER (WHERE pl.quantity > 0), 0) AS stock
+    FROM products p
+    LEFT JOIN product_lots pl ON pl.product_id = p.id
+    GROUP BY p.id
+    HAVING COALESCE(SUM(pl.quantity) FILTER (WHERE pl.quantity > 0), 0) <= p.alert_threshold
+    ORDER BY stock ASC
+  `);
   res.json(rows);
 });
 
@@ -55,7 +63,13 @@ router.get('/expiring', authMiddleware, async (req, res) => {
 
 // 商品詳細
 router.get('/:id', authMiddleware, async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
+  const { rows } = await pool.query(`
+    SELECT p.*, COALESCE(SUM(pl.quantity) FILTER (WHERE pl.quantity > 0), 0) AS stock
+    FROM products p
+    LEFT JOIN product_lots pl ON pl.product_id = p.id
+    WHERE p.id = $1
+    GROUP BY p.id
+  `, [req.params.id]);
   const product = rows[0];
   if (!product) return res.status(404).json({ error: '商品が見つかりません' });
   res.json(product);
