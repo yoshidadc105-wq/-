@@ -14,6 +14,7 @@ export default function ProductDetailPage() {
   // Lot form state
   const [lotExpiry, setLotExpiry] = useState('');
   const [lotQty, setLotQty] = useState(1);
+  const [lotPackageLabel, setLotPackageLabel] = useState('');
   const [addingLot, setAddingLot] = useState(false);
   const [lotError, setLotError] = useState('');
 
@@ -41,12 +42,13 @@ export default function ProductDetailPage() {
     setLotError('');
     setAddingLot(true);
     try {
-      await api.addLot(id, { expiry_date: lotExpiry || null, quantity: lotQty });
+      await api.addLot(id, { expiry_date: lotExpiry || null, quantity: lotQty, package_label: lotPackageLabel || null });
       const [updatedLots, updatedProduct] = await Promise.all([api.getLots(id), api.getProduct(id)]);
       setLots(updatedLots);
       setProduct(updatedProduct);
       setLotExpiry('');
       setLotQty(1);
+      setLotPackageLabel('');
     } catch (e) {
       setLotError(e.message);
     } finally {
@@ -118,7 +120,7 @@ export default function ProductDetailPage() {
         <div style={{ marginTop: 16, padding: '14px 0', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: '#64748b' }}>現在の在庫</span>
           <span style={{ fontSize: 28, fontWeight: 700, color: product.stock === 0 ? '#dc2626' : isLow ? '#f59e0b' : '#16a34a' }}>
-            {product.stock}個
+            {product.stock}{product.unit || '個'}
           </span>
         </div>
 
@@ -136,6 +138,7 @@ export default function ProductDetailPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginBottom: 16 }}>
             <thead>
               <tr style={{ background: '#f8fafc' }}>
+                <th style={{ textAlign: 'left', padding: '8px 6px', color: '#64748b', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #e2e8f0' }}>パッケージ</th>
                 <th style={{ textAlign: 'left', padding: '8px 6px', color: '#64748b', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #e2e8f0' }}>使用期限</th>
                 <th style={{ textAlign: 'right', padding: '8px 6px', color: '#64748b', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #e2e8f0' }}>数量</th>
                 <th style={{ textAlign: 'center', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}></th>
@@ -144,6 +147,9 @@ export default function ProductDetailPage() {
             <tbody>
               {lots.map(lot => (
                 <tr key={lot.id}>
+                  <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9' }}>
+                    {lot.package_label || <span style={{ color: '#94a3b8' }}>未設定</span>}
+                  </td>
                   <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9' }}>
                     {lot.expiry_date || <span style={{ color: '#94a3b8' }}>未設定</span>}
                   </td>
@@ -175,6 +181,16 @@ export default function ProductDetailPage() {
         <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, color: '#475569' }}>新しいロットを追加</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>パッケージ</label>
+              <input
+                type="text"
+                value={lotPackageLabel}
+                onChange={e => setLotPackageLabel(e.target.value)}
+                placeholder="例: 100枚入り"
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+              />
+            </div>
             <div style={{ flex: 1, minWidth: 120 }}>
               <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>使用期限 (YYYY-MM)</label>
               <input

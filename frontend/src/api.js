@@ -45,7 +45,7 @@ export const api = {
   deleteProduct: (id) => request('DELETE', `/products/${id}`),
 
   useProduct: (product_id, quantity, note) => request('POST', '/inventory/use', { product_id, quantity, note }),
-  receiveProduct: (product_id, quantity, note, expiry_date) => request('POST', '/inventory/receive', { product_id, quantity, note, expiry_date }),
+  receiveProduct: (product_id, quantity, note, expiry_date, package_label) => request('POST', '/inventory/receive', { product_id, quantity, note, expiry_date, package_label }),
   getUsageLogs: (product_id) => request('GET', `/inventory/usage/${product_id}`),
 
   getLots: (productId) => request('GET', `/products/${productId}/lots`),

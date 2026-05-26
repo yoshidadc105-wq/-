@@ -61,7 +61,7 @@ router.post('/use', authMiddleware, async (req, res) => {
 
 // 入荷記録（在庫を増やす）
 router.post('/receive', authMiddleware, async (req, res) => {
-  const { product_id, quantity, note, expiry_date } = req.body;
+  const { product_id, quantity, note, expiry_date, package_label } = req.body;
   if (!product_id || !quantity || quantity <= 0) {
     return res.status(400).json({ error: '商品と数量を正しく入力してください' });
   }
@@ -69,15 +69,16 @@ router.post('/receive', authMiddleware, async (req, res) => {
   await pool.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [quantity, product_id]);
   await pool.query('INSERT INTO stock_logs (product_id, quantity, expiry_date, user_id, note) VALUES ($1, $2, $3, $4, $5)', [product_id, quantity, expiry_date || null, req.user.id, note || null]);
 
-  if (expiry_date) {
-    // Add or update lot
-    const { rows: existingLots } = await pool.query('SELECT * FROM product_lots WHERE product_id = $1 AND expiry_date = $2', [product_id, expiry_date]);
-    const existingLot = existingLots[0];
-    if (existingLot) {
-      await pool.query('UPDATE product_lots SET quantity = quantity + $1 WHERE id = $2', [quantity, existingLot.id]);
-    } else {
-      await pool.query('INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES ($1, $2, $3)', [product_id, expiry_date, quantity]);
-    }
+  // Add or update lot (match on both expiry_date and package_label)
+  const { rows } = await pool.query(
+    'SELECT * FROM product_lots WHERE product_id = $1 AND expiry_date IS NOT DISTINCT FROM $2 AND package_label IS NOT DISTINCT FROM $3',
+    [product_id, expiry_date || null, package_label || null]
+  );
+  const existingLot = rows[0];
+  if (existingLot) {
+    await pool.query('UPDATE product_lots SET quantity = quantity + $1 WHERE id = $2', [quantity, existingLot.id]);
+  } else {
+    await pool.query('INSERT INTO product_lots (product_id, expiry_date, quantity, package_label) VALUES ($1, $2, $3, $4)', [product_id, expiry_date || null, quantity, package_label || null]);
   }
 
   const { rows: updatedRows } = await pool.query('SELECT stock FROM products WHERE id = $1', [product_id]);

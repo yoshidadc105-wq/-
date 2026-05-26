@@ -12,6 +12,7 @@ export default function HomePage() {
   const [sheet, setSheet] = useState(null); // { product, mode: 'use'|'receive' }
   const [quantity, setQuantity] = useState(1);
   const [expiryDate, setExpiryDate] = useState('');
+  const [packageLabel, setPackageLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [flashMessage, setFlashMessage] = useState('');
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export default function HomePage() {
     setSheet({ product, mode });
     setQuantity(1);
     setExpiryDate('');
+    setPackageLabel('');
   };
 
   const closeSheet = () => setSheet(null);
@@ -48,7 +50,7 @@ export default function HomePage() {
         await api.useProduct(sheet.product.id, quantity, null);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 使用しました`);
       } else {
-        await api.receiveProduct(sheet.product.id, quantity, null, expiryDate || undefined);
+        await api.receiveProduct(sheet.product.id, quantity, null, expiryDate || undefined, packageLabel || undefined);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 入荷しました`);
       }
       closeSheet();
@@ -167,7 +169,7 @@ export default function HomePage() {
             </div>
 
             <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12, textAlign: 'center' }}>
-              現在の在庫: <strong style={{ color: '#1e293b' }}>{sheet.product.stock}個</strong>
+              現在の在庫: <strong style={{ color: '#1e293b' }}>{sheet.product.stock}{sheet.product.unit || '個'}</strong>
             </div>
 
             {/* Quantity */}
@@ -185,15 +187,24 @@ export default function HomePage() {
               }}>＋</button>
             </div>
 
-            {/* Expiry date for receive */}
+            {/* Package label and expiry date for receive */}
             {sheet.mode === 'receive' && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>使用期限（任意・YYYY-MM）</label>
-                <input type="text" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
-                  placeholder="例: 2025-12"
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
-                />
-              </div>
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>パッケージ（任意・例: 100枚入り）</label>
+                  <input type="text" value={packageLabel} onChange={e => setPackageLabel(e.target.value)}
+                    placeholder="例: 100枚入り、200枚入り"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>使用期限（任意・YYYY-MM）</label>
+                  <input type="text" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
+                    placeholder="例: 2025-12"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+                  />
+                </div>
+              </>
             )}
 
             <button onClick={handleSubmit} disabled={submitting} style={{
@@ -230,8 +241,8 @@ function ProductCard({ product, onUse, onReceive, onDetail }) {
           )}
           <div style={{ marginTop: 4 }}>
             {isEmpty ? <span className="badge-danger">在庫なし</span>
-              : isLow ? <span className="badge-warning">残{product.stock}個</span>
-              : <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>在庫: {product.stock}個</span>}
+              : isLow ? <span className="badge-warning">残{product.stock}{product.unit || '個'}</span>
+              : <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>在庫: {product.stock}{product.unit || '個'}</span>}
           </div>
         </div>
       </div>

@@ -56,12 +56,12 @@ router.get('/:id/lots', authMiddleware, async (req, res) => {
 
 // ロット追加
 router.post('/:id/lots', authMiddleware, async (req, res) => {
-  const { expiry_date, quantity } = req.body;
+  const { expiry_date, quantity, package_label } = req.body;
   if (!quantity || quantity <= 0) return res.status(400).json({ error: '数量を正しく入力してください' });
 
   const result = await pool.query(
-    'INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES ($1, $2, $3) RETURNING id',
-    [req.params.id, expiry_date || null, parseInt(quantity)]
+    'INSERT INTO product_lots (product_id, expiry_date, quantity, package_label) VALUES ($1, $2, $3, $4) RETURNING id',
+    [req.params.id, expiry_date || null, parseInt(quantity), package_label || null]
   );
 
   res.json({ id: result.rows[0].id, message: 'ロットを追加しました' });
@@ -135,15 +135,15 @@ router.post('/scan', authMiddleware, async (req, res) => {
 
 // 商品登録
 router.post('/', authMiddleware, upload.single('photo'), async (req, res) => {
-  const { name, maker, item_code, stock, alert_threshold, photo_path, category, expiry_date, supplier_url } = req.body;
+  const { name, maker, item_code, stock, alert_threshold, photo_path, category, expiry_date, supplier_url, unit } = req.body;
   if (!name) return res.status(400).json({ error: '商品名は必須です' });
 
   const photoPath = req.file ? `/uploads/${req.file.filename}` : (photo_path || null);
   const stockQty = parseInt(stock) || 0;
 
   const result = await pool.query(
-    'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path, category, supplier_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-    [name, maker || null, item_code || null, stockQty, parseInt(alert_threshold) || 5, photoPath, category || null, supplier_url || null]
+    'INSERT INTO products (name, maker, item_code, stock, alert_threshold, photo_path, category, supplier_url, unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+    [name, maker || null, item_code || null, stockQty, parseInt(alert_threshold) || 5, photoPath, category || null, supplier_url || null, unit || null]
   );
 
   const productId = result.rows[0].id;
@@ -159,7 +159,7 @@ router.post('/', authMiddleware, upload.single('photo'), async (req, res) => {
 
 // 商品更新
 router.put('/:id', authMiddleware, upload.single('photo'), async (req, res) => {
-  const { name, maker, item_code, alert_threshold, category, supplier_url } = req.body;
+  const { name, maker, item_code, alert_threshold, category, supplier_url, unit } = req.body;
   const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
   const product = rows[0];
   if (!product) return res.status(404).json({ error: '商品が見つかりません' });
@@ -167,8 +167,8 @@ router.put('/:id', authMiddleware, upload.single('photo'), async (req, res) => {
   const photoPath = req.file ? `/uploads/${req.file.filename}` : product.photo_path;
 
   await pool.query(
-    'UPDATE products SET name=$1, maker=$2, item_code=$3, alert_threshold=$4, photo_path=$5, category=$6, supplier_url=$7 WHERE id=$8',
-    [name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, category !== undefined ? category : product.category, supplier_url !== undefined ? supplier_url : product.supplier_url, req.params.id]
+    'UPDATE products SET name=$1, maker=$2, item_code=$3, alert_threshold=$4, photo_path=$5, category=$6, supplier_url=$7, unit=$8 WHERE id=$9',
+    [name || product.name, maker ?? product.maker, item_code ?? product.item_code, parseInt(alert_threshold) || product.alert_threshold, photoPath, category !== undefined ? category : product.category, supplier_url !== undefined ? supplier_url : product.supplier_url, unit !== undefined ? (unit || null) : product.unit, req.params.id]
   );
 
   res.json({ message: '商品を更新しました' });
