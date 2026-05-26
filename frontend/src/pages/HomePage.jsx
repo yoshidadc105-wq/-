@@ -171,7 +171,7 @@ export default function HomePage() {
             </div>
 
             <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12, textAlign: 'center' }}>
-              現在の在庫: <strong style={{ color: '#1e293b' }}>{sheet.product.stock}{sheet.product.unit || '個'}</strong>
+              現在の在庫: <strong style={{ color: '#1e293b' }}>{sheet.product.lots && sheet.product.lots.length > 0 ? sheet.product.lots.reduce((s, l) => s + l.quantity, 0) : sheet.product.stock}{sheet.product.unit || '個'}</strong>
             </div>
 
             {/* Lot selector for use mode */}
@@ -266,8 +266,11 @@ export default function HomePage() {
 }
 
 function ProductCard({ product, onUse, onReceive, onDetail }) {
-  const isLow = product.stock <= product.alert_threshold;
-  const isEmpty = product.stock === 0;
+  const stock = product.lots && product.lots.length > 0
+    ? product.lots.reduce((s, l) => s + l.quantity, 0)
+    : product.stock;
+  const isLow = stock <= product.alert_threshold;
+  const isEmpty = stock === 0;
 
   return (
     <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -285,8 +288,8 @@ function ProductCard({ product, onUse, onReceive, onDetail }) {
           )}
           <div style={{ marginTop: 4 }}>
             {isEmpty ? <span className="badge-danger">在庫なし</span>
-              : isLow ? <span className="badge-warning">残{product.stock}{product.unit || '個'}</span>
-              : <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>在庫: {product.stock}{product.unit || '個'}</span>}
+              : isLow ? <span className="badge-warning">残{stock}{product.unit || '個'}</span>
+              : <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>在庫: {stock}{product.unit || '個'}</span>}
           </div>
           {product.lots && product.lots.length > 0 && (
             <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>

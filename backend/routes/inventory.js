@@ -33,11 +33,7 @@ router.post('/use', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: '商品と数量を正しく入力してください' });
   }
 
-  const { rows: productRows } = await pool.query(`
-    SELECT p.*, COALESCE(SUM(pl.quantity) FILTER (WHERE pl.quantity > 0), 0) AS stock
-    FROM products p LEFT JOIN product_lots pl ON pl.product_id = p.id
-    WHERE p.id = $1 GROUP BY p.id
-  `, [product_id]);
+  const { rows: productRows } = await pool.query('SELECT * FROM products WHERE id = $1', [product_id]);
   const product = productRows[0];
   if (!product) return res.status(404).json({ error: '商品が見つかりません' });
   if (product.stock < quantity) {

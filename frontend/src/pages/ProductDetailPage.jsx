@@ -71,7 +71,10 @@ export default function ProductDetailPage() {
   if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><div className="spinner" /></div>;
   if (!product) return <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>商品が見つかりません</div>;
 
-  const isLow = product.stock <= product.alert_threshold;
+  const realStock = lots.length > 0
+    ? lots.reduce((s, l) => s + l.quantity, 0)
+    : product.stock;
+  const isLow = realStock <= product.alert_threshold;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -119,8 +122,8 @@ export default function ProductDetailPage() {
 
         <div style={{ marginTop: 16, padding: '14px 0', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: '#64748b' }}>現在の在庫</span>
-          <span style={{ fontSize: 28, fontWeight: 700, color: product.stock === 0 ? '#dc2626' : isLow ? '#f59e0b' : '#16a34a' }}>
-            {product.stock}{product.unit || '個'}
+          <span style={{ fontSize: 28, fontWeight: 700, color: realStock === 0 ? '#dc2626' : isLow ? '#f59e0b' : '#16a34a' }}>
+            {realStock}{product.unit || '個'}
           </span>
         </div>
 
