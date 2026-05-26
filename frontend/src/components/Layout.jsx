@@ -5,10 +5,9 @@ const navItems = [
   { path: '/', label: '在庫', icon: '📦' },
   { path: '/history', label: '履歴', icon: '📋' },
   { path: '/add', label: '追加', icon: '➕' },
-  { path: '/settings', label: '設定', icon: '⚙️' },
 ];
 
-export default function Layout({ children, user, onLogout }) {
+export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,7 +19,6 @@ export default function Layout({ children, user, onLogout }) {
         position: 'sticky', top: 0, zIndex: 100,
       }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>🦷 歯科在庫管理</div>
-        {user?.displayName && <div style={{ fontSize: 13, opacity: 0.85 }}>{user.displayName}</div>}
       </header>
 
       <main style={{ flex: 1, padding: '16px', maxWidth: 600, width: '100%', margin: '0 auto', paddingBottom: 80 }}>
