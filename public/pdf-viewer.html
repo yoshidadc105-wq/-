@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF閲覧</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    .pdf-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: #3b6fd4;
+      color: white;
+      min-height: 52px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .back-btn:active { background: rgba(255,255,255,0.4); }
+    .pdf-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dl-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dl-btn:active { background: rgba(255,255,255,0.4); }
+    .pdf-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    iframe { flex: 1; width: 100%; border: none; }
+    .ios-fallback {
+      display: none;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      padding: 32px;
+      text-align: center;
+      color: #555;
+    }
+    .ios-fallback a {
+      background: #3b6fd4;
+      color: white;
+      padding: 12px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+<div class="pdf-header">
+  <button class="back-btn" onclick="goBack()">← 戻る</button>
+  <div class="pdf-title" id="pdfTitle">PDF</div>
+  <a class="dl-btn" id="dlBtn" href="#">⬇ 保存</a>
+</div>
+<div class="pdf-area" id="pdfArea">
+  <iframe id="pdfFrame" src="" title="PDF"></iframe>
+  <div class="ios-fallback" id="iosFallback">
+    <p>PDFが表示されない場合は下のボタンをタップしてください</p>
+    <a id="directLink" href="#">📄 PDFを開く</a>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const file = params.get('file') || '';
+const title = params.get('title') || 'PDF';
+const backId = params.get('id') || '';
+
+document.getElementById('pdfTitle').textContent = title;
+document.title = title;
+
+const fileUrl = '/uploads/' + file;
+const frame = document.getElementById('pdfFrame');
+frame.src = fileUrl;
+document.getElementById('dlBtn').href = fileUrl;
+document.getElementById('directLink').href = fileUrl;
+
+// iframeがロードできなかった場合のフォールバック
+frame.onerror = showFallback;
+setTimeout(() => {
+  if (!frame.contentDocument && frame.src) showFallback();
+}, 4000);
+
+function showFallback() {
+  document.getElementById('iosFallback').style.display = 'flex';
+  frame.style.display = 'none';
+}
+
+function goBack() {
+  if (backId) {
+    location.href = '/view.html?id=' + backId;
+  } else {
+    history.length > 1 ? history.back() : window.close();
+  }
+}
+</script>
+</body>
+</html>

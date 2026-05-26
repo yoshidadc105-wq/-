@@ -41,9 +41,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7日間
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    secure: false // HTTPSを使う場合はtrueに変更
+    secure: false
   }
 }));
 
@@ -72,7 +72,7 @@ app.get(['/', '/index.html'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get(['/view.html', '/create.html'], (req, res) => {
+app.get(['/view.html', '/create.html', '/pdf-viewer.html'], (req, res) => {
   if (!req.session.userId) return res.redirect('/login.html');
   res.sendFile(path.join(__dirname, 'public', req.path.slice(1)));
 });

@@ -123,9 +123,10 @@ async function loadManual() {
   let bodyHtml = '';
 
   if (manualData.type === 'pdf') {
+    const viewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(manualData.file_path)}&title=${encodeURIComponent(manualData.title)}&id=${manualId}`;
     bodyHtml = `
       <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-        <a href="/uploads/${manualData.file_path}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
+        <a href="${viewerUrl}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
         <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
         ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
         ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
