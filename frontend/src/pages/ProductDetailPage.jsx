@@ -90,26 +90,13 @@ export default function ProductDetailPage() {
         {product.maker && <p style={{ color: '#64748b', marginTop: 4 }}>{product.maker}</p>}
         {product.item_code && <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 2 }}>品番: {product.item_code}</p>}
         {product.supplier_url && (
-          <div style={{ marginTop: 8 }}>
-            <a
-              href={product.supplier_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                background: '#eff6ff',
-                color: '#2563eb',
-                padding: '6px 14px',
-                borderRadius: 8,
-                fontSize: 14,
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              🛒 発注先を開く
-            </a>
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {product.supplier_url.split('\n').map(url => url.trim()).filter(Boolean).map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', color: '#2563eb', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
+                🛒 発注先{product.supplier_url.split('\n').filter(u => u.trim()).length > 1 ? ` ${i + 1}` : ''}を開く
+              </a>
+            ))}
           </div>
         )}
         {product.category && (

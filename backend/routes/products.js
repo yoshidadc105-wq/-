@@ -176,6 +176,9 @@ router.put('/:id', authMiddleware, upload.single('photo'), async (req, res) => {
 
 // 商品削除
 router.delete('/:id', authMiddleware, async (req, res) => {
+  await pool.query('DELETE FROM product_lots WHERE product_id = $1', [req.params.id]);
+  await pool.query('DELETE FROM usage_logs WHERE product_id = $1', [req.params.id]);
+  await pool.query('DELETE FROM stock_logs WHERE product_id = $1', [req.params.id]);
   await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
   res.json({ message: '商品を削除しました' });
 });

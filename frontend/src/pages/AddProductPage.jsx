@@ -169,41 +169,16 @@ export default function AddProductPage() {
         <Field label="商品名 *" value={form.name} onChange={v => setForm(p => ({ ...p, name: v }))} placeholder="例: グラスアイオノマーセメント" />
         <Field label="メーカー" value={form.maker} onChange={v => setForm(p => ({ ...p, maker: v }))} placeholder="例: GC" />
         <Field label="品番" value={form.item_code} onChange={v => setForm(p => ({ ...p, item_code: v }))} placeholder="例: ABC-1234" />
-        {/* カテゴリ選択 */}
         <div>
-          <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>カテゴリ</label>
-          {!newCategory ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select
-                value={form.category}
-                onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                style={{ flex: 1, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white' }}
-              >
-                <option value="">選択してください</option>
-                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-              <button type="button" onClick={() => { setNewCategory(true); setForm(p => ({ ...p, category: '' })); }}
-                style={{ padding: '10px 12px', borderRadius: 8, background: '#f1f5f9', color: '#475569', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                ＋ 新規
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="text"
-                value={form.category}
-                onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                placeholder="新しいカテゴリ名を入力"
-                autoFocus
-              />
-              <button type="button" onClick={() => setNewCategory(false)}
-                style={{ padding: '10px 12px', borderRadius: 8, background: '#f1f5f9', color: '#475569', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                一覧
-              </button>
-            </div>
-          )}
+          <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>発注先URL（任意・複数行で複数登録可）</label>
+          <textarea
+            value={form.supplier_url}
+            onChange={e => setForm(p => ({ ...p, supplier_url: e.target.value }))}
+            placeholder={'https://www.feed.jp/...\nhttps://www.monotaro.com/...'}
+            rows={3}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }}
+          />
         </div>
-        <Field label="発注先URL（任意）" value={form.supplier_url} onChange={v => setForm(p => ({ ...p, supplier_url: v }))} placeholder="例: https://www.feed.jp/..." />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="現在の在庫数" value={form.stock} onChange={v => setForm(p => ({ ...p, stock: v }))} type="number" min="0" />
