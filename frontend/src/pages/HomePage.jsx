@@ -244,6 +244,15 @@ function ProductCard({ product, onUse, onReceive, onDetail }) {
               : isLow ? <span className="badge-warning">残{product.stock}{product.unit || '個'}</span>
               : <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>在庫: {product.stock}{product.unit || '個'}</span>}
           </div>
+          {product.lots && product.lots.length > 0 && (
+            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {product.lots.map((lot, i) => (
+                <span key={i} style={{ fontSize: 11, background: '#f1f5f9', color: '#475569', padding: '2px 7px', borderRadius: 6 }}>
+                  {lot.package_label || '期限なし'}{lot.expiry_date ? `(${lot.expiry_date})` : ''} × {lot.quantity}{product.unit || '個'}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {/* Quick action buttons */}

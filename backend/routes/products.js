@@ -16,7 +16,20 @@ const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
 
 // 全商品一覧
 router.get('/', authMiddleware, async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM products ORDER BY name ASC');
+  const { rows } = await pool.query(`
+    SELECT p.*,
+      COALESCE(
+        json_agg(
+          json_build_object('package_label', pl.package_label, 'expiry_date', pl.expiry_date, 'quantity', pl.quantity)
+          ORDER BY pl.expiry_date ASC NULLS LAST
+        ) FILTER (WHERE pl.id IS NOT NULL AND pl.quantity > 0),
+        '[]'
+      ) as lots
+    FROM products p
+    LEFT JOIN product_lots pl ON pl.product_id = p.id
+    GROUP BY p.id
+    ORDER BY p.name ASC
+  `);
   res.json(rows);
 });
 
