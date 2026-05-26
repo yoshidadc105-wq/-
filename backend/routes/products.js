@@ -20,7 +20,7 @@ router.get('/', authMiddleware, async (req, res) => {
     SELECT p.*,
       COALESCE(
         json_agg(
-          json_build_object('package_label', pl.package_label, 'expiry_date', pl.expiry_date, 'quantity', pl.quantity)
+          json_build_object('id', pl.id, 'package_label', pl.package_label, 'expiry_date', pl.expiry_date, 'quantity', pl.quantity)
           ORDER BY pl.expiry_date ASC NULLS LAST
         ) FILTER (WHERE pl.id IS NOT NULL AND pl.quantity > 0),
         '[]'

@@ -13,6 +13,7 @@ export default function HomePage() {
   const [quantity, setQuantity] = useState(1);
   const [expiryDate, setExpiryDate] = useState('');
   const [packageLabel, setPackageLabel] = useState('');
+  const [selectedLotId, setSelectedLotId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [flashMessage, setFlashMessage] = useState('');
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ export default function HomePage() {
     setQuantity(1);
     setExpiryDate('');
     setPackageLabel('');
+    setSelectedLotId(null);
   };
 
   const closeSheet = () => setSheet(null);
@@ -47,7 +49,7 @@ export default function HomePage() {
     setSubmitting(true);
     try {
       if (sheet.mode === 'use') {
-        await api.useProduct(sheet.product.id, quantity, null);
+        await api.useProduct(sheet.product.id, quantity, null, selectedLotId || undefined);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 使用しました`);
       } else {
         await api.receiveProduct(sheet.product.id, quantity, null, expiryDate || undefined, packageLabel || undefined);
@@ -171,6 +173,42 @@ export default function HomePage() {
             <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12, textAlign: 'center' }}>
               現在の在庫: <strong style={{ color: '#1e293b' }}>{sheet.product.stock}{sheet.product.unit || '個'}</strong>
             </div>
+
+            {/* Lot selector for use mode */}
+            {sheet.mode === 'use' && sheet.product.lots && sheet.product.lots.length > 1 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>どのロットから使用しますか？</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <button
+                    onClick={() => setSelectedLotId(null)}
+                    style={{
+                      padding: '8px 12px', borderRadius: 8, fontSize: 13, textAlign: 'left',
+                      background: selectedLotId === null ? '#dbeafe' : '#f8fafc',
+                      color: selectedLotId === null ? '#1d4ed8' : '#475569',
+                      border: selectedLotId === null ? '1.5px solid #3b82f6' : '1.5px solid #e2e8f0',
+                      cursor: 'pointer', fontWeight: selectedLotId === null ? 700 : 400,
+                    }}
+                  >
+                    自動（期限が早い順）
+                  </button>
+                  {sheet.product.lots.map(lot => (
+                    <button
+                      key={lot.id}
+                      onClick={() => setSelectedLotId(lot.id)}
+                      style={{
+                        padding: '8px 12px', borderRadius: 8, fontSize: 13, textAlign: 'left',
+                        background: selectedLotId === lot.id ? '#dbeafe' : '#f8fafc',
+                        color: selectedLotId === lot.id ? '#1d4ed8' : '#475569',
+                        border: selectedLotId === lot.id ? '1.5px solid #3b82f6' : '1.5px solid #e2e8f0',
+                        cursor: 'pointer', fontWeight: selectedLotId === lot.id ? 700 : 400,
+                      }}
+                    >
+                      {lot.package_label || '(ラベルなし)'}{lot.expiry_date ? `  期限: ${lot.expiry_date}` : ''}　残{lot.quantity}{sheet.product.unit || '個'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quantity */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 20 }}>
