@@ -17,6 +17,7 @@ router.post('/preview', authMiddleware, (req, res) => {
     alert_threshold: parseInt(p.alert_threshold) || 5,
     expiry_date: p.expiry_date || '',
     unit: p.unit || '',
+    package_label: p.package_label || '',
   }));
 
   res.json(validated);
@@ -36,11 +37,12 @@ router.post('/execute', authMiddleware, async (req, res) => {
     );
 
     const newId = result.rows[0].id;
-    if (p.expiry_date && newId) {
-      const qty = parseInt(p.stock) || 0;
-      if (qty > 0) {
-        await pool.query('INSERT INTO product_lots (product_id, expiry_date, quantity) VALUES ($1, $2, $3)', [newId, p.expiry_date, qty]);
-      }
+    const qty = parseInt(p.stock) || 0;
+    if (newId && qty > 0 && (p.expiry_date || p.package_label)) {
+      await pool.query(
+        'INSERT INTO product_lots (product_id, expiry_date, quantity, package_label) VALUES ($1, $2, $3, $4)',
+        [newId, p.expiry_date || null, qty, p.package_label || null]
+      );
     }
     count++;
   }

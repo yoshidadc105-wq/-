@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
-const EMPTY_ROW = () => ({ name: '', maker: '', item_code: '', stock: '0', alert_threshold: '5', expiry_date: '', unit: '' });
+const EMPTY_ROW = () => ({ name: '', maker: '', item_code: '', stock: '0', alert_threshold: '5', expiry_date: '', unit: '', package_label: '' });
 
 export default function ImportPage() {
   const [step, setStep] = useState(1);
@@ -34,6 +34,7 @@ export default function ImportPage() {
           alert_threshold: (cols[4] || '5').trim(),
           expiry_date: (cols[5] || '').trim(),
           unit: (cols[6] || '').trim(),
+          package_label: (cols[7] || '').trim(),
         };
       }).filter(r => r.name);
       if (parsed.length > 0) {
@@ -100,9 +101,9 @@ export default function ImportPage() {
           <div style={{ fontWeight: 700, marginBottom: 8 }}>CSVファイルをアップロードしてください</div>
           <div style={{ fontSize: 13, marginBottom: 6, color: '#64748b' }}>CSVのフォーマット（1行目はヘッダーとして読み飛ばされます）:</div>
           <code style={{ display: 'block', background: '#e2e8f0', padding: '8px 12px', borderRadius: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-            商品名,メーカー,品番,在庫数,アラート閾値,使用期限,単位
+            商品名,メーカー,品番,在庫数,アラート閾値,使用期限,単位,パッケージ
           </code>
-          <div style={{ fontSize: 12, marginTop: 8, color: '#94a3b8' }}>使用期限はYYYY-MM形式 (例: 2025-12)　単位は箱・袋・本など</div>
+          <div style={{ fontSize: 12, marginTop: 8, color: '#94a3b8' }}>単位: 箱・袋・本など　パッケージ: 100枚入り・200枚入りなど</div>
         </div>
 
         <input
@@ -153,7 +154,7 @@ export default function ImportPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 500 }}>
           <thead>
             <tr style={{ background: '#f8fafc' }}>
-              {['商品名', 'メーカー', '品番', '在庫', '閾値', '使用期限', '単位', ''].map((h, i) => (
+              {['商品名', 'メーカー', '品番', '在庫', '閾値', '使用期限', '単位', 'パッケージ', ''].map((h, i) => (
                 <th key={i} style={{ padding: '8px 6px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 12, borderBottom: '2px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -161,7 +162,7 @@ export default function ImportPage() {
           <tbody>
             {rows.map((row, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                {['name', 'maker', 'item_code', 'stock', 'alert_threshold', 'expiry_date', 'unit'].map(field => (
+                {['name', 'maker', 'item_code', 'stock', 'alert_threshold', 'expiry_date', 'unit', 'package_label'].map(field => (
                   <td key={field} style={{ padding: '6px 4px' }}>
                     <input
                       value={row[field]}
