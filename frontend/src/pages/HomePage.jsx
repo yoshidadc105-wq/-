@@ -14,6 +14,7 @@ export default function HomePage() {
   const [expiryDate, setExpiryDate] = useState('');
   const [packageLabel, setPackageLabel] = useState('');
   const [supplierName, setSupplierName] = useState('');
+  const [otherSupplier, setOtherSupplier] = useState(false);
   const [unitPrice, setUnitPrice] = useState('');
   const [selectedLotId, setSelectedLotId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -45,6 +46,7 @@ export default function HomePage() {
     setPackageLabel('');
     setSelectedLotId(null);
     setSupplierName(product.default_supplier || '');
+    setOtherSupplier(false);
     setUnitPrice(product.default_price ? String(product.default_price) : '');
   };
 
@@ -257,18 +259,28 @@ export default function HomePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                   <div>
                     <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>発注先</label>
-                    <select value={suppliers.map(s => s.name || s).includes(supplierName) ? supplierName : supplierName ? '__other__' : ''}
-                      onChange={e => e.target.value === '__other__' ? setSupplierName('') : setSupplierName(e.target.value)}
+                    <select
+                      value={otherSupplier ? '__other__' : supplierName}
+                      onChange={e => {
+                        if (e.target.value === '__other__') {
+                          setOtherSupplier(true);
+                          setSupplierName('');
+                        } else {
+                          setOtherSupplier(false);
+                          setSupplierName(e.target.value);
+                        }
+                      }}
                       style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white', boxSizing: 'border-box' }}
                     >
                       <option value="">（未選択）</option>
                       {suppliers.map(s => { const name = s.name || s; return <option key={name} value={name}>{name}</option>; })}
                       <option value="__other__">その他（手入力）</option>
                     </select>
-                    {(supplierName === '__other__' || (supplierName && !suppliers.map(s => s.name || s).includes(supplierName))) && (
-                      <input type="text" value={supplierName === '__other__' ? '' : supplierName}
-                        placeholder="発注先を入力" onChange={e => setSupplierName(e.target.value)}
-                        style={{ width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+                    {otherSupplier && (
+                      <input type="text" value={supplierName}
+                        placeholder="発注先を入力" autoFocus
+                        onChange={e => setSupplierName(e.target.value)}
+                        style={{ width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #2563eb', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
                       />
                     )}
                   </div>
