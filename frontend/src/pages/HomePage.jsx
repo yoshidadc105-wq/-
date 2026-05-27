@@ -257,19 +257,17 @@ export default function HomePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                   <div>
                     <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>発注先</label>
-                    <select value={supplierName} onChange={e => setSupplierName(e.target.value)}
+                    <select value={suppliers.map(s => s.name || s).includes(supplierName) ? supplierName : supplierName ? '__other__' : ''}
+                      onChange={e => e.target.value === '__other__' ? setSupplierName('') : setSupplierName(e.target.value)}
                       style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white', boxSizing: 'border-box' }}
                     >
                       <option value="">（未選択）</option>
-                      {['Ci', 'FEED', 'PDR', 'モノタロウ', 'アスクル', 'アマゾン', '楽天']
-                        .concat(suppliers)
-                        .filter((v, i, a) => a.indexOf(v) === i)
-                        .map(s => <option key={s} value={s}>{s}</option>)}
+                      {suppliers.map(s => { const name = s.name || s; return <option key={name} value={name}>{name}</option>; })}
                       <option value="__other__">その他（手入力）</option>
                     </select>
-                    {supplierName === '__other__' && (
-                      <input type="text" placeholder="発注先を入力"
-                        onChange={e => setSupplierName(e.target.value)}
+                    {(supplierName === '__other__' || (supplierName && !suppliers.map(s => s.name || s).includes(supplierName))) && (
+                      <input type="text" value={supplierName === '__other__' ? '' : supplierName}
+                        placeholder="発注先を入力" onChange={e => setSupplierName(e.target.value)}
                         style={{ width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
                       />
                     )}

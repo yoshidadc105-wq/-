@@ -56,7 +56,9 @@ export const api = {
   importPreview: (data) => request('POST', '/import/preview', data),
   importExecute: (data) => request('POST', '/import/execute', data),
 
-  getSuppliers: () => request('GET', '/stats/suppliers'),
+  getSuppliers: () => request('GET', '/suppliers'),
+  addSupplier: (name) => request('POST', '/suppliers', { name }),
+  deleteSupplier: (id) => request('DELETE', `/suppliers/${id}`),
   getStatMonths: () => request('GET', '/stats/months'),
   getPurchaseStats: (period, month) => request('GET', `/stats/purchases?${month ? `month=${month}` : `period=${period}`}`),
 };

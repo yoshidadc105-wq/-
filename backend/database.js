@@ -70,6 +70,14 @@ async function initDb() {
 
   await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT');
   await pool.query('ALTER TABLE product_lots ADD COLUMN IF NOT EXISTS package_label TEXT');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS suppliers (
+      id SERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
   try { await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS default_supplier TEXT'); } catch (e) {}
   try { await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS default_price INTEGER'); } catch (e) {}
   try { await pool.query('ALTER TABLE stock_logs ADD COLUMN IF NOT EXISTS supplier_name TEXT'); } catch (e) {}

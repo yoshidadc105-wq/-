@@ -191,9 +191,7 @@ export default function AddProductPage() {
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
             />
             <datalist id="suppliers-add-list">
-              {['Ci', 'FEED', 'PDR', 'モノタロウ', 'アスクル', 'アマゾン', '楽天'].concat(suppliers).filter((v, i, a) => a.indexOf(v) === i).map(s => (
-                <option key={s} value={s} />
-              ))}
+              {suppliers.map(s => { const name = s.name || s; return <option key={name} value={name} />; })}
             </datalist>
           </div>
           <div>

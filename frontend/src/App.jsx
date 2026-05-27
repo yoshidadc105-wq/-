@@ -8,6 +8,7 @@ import ImportPage from './pages/ImportPage';
 import HistoryPage from './pages/HistoryPage';
 import AddMenuPage from './pages/AddMenuPage';
 import StatsPage from './pages/StatsPage';
+import SuppliersPage from './pages/SuppliersPage';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>
