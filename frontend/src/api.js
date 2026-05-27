@@ -57,5 +57,6 @@ export const api = {
   importExecute: (data) => request('POST', '/import/execute', data),
 
   getSuppliers: () => request('GET', '/stats/suppliers'),
-  getPurchaseStats: (period) => request('GET', `/stats/purchases?period=${period}`),
+  getStatMonths: () => request('GET', '/stats/months'),
+  getPurchaseStats: (period, month) => request('GET', `/stats/purchases?${month ? `month=${month}` : `period=${period}`}`),
 };
