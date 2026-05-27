@@ -45,24 +45,24 @@ export default function SuppliersPage() {
       {/* 追加フォーム */}
       <div className="card">
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>新しく追加</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            type="text"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            placeholder="例: ○○商事"
-            style={{ flex: 1, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15 }}
-          />
-          <button
-            onClick={handleAdd}
-            disabled={adding || !newName.trim()}
-            className="btn-primary"
-            style={{ padding: '10px 20px', flexShrink: 0 }}
-          >
-            追加
-          </button>
-        </div>
+        <input
+          type="text"
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          placeholder="例: ○○商事"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={adding || !newName.trim()}
+          style={{
+            marginTop: 8, width: '100%', padding: '12px', borderRadius: 8,
+            background: adding || !newName.trim() ? '#94a3b8' : '#2563eb',
+            color: 'white', fontWeight: 700, fontSize: 15, border: 'none', cursor: adding || !newName.trim() ? 'default' : 'pointer',
+          }}
+        >
+          {adding ? '追加中...' : '追加'}
+        </button>
         {error && <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8 }}>{error}</div>}
       </div>
 
