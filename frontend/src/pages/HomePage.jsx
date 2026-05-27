@@ -257,15 +257,22 @@ export default function HomePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                   <div>
                     <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>発注先</label>
-                    <input list="suppliers-list" type="text" value={supplierName} onChange={e => setSupplierName(e.target.value)}
-                      placeholder="例: モノタロウ"
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
-                    />
-                    <datalist id="suppliers-list">
-                      {['Ci', 'FEED', 'PDR', 'モノタロウ', 'アスクル', 'アマゾン', '楽天'].concat(suppliers).filter((v, i, a) => a.indexOf(v) === i).map(s => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
+                    <select value={supplierName} onChange={e => setSupplierName(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white', boxSizing: 'border-box' }}
+                    >
+                      <option value="">（未選択）</option>
+                      {['Ci', 'FEED', 'PDR', 'モノタロウ', 'アスクル', 'アマゾン', '楽天']
+                        .concat(suppliers)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .map(s => <option key={s} value={s}>{s}</option>)}
+                      <option value="__other__">その他（手入力）</option>
+                    </select>
+                    {supplierName === '__other__' && (
+                      <input type="text" placeholder="発注先を入力"
+                        onChange={e => setSupplierName(e.target.value)}
+                        style={{ width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+                      />
+                    )}
                   </div>
                   <div>
                     <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>単価（円）</label>
