@@ -9,7 +9,7 @@ export default function SuppliersPage() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const load = () => api.getSuppliers().then(setSuppliers).catch(() => {});
+  const load = () => api.getSuppliers().then(setSuppliers).catch(e => setError(e.message));
 
   useEffect(() => { load(); }, []);
 
@@ -22,7 +22,8 @@ export default function SuppliersPage() {
       setNewName('');
       await load();
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'エラーが発生しました');
+      alert('追加エラー: ' + (e.message || 'エラーが発生しました'));
     } finally {
       setAdding(false);
     }
