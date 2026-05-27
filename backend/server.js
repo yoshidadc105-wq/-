@@ -20,6 +20,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/lots', require('./routes/lots'));
 app.use('/api/import', require('./routes/import'));
+app.use('/api/stats', require('./routes/stats'));
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

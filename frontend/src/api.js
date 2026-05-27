@@ -45,7 +45,7 @@ export const api = {
   deleteProduct: (id) => request('DELETE', `/products/${id}`),
 
   useProduct: (product_id, quantity, note, lot_id) => request('POST', '/inventory/use', { product_id, quantity, note, lot_id }),
-  receiveProduct: (product_id, quantity, note, expiry_date, package_label) => request('POST', '/inventory/receive', { product_id, quantity, note, expiry_date, package_label }),
+  receiveProduct: (product_id, quantity, note, expiry_date, package_label, supplier_name, unit_price) => request('POST', '/inventory/receive', { product_id, quantity, note, expiry_date, package_label, supplier_name, unit_price }),
   getUsageLogs: (product_id) => request('GET', `/inventory/usage/${product_id}`),
 
   getLots: (productId) => request('GET', `/products/${productId}/lots`),
@@ -55,4 +55,7 @@ export const api = {
   getAllHistory: () => request('GET', '/inventory/history'),
   importPreview: (data) => request('POST', '/import/preview', data),
   importExecute: (data) => request('POST', '/import/execute', data),
+
+  getSuppliers: () => request('GET', '/stats/suppliers'),
+  getPurchaseStats: (period) => request('GET', `/stats/purchases?period=${period}`),
 };

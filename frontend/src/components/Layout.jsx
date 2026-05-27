@@ -5,6 +5,7 @@ const navItems = [
   { path: '/', label: '在庫', icon: '📦' },
   { path: '/history', label: '履歴', icon: '📋' },
   { path: '/add', label: '追加', icon: '➕' },
+  { path: '/stats', label: '統計', icon: '📊' },
 ];
 
 export default function Layout({ children }) {

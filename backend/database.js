@@ -70,6 +70,10 @@ async function initDb() {
 
   await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT');
   await pool.query('ALTER TABLE product_lots ADD COLUMN IF NOT EXISTS package_label TEXT');
+  try { await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS default_supplier TEXT'); } catch (e) {}
+  try { await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS default_price INTEGER'); } catch (e) {}
+  try { await pool.query('ALTER TABLE stock_logs ADD COLUMN IF NOT EXISTS supplier_name TEXT'); } catch (e) {}
+  try { await pool.query('ALTER TABLE stock_logs ADD COLUMN IF NOT EXISTS unit_price INTEGER'); } catch (e) {}
 
   // Create default admin user if not exists
   const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);

@@ -70,13 +70,16 @@ router.post('/use', authMiddleware, async (req, res) => {
 
 // 入荷記録（在庫を増やす）
 router.post('/receive', authMiddleware, async (req, res) => {
-  const { product_id, quantity, note, expiry_date, package_label } = req.body;
+  const { product_id, quantity, note, expiry_date, package_label, supplier_name, unit_price } = req.body;
   if (!product_id || !quantity || quantity <= 0) {
     return res.status(400).json({ error: '商品と数量を正しく入力してください' });
   }
 
   await pool.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [quantity, product_id]);
-  await pool.query('INSERT INTO stock_logs (product_id, quantity, expiry_date, user_id, note) VALUES ($1, $2, $3, $4, $5)', [product_id, quantity, expiry_date || null, req.user.id, note || null]);
+  await pool.query(
+    'INSERT INTO stock_logs (product_id, quantity, expiry_date, user_id, note, supplier_name, unit_price) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [product_id, quantity, expiry_date || null, req.user.id, note || null, supplier_name || null, unit_price ? parseInt(unit_price) : null]
+  );
 
   // Add or update lot (match on both expiry_date and package_label)
   const { rows } = await pool.query(

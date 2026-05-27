@@ -8,11 +8,12 @@ export default function AddProductPage() {
   const [photoPath, setPhotoPath] = useState('');
   const [scanning, setScanning] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '', supplier_url: '', unit: '', package_label: '' });
+  const [form, setForm] = useState({ name: '', maker: '', item_code: '', category: '', stock: '0', alert_threshold: '5', expiry_date: '', supplier_url: '', unit: '', package_label: '', default_supplier: '', default_price: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [newCategory, setNewCategory] = useState(false);
   const fileRef = useRef();
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function AddProductPage() {
       const cats = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
       setCategories(cats);
     });
+    api.getSuppliers().then(setSuppliers).catch(() => {});
   }, []);
 
   const resizeImage = (file, maxSize = 1024) => new Promise((resolve) => {
@@ -178,6 +180,30 @@ export default function AddProductPage() {
             rows={3}
             style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }}
           />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>よく使う発注先</label>
+            <input list="suppliers-add-list" type="text" value={form.default_supplier}
+              onChange={e => setForm(p => ({ ...p, default_supplier: e.target.value }))}
+              placeholder="例: モノタロウ"
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
+            />
+            <datalist id="suppliers-add-list">
+              {['モノタロウ', 'FEED', 'PDR', 'ヨシダ', 'デンタルシステムズ'].concat(suppliers).filter((v, i, a) => a.indexOf(v) === i).map(s => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>標準単価（円）</label>
+            <input type="number" min="0" value={form.default_price}
+              onChange={e => setForm(p => ({ ...p, default_price: e.target.value }))}
+              placeholder="例: 1500"
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
+            />
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

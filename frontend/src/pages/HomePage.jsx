@@ -13,9 +13,12 @@ export default function HomePage() {
   const [quantity, setQuantity] = useState(1);
   const [expiryDate, setExpiryDate] = useState('');
   const [packageLabel, setPackageLabel] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
   const [selectedLotId, setSelectedLotId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [flashMessage, setFlashMessage] = useState('');
+  const [suppliers, setSuppliers] = useState([]);
   const navigate = useNavigate();
 
   const load = useCallback(() => {
@@ -25,6 +28,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.getSuppliers().then(setSuppliers).catch(() => {}); }, []);
 
   const categories = ['すべて', ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort()];
 
@@ -40,6 +44,8 @@ export default function HomePage() {
     setExpiryDate('');
     setPackageLabel('');
     setSelectedLotId(null);
+    setSupplierName(product.default_supplier || '');
+    setUnitPrice(product.default_price ? String(product.default_price) : '');
   };
 
   const closeSheet = () => setSheet(null);
@@ -52,7 +58,7 @@ export default function HomePage() {
         await api.useProduct(sheet.product.id, quantity, null, selectedLotId || undefined);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 使用しました`);
       } else {
-        await api.receiveProduct(sheet.product.id, quantity, null, expiryDate || undefined, packageLabel || undefined);
+        await api.receiveProduct(sheet.product.id, quantity, null, expiryDate || undefined, packageLabel || undefined, supplierName || undefined, unitPrice ? parseInt(unitPrice) : undefined);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 入荷しました`);
       }
       closeSheet();
@@ -231,23 +237,49 @@ export default function HomePage() {
               }}>＋</button>
             </div>
 
-            {/* Package label and expiry date for receive */}
+            {/* Package label, expiry, supplier, price for receive */}
             {sheet.mode === 'receive' && (
               <>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>パッケージ（任意・例: 100枚入り）</label>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>パッケージ（任意）</label>
                   <input type="text" value={packageLabel} onChange={e => setPackageLabel(e.target.value)}
-                    placeholder="例: 100枚入り、200枚入り"
+                    placeholder="例: 100枚入り"
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
                   />
                 </div>
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>使用期限（任意・YYYY-MM）</label>
                   <input type="text" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
                     placeholder="例: 2025-12"
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
                   />
                 </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>発注先</label>
+                    <input list="suppliers-list" type="text" value={supplierName} onChange={e => setSupplierName(e.target.value)}
+                      placeholder="例: モノタロウ"
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+                    />
+                    <datalist id="suppliers-list">
+                      {['モノタロウ', 'FEED', 'PDR', 'ヨシダ', 'デンタルシステムズ'].concat(suppliers).filter((v, i, a) => a.indexOf(v) === i).map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>単価（円）</label>
+                    <input type="number" min="0" value={unitPrice} onChange={e => setUnitPrice(e.target.value)}
+                      placeholder="例: 1500"
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+                {unitPrice && quantity > 0 && (
+                  <div style={{ textAlign: 'center', fontSize: 14, color: '#64748b', marginBottom: 12 }}>
+                    合計金額: <strong style={{ color: '#1e293b', fontSize: 16 }}>¥{(parseInt(unitPrice) * quantity).toLocaleString()}</strong>
+                  </div>
+                )}
               </>
             )}
 
