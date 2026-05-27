@@ -59,6 +59,7 @@ export const api = {
   getSuppliers: () => request('GET', '/suppliers'),
   addSupplier: (name) => request('POST', '/suppliers', { name }),
   deleteSupplier: (id) => request('DELETE', `/suppliers/${id}`),
-  getStatMonths: () => request('GET', '/stats/months'),
+  getStatMonths: (type) => request('GET', `/stats/months?type=${type || 'purchase'}`),
   getPurchaseStats: (period, month) => request('GET', `/stats/purchases?${month ? `month=${month}` : `period=${period}`}`),
+  getUsageStats: (period, month) => request('GET', `/stats/usage?${month ? `month=${month}` : `period=${period}`}`),
 };

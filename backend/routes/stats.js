@@ -89,15 +89,74 @@ router.get('/purchases', authMiddleware, async (req, res) => {
   res.json({ summary, bySupplier, logs, periodType: period === 'week' || period === 'month' ? (period === 'week' ? 'week_day' : 'month_week') : 'multi_month' });
 });
 
-// データが存在する月の一覧
+// データが存在する月の一覧（購入・使用両方）
 router.get('/months', authMiddleware, async (req, res) => {
+  const { type = 'purchase' } = req.query;
+  const table = type === 'usage' ? 'usage_logs' : 'stock_logs';
   const { rows } = await pool.query(`
     SELECT TO_CHAR(DATE_TRUNC('month', logged_at), 'YYYY-MM') as month
-    FROM stock_logs
+    FROM ${table}
     GROUP BY DATE_TRUNC('month', logged_at)
     ORDER BY DATE_TRUNC('month', logged_at) DESC
   `);
   res.json(rows.map(r => r.month));
+});
+
+// 使用統計
+router.get('/usage', authMiddleware, async (req, res) => {
+  const { period, month } = req.query;
+
+  const buildWhere = (startSql, endSql) =>
+    endSql
+      ? `logged_at >= ${startSql} AND logged_at < ${endSql}`
+      : `logged_at >= ${startSql}`;
+
+  let whereClause, groupSql;
+
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    whereClause = buildWhere(
+      `DATE_TRUNC('month', '${month}-01'::date)`,
+      `DATE_TRUNC('month', '${month}-01'::date) + INTERVAL '1 month'`
+    );
+    groupSql = "DATE_TRUNC('day', logged_at)";
+  } else {
+    const cfg = PERIOD_CONFIG[period] || PERIOD_CONFIG.month;
+    whereClause = buildWhere(cfg.startSql);
+    groupSql = cfg.groupSql;
+  }
+
+  const [{ rows: summary }, { rows: byProduct }, { rows: logs }] = await Promise.all([
+    pool.query(`
+      SELECT ${groupSql} as period_start,
+        SUM(quantity) as total_qty,
+        COUNT(*) as use_count
+      FROM usage_logs
+      WHERE ${whereClause}
+      GROUP BY ${groupSql} ORDER BY ${groupSql}
+    `),
+    pool.query(`
+      SELECT p.name as product_name, p.unit,
+        SUM(ul.quantity) as total_qty,
+        COUNT(*) as use_count
+      FROM usage_logs ul
+      LEFT JOIN products p ON ul.product_id = p.id
+      WHERE ${whereClause}
+      GROUP BY p.id, p.name, p.unit
+      ORDER BY total_qty DESC
+      LIMIT 20
+    `),
+    pool.query(`
+      SELECT ul.quantity, ul.logged_at, ul.note,
+        p.name as product_name, p.unit
+      FROM usage_logs ul
+      LEFT JOIN products p ON ul.product_id = p.id
+      WHERE ${whereClause}
+      ORDER BY ul.logged_at DESC
+      LIMIT 500
+    `),
+  ]);
+
+  res.json({ summary, byProduct, logs });
 });
 
 // 発注先の一覧（サジェスト用）
