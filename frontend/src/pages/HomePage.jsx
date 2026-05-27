@@ -262,7 +262,7 @@ export default function HomePage() {
                       style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, boxSizing: 'border-box' }}
                     />
                     <datalist id="suppliers-list">
-                      {['モノタロウ', 'FEED', 'PDR', 'ヨシダ', 'デンタルシステムズ'].concat(suppliers).filter((v, i, a) => a.indexOf(v) === i).map(s => (
+                      {['Ci', 'FEED', 'PDR', 'モノタロウ', 'アスクル', 'アマゾン', '楽天'].concat(suppliers).filter((v, i, a) => a.indexOf(v) === i).map(s => (
                         <option key={s} value={s} />
                       ))}
                     </datalist>
