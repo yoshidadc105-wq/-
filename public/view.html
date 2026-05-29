@@ -109,8 +109,8 @@ async function loadManual() {
   manualData = await res.json();
   document.title = `${manualData.title} - マニュアルシステム`;
 
-  const canEdit = currentUser.role === 'admin' || manualData.created_by === currentUser.id;
-  const canDelete = currentUser.role === 'admin';
+  // 管理者のみ編集・移動・削除・ダウンロード可能
+  const isAdmin = currentUser.role === 'admin';
 
   const viewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(manualData.file_path || '')}&title=${encodeURIComponent(manualData.title)}&id=${manualId}`;
   const pdfUrl = `/uploads/${manualData.file_path}`;
@@ -118,19 +118,21 @@ async function loadManual() {
   let bodyHtml = '';
 
   if (manualData.type === 'pdf') {
-    const editBtnsPdf = `
-      <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-        <a href="${viewerUrl}" ${isMobile ? '' : 'target="_blank"'} class="btn btn-primary btn-sm">🔍 PDFを見る</a>
-        <a href="${pdfUrl}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
-        ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
-        ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
-        ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
-      </div>`;
+    const adminBtns = isAdmin ? `
+      <a href="${pdfUrl}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+      <a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>
+      <button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>
+      <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : '';
+
     if (isMobile) {
-      bodyHtml = editBtnsPdf;
+      bodyHtml = adminBtns ? `<div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">${adminBtns}</div>` : '';
     } else {
-      bodyHtml = editBtnsPdf +
-        `<iframe src="${pdfUrl}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>`;
+      bodyHtml = `
+        <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+          <a href="${viewerUrl}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
+          ${adminBtns}
+        </div>
+        <iframe src="${pdfUrl}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>`;
     }
   } else if (manualData.type === 'steps') {
     let stepsData = {};
@@ -160,11 +162,19 @@ async function loadManual() {
     bodyHtml = `<div class="card"><div class="card-body"><div class="manual-content">${manualData.content || ''}</div></div></div>`;
   }
 
-  const editBtns = manualData.type !== 'pdf' ? `
+  const editBtns = manualData.type !== 'pdf' && isAdmin ? `
     <div class="flex gap-2">
-      ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
-      ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
-      ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+      <a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>
+      <button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>
+      <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>
+    </div>` : '';
+
+  // PDFモバイル用の「PDFを見る」ボタンカード
+  const pdfMobileCard = manualData.type === 'pdf' && isMobile ? `
+    <div style="text-align:center; padding:40px 20px; background:white; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:8px;">
+      <div style="font-size:64px; margin-bottom:12px;">📄</div>
+      <p style="color:#64748b; font-size:14px; margin-bottom:20px;">${manualData.file_name || 'PDF'}</p>
+      <a href="${viewerUrl}" class="btn btn-primary btn-lg">PDFを見る</a>
     </div>` : '';
 
   document.getElementById('content').innerHTML = `
@@ -182,6 +192,7 @@ async function loadManual() {
         ${editBtns}
       </div>
     </div>
+    ${pdfMobileCard}
     ${bodyHtml}
     <div class="card mt-2">
       <div class="card-body" style="text-align:center; padding:24px;" id="checkArea">

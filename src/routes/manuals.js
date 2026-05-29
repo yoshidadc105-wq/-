@@ -12,14 +12,11 @@ const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemDa
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// PDF アップロード設定
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
+  destination: (req, file, cb) => { cb(null, UPLOAD_DIR); },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
-    const safe = file.originalname.replace(/[^a-zA-Z0-9.\-_　-鿿゠-ヿ぀-ゟ]/g, '_');
+    const safe = file.originalname.replace(/[^a-zA-Z0-9.\-_　-鿿＀-￯゠-ヿ぀-ゟ]/g, '_');
     cb(null, `${timestamp}_${safe}`);
   }
 });
@@ -42,11 +39,8 @@ const uploadMany = multer({
   }
 });
 
-// ステップ画像アップロード設定
 const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
+  destination: (req, file, cb) => { cb(null, UPLOAD_DIR); },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg';
     cb(null, `step_${Date.now()}${ext}`);
@@ -66,30 +60,16 @@ const uploadImage = multer({
 router.get('/', requireLogin, (req, res) => {
   const { search, category_id, type, page = 1, limit = 20 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
-
   const db = getDb();
   let conditions = ['m.is_deleted = 0'];
   const params = [];
-
-  if (search) {
-    conditions.push('(m.title LIKE ? OR m.description LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
-  }
-  if (category_id) {
-    conditions.push('m.category_id = ?');
-    params.push(parseInt(category_id));
-  }
-  if (type) {
-    conditions.push('m.type = ?');
-    params.push(type);
-  }
-
+  if (search) { conditions.push('(m.title LIKE ? OR m.description LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
+  if (category_id) { conditions.push('m.category_id = ?'); params.push(parseInt(category_id)); }
+  if (type) { conditions.push('m.type = ?'); params.push(type); }
   const where = conditions.join(' AND ');
   const total = db.prepare(`SELECT COUNT(*) as count FROM manuals m WHERE ${where}`).get(...params).count;
-
   const manuals = db.prepare(`
-    SELECT
-      m.id, m.title, m.description, m.type, m.file_name, m.file_size,
+    SELECT m.id, m.title, m.description, m.type, m.file_name, m.file_size,
       m.category_id, c.name as category_name,
       m.created_by, u.display_name as created_by_name,
       m.created_at, m.updated_at
@@ -100,7 +80,6 @@ router.get('/', requireLogin, (req, res) => {
     ORDER BY m.updated_at DESC
     LIMIT ? OFFSET ?
   `).all(...params, parseInt(limit), offset);
-
   res.json({ manuals, total, page: parseInt(page), limit: parseInt(limit) });
 });
 
@@ -108,20 +87,15 @@ router.get('/', requireLogin, (req, res) => {
 router.get('/:id', requireLogin, (req, res) => {
   const db = getDb();
   const manual = db.prepare(`
-    SELECT
-      m.*,
-      c.name as category_name,
-      u.display_name as created_by_name,
-      u2.display_name as updated_by_name
+    SELECT m.*, c.name as category_name,
+      u.display_name as created_by_name, u2.display_name as updated_by_name
     FROM manuals m
     LEFT JOIN categories c ON c.id = m.category_id
     LEFT JOIN users u ON u.id = m.created_by
     LEFT JOIN users u2 ON u2.id = m.updated_by
     WHERE m.id = ? AND m.is_deleted = 0
   `).get(req.params.id);
-
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-
   db.prepare(`INSERT INTO view_history (manual_id, user_id) VALUES (?, ?)`).run(manual.id, req.session.userId);
   res.json(manual);
 });
@@ -131,108 +105,68 @@ router.post('/text', requireLogin, (req, res) => {
   const { title, description, content, category_id } = req.body;
   if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
   if (!content) return res.status(400).json({ error: '本文は必須です' });
-
   const db = getDb();
-  const result = db.prepare(`
-    INSERT INTO manuals (title, description, type, content, category_id, created_by, updated_by)
-    VALUES (?, ?, 'rich_text', ?, ?, ?, ?)
-  `).run(title, description || null, content, category_id || null, req.session.userId, req.session.userId);
-
+  const result = db.prepare(`INSERT INTO manuals (title, description, type, content, category_id, created_by, updated_by) VALUES (?, ?, 'rich_text', ?, ?, ?, ?)`)
+    .run(title, description || null, content, category_id || null, req.session.userId, req.session.userId);
   res.status(201).json({ id: result.lastInsertRowid, message: 'マニュアルを作成しました' });
 });
 
 // PDFマニュアルアップロード
 router.post('/pdf', requireLogin, upload.single('pdf'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'PDFファイルを選択してください' });
-
   const { title, description, category_id } = req.body;
   const fixedName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
   const manualTitle = title || path.parse(fixedName).name;
-
   const db = getDb();
-  const result = db.prepare(`
-    INSERT INTO manuals (title, description, type, file_path, file_name, file_size, category_id, created_by, updated_by)
-    VALUES (?, ?, 'pdf', ?, ?, ?, ?, ?, ?)
-  `).run(
-    manualTitle, description || null,
-    req.file.filename, req.file.originalname, req.file.size,
-    category_id || null, req.session.userId, req.session.userId
-  );
-
+  const result = db.prepare(`INSERT INTO manuals (title, description, type, file_path, file_name, file_size, category_id, created_by, updated_by) VALUES (?, ?, 'pdf', ?, ?, ?, ?, ?, ?)`)
+    .run(manualTitle, description || null, req.file.filename, req.file.originalname, req.file.size, category_id || null, req.session.userId, req.session.userId);
   res.status(201).json({ id: result.lastInsertRowid, message: 'PDFをアップロードしました' });
 });
 
-// マニュアル更新
-router.put('/:id', requireLogin, (req, res) => {
+// マニュアル更新（管理者のみ）
+router.put('/:id', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-
   const { title, description, content, category_id } = req.body;
   if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
-
-  db.prepare(`
-    UPDATE manuals
-    SET title = ?, description = ?, content = ?, category_id = ?,
-        updated_by = ?, updated_at = datetime('now', 'localtime')
-    WHERE id = ?
-  `).run(title, description || null, content || manual.content, category_id || null, req.session.userId, req.params.id);
-
+  db.prepare(`UPDATE manuals SET title = ?, description = ?, content = ?, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
+    .run(title, description || null, content || manual.content, category_id || null, req.session.userId, req.params.id);
   res.json({ message: 'マニュアルを更新しました' });
 });
 
-// PDFの差し替え
-router.put('/:id/pdf', requireLogin, upload.single('pdf'), (req, res) => {
+// PDFの差し替え（管理者のみ）
+router.put('/:id/pdf', requireAdmin, upload.single('pdf'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'PDFファイルを選択してください' });
-
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-
   if (manual.file_path) {
     const oldPath = path.join(UPLOAD_DIR, path.basename(manual.file_path));
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
   }
-
   const { title, description, category_id } = req.body;
-  db.prepare(`
-    UPDATE manuals
-    SET title = ?, description = ?, file_path = ?, file_name = ?, file_size = ?,
-        category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime')
-    WHERE id = ?
-  `).run(
-    title || manual.title, description || manual.description,
-    req.file.filename, req.file.originalname, req.file.size,
-    category_id || null, req.session.userId, req.params.id
-  );
-
+  db.prepare(`UPDATE manuals SET title = ?, description = ?, file_path = ?, file_name = ?, file_size = ?, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
+    .run(title || manual.title, description || manual.description, req.file.filename, req.file.originalname, req.file.size, category_id || null, req.session.userId, req.params.id);
   res.json({ message: 'PDFを更新しました' });
 });
 
-// カテゴリ移動
-router.patch('/:id/category', requireLogin, (req, res) => {
+// カテゴリ移動（管理者のみ）
+router.patch('/:id/category', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-
-  if (req.session.role !== 'admin' && manual.created_by !== req.session.userId) {
-    return res.status(403).json({ error: 'このマニュアルを移動する権限がありません' });
-  }
-
   const { category_id } = req.body;
-  db.prepare(`
-    UPDATE manuals SET category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?
-  `).run(category_id || null, req.session.userId, req.params.id);
-
+  db.prepare(`UPDATE manuals SET category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
+    .run(category_id || null, req.session.userId, req.params.id);
   res.json({ message: 'カテゴリを変更しました' });
 });
 
-// マニュアル削除（論理削除）
+// マニュアル削除（管理者のみ）
 router.delete('/:id', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-
   db.prepare("UPDATE manuals SET is_deleted = 1, updated_at = datetime('now', 'localtime') WHERE id = ?").run(req.params.id);
   res.json({ message: 'マニュアルを削除しました' });
 });
@@ -247,42 +181,27 @@ router.post('/step-image', requireLogin, uploadImage.single('image'), (req, res)
 router.post('/steps', requireLogin, (req, res) => {
   const { title, description, content, category_id } = req.body;
   if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
-
   const db = getDb();
-  const result = db.prepare(`
-    INSERT INTO manuals (title, description, type, content, category_id, created_by, updated_by)
-    VALUES (?, ?, 'steps', ?, ?, ?, ?)
-  `).run(title, description || null, content || '{}', category_id || null, req.session.userId, req.session.userId);
-
+  const result = db.prepare(`INSERT INTO manuals (title, description, type, content, category_id, created_by, updated_by) VALUES (?, ?, 'steps', ?, ?, ?, ?)`)
+    .run(title, description || null, content || '{}', category_id || null, req.session.userId, req.session.userId);
   res.status(201).json({ id: result.lastInsertRowid, message: 'マニュアルを作成しました' });
 });
 
 // PDF一括アップロード
 router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: 'PDFファイルを選択してください' });
-  }
-
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'PDFファイルを選択してください' });
   const { category_id } = req.body;
   const db = getDb();
-  const insert = db.prepare(`
-    INSERT INTO manuals (title, type, file_path, file_name, file_size, category_id, created_by, updated_by)
-    VALUES (?, 'pdf', ?, ?, ?, ?, ?, ?)
-  `);
-
+  const insert = db.prepare(`INSERT INTO manuals (title, type, file_path, file_name, file_size, category_id, created_by, updated_by) VALUES (?, 'pdf', ?, ?, ?, ?, ?, ?)`);
   const results = [];
   for (const file of req.files) {
     const raw = file.originalname;
     const asUtf8 = Buffer.from(raw, 'latin1').toString('utf8');
     const fixedName = asUtf8.includes('�') ? raw : asUtf8;
     const title = path.parse(fixedName).name;
-    const result = insert.run(
-      title, file.filename, fixedName, file.size,
-      category_id || null, req.session.userId, req.session.userId
-    );
+    const result = insert.run(title, file.filename, fixedName, file.size, category_id || null, req.session.userId, req.session.userId);
     results.push({ id: result.lastInsertRowid, title });
   }
-
   res.status(201).json({ message: `${results.length}件のPDFを登録しました`, results });
 });
 
