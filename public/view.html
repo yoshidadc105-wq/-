@@ -126,26 +126,30 @@ async function loadManual() {
 
   if (manualData.type === 'pdf') {
     const viewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(manualData.file_path)}&title=${encodeURIComponent(manualData.title)}&id=${manualId}`;
-    const actionBtns = `
-      <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-        ${isMobile
-          ? `<a href="${viewerUrl}" class="btn btn-primary btn-sm">🔍 PDFを開く</a>`
-          : `<a href="${viewerUrl}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>`
-        }
-        <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
-        ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
-        ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
-        ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
-      </div>`;
     if (isMobile) {
-      bodyHtml = actionBtns + `
+      // Mobile: show a single prominent card button; no redundant top button
+      const subBtns = `
+        <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+          <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+          ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+          ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
+          ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+        </div>`;
+      bodyHtml = subBtns + `
         <div style="text-align:center; padding:40px 20px; background:white; border-radius:8px; border:1px solid #e2e8f0;">
           <div style="font-size:64px; margin-bottom:12px;">📄</div>
           <p style="color:#64748b; font-size:14px; margin-bottom:20px;">${manualData.file_name || 'PDF'}</p>
           <a href="${viewerUrl}" class="btn btn-primary btn-lg">PDFを見る</a>
         </div>`;
     } else {
-      bodyHtml = actionBtns + `
+      bodyHtml = `
+        <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+          <a href="${viewerUrl}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
+          <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+          ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
+          ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
+          ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
+        </div>
         <iframe src="/uploads/${manualData.file_path}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>`;
     }
   } else if (manualData.type === 'steps') {
