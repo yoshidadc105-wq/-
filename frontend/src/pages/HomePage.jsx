@@ -134,7 +134,8 @@ export default function HomePage() {
         <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
           {search || selectedCategory !== 'すべて' ? '該当する商品がありません' : '商品が登録されていません'}
         </div>
-      ) : (
+      ) : selectedCategory !== 'すべて' || search ? (
+        // カテゴリ絞り込み中・検索中はフラットリスト
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.map(p => (
             <ProductCard key={p.id} product={p}
@@ -144,6 +145,38 @@ export default function HomePage() {
             />
           ))}
         </div>
+      ) : (
+        // 全表示時はカテゴリごとにグループ化
+        (() => {
+          const groups = [];
+          const seen = new Set();
+          filtered.forEach(p => {
+            const cat = p.category || '未分類';
+            if (!seen.has(cat)) { seen.add(cat); groups.push(cat); }
+          });
+          return groups.map(cat => (
+            <div key={cat}>
+              <div style={{
+                fontSize: 13, fontWeight: 700, color: '#475569',
+                padding: '6px 4px 4px',
+                borderBottom: '2px solid #e2e8f0',
+                marginBottom: 8,
+                letterSpacing: '0.05em',
+              }}>
+                {cat === '未分類' ? '─ その他' : `─ ${cat}`}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {filtered.filter(p => (p.category || '未分類') === cat).map(p => (
+                  <ProductCard key={p.id} product={p}
+                    onUse={() => openSheet(p, 'use')}
+                    onReceive={() => openSheet(p, 'receive')}
+                    onDetail={() => navigate(`/product/${p.id}`)}
+                  />
+                ))}
+              </div>
+            </div>
+          ));
+        })()
       )}
 
       {/* Bottom sheet overlay */}
