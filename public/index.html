@@ -94,7 +94,7 @@ async function init() {
 async function loadCategories() {
   const res = await fetch('/api/categories');
   const cats = await res.json();
-  window._allCats = cats; // サブフォルダ表示に使用
+  window._allCats = cats;
   const nav = document.getElementById('categoryNav');
   nav.innerHTML = `<li><a href="#" class="${currentCategory === '' ? 'active' : ''}" onclick="filterByCategory('', 'すべて', this)">すべて</a></li>`;
 
@@ -104,7 +104,7 @@ async function loadCategories() {
   function renderNode(c, depth) {
     const indent = depth * 12;
     const kids = children(c.id);
-    const nameEscaped = c.name.replace(/'/g, "\\'");
+    const nameEscaped = c.name.replace(/'/g, "\\'")
 
     if (kids.length > 0) {
       let html = `<li>
@@ -137,7 +137,6 @@ function toggleCategory(id, name, el) {
     const isOpen = sub.style.display !== 'none';
     sub.style.display = isOpen ? 'none' : '';
     if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
-    // モバイル：開いたとき、サブカテゴリが見えるようにスクロール
     if (!isOpen && window.innerWidth <= 768) {
       setTimeout(() => sub.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
     }
@@ -164,7 +163,6 @@ function filterByCategory(id, name, el, hasChildren) {
   document.querySelectorAll('#categoryNav a').forEach(a => a.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('pageTitle').textContent = name;
-  // 子カテゴリがない（末端）場合のみメインコンテンツへスクロール
   loadManuals(1).then(() => {
     if (window.innerWidth <= 768 && !hasChildren) {
       document.querySelector('.main-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -201,7 +199,6 @@ async function loadManuals(page = 1) {
 function renderManuals(manuals) {
   const container = document.getElementById('manualList');
 
-  // 選択中カテゴリの直下サブカテゴリをフォルダとして表示
   const subCats = currentCategory
     ? (window._allCats || []).filter(c => c.parent_id == currentCategory)
     : [];
@@ -241,12 +238,6 @@ function renderManuals(manuals) {
         </div>
         <div class="manual-card-title">${m.title}</div>
         ${m.description ? `<div class="manual-card-desc">${m.description}</div>` : ''}
-        <div class="manual-card-meta">
-          <span>${m.created_by_name}</span>
-          <span>·</span>
-          <span>${formatDate(m.updated_at)}</span>
-          ${m.file_size ? `<span>· ${formatFileSize(m.file_size)}</span>` : ''}
-        </div>
       </a>
     `).join('')}</div>`;
   } else {
@@ -256,7 +247,7 @@ function renderManuals(manuals) {
           <table>
             <thead>
               <tr>
-                <th>種別</th><th>タイトル</th><th>カテゴリ</th><th>作成者</th><th>更新日時</th><th>サイズ</th>
+                <th>種別</th><th>タイトル</th><th>カテゴリ</th>
               </tr>
             </thead>
             <tbody>
@@ -265,9 +256,6 @@ function renderManuals(manuals) {
                   <td><span class="badge ${m.type === 'pdf' ? 'badge-pdf' : m.type === 'steps' ? 'badge-steps' : 'badge-text'}">${m.type === 'pdf' ? 'PDF' : m.type === 'steps' ? 'ステップ' : 'テキスト'}</span></td>
                   <td style="font-weight:500;">${m.title}</td>
                   <td>${m.category_name || '<span class="text-muted">-</span>'}</td>
-                  <td>${m.created_by_name}</td>
-                  <td>${formatDate(m.updated_at)}</td>
-                  <td>${formatFileSize(m.file_size) || '-'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -280,7 +268,6 @@ function renderManuals(manuals) {
   container.innerHTML = subCatHtml + manualsHtml;
 }
 
-// メインコンテンツのフォルダカードをクリックしてドリルダウン
 function drillDown(id) {
   const cat = (window._allCats || []).find(c => c.id == id);
   if (!cat) return;
