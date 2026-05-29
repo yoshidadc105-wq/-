@@ -11,6 +11,12 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [saving, setSaving] = useState(false);
+
   // Lot form state
   const [lotExpiry, setLotExpiry] = useState('');
   const [lotQty, setLotQty] = useState(1);
@@ -22,7 +28,42 @@ export default function ProductDetailPage() {
     Promise.all([api.getProduct(id), api.getLots(id), api.getHistory(id)])
       .then(([p, l, h]) => { setProduct(p); setLots(l); setHistory(h); })
       .finally(() => setLoading(false));
+    api.getProducts().then(ps => {
+      setCategories([...new Set(ps.map(p => p.category).filter(Boolean))].sort());
+    });
   }, [id]);
+
+  const startEdit = () => {
+    setEditForm({
+      name: product.name || '',
+      maker: product.maker || '',
+      item_code: product.item_code || '',
+      category: product.category || '',
+      unit: product.unit || '',
+      alert_threshold: product.alert_threshold || 5,
+      supplier_url: product.supplier_url || '',
+      default_supplier: product.default_supplier || '',
+      default_price: product.default_price || '',
+    });
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      Object.entries(editForm).forEach(([k, v]) => fd.append(k, v));
+      await api.updateProduct(id, fd);
+      const updated = await api.getProduct(id);
+      setProduct(updated);
+      setEditing(false);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   const handleDelete = async () => {
     if (!confirm(`「${product.name}」を削除しますか？`)) return;
@@ -84,40 +125,96 @@ export default function ProductDetailPage() {
 
       <div className="card">
         {product.photo_path && (
-          <img
-            src={product.photo_path}
-            alt={product.name}
-            style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, marginBottom: 14 }}
-          />
+          <img src={product.photo_path} alt={product.name}
+            style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, marginBottom: 14 }} />
         )}
 
-        <h1 style={{ fontSize: 20, fontWeight: 700 }}>{product.name}</h1>
-        {product.maker && <p style={{ color: '#64748b', marginTop: 4 }}>{product.maker}</p>}
-        {product.item_code && <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 2 }}>品番: {product.item_code}</p>}
-        {product.supplier_url && (
-          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {product.supplier_url.split('\n').map(url => url.trim()).filter(Boolean).map((url, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', color: '#2563eb', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
-                🛒 発注先{product.supplier_url.split('\n').filter(u => u.trim()).length > 1 ? ` ${i + 1}` : ''}を開く
-              </a>
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[
+              { label: '商品名 *', key: 'name', type: 'text' },
+              { label: 'メーカー', key: 'maker', type: 'text' },
+              { label: '品番', key: 'item_code', type: 'text' },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                <input type={f.type} value={editForm[f.key]} onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))} />
+              </div>
             ))}
+            <div>
+              <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>カテゴリ</label>
+              <select value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white' }}>
+                <option value="">（なし）</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                {editForm.category && !categories.includes(editForm.category) && (
+                  <option value={editForm.category}>{editForm.category}</option>
+                )}
+              </select>
+              <input type="text" value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}
+                placeholder="新しいカテゴリを入力" style={{ marginTop: 6 }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>単位</label>
+                <select value={editForm.unit} onChange={e => setEditForm(p => ({ ...p, unit: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white' }}>
+                  <option value="">個</option>
+                  {['箱','袋','本','枚','セット','巻'].map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>アラート閾値</label>
+                <input type="number" value={editForm.alert_threshold} onChange={e => setEditForm(p => ({ ...p, alert_threshold: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>発注先URL</label>
+              <textarea value={editForm.supplier_url} onChange={e => setEditForm(p => ({ ...p, supplier_url: e.target.value }))}
+                rows={2} style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={() => setEditing(false)}
+                style={{ flex: 1, padding: 12, borderRadius: 8, background: '#f1f5f9', color: '#475569', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                キャンセル
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                style={{ flex: 1, padding: 12, borderRadius: 8, background: '#2563eb', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                {saving ? '保存中...' : '保存'}
+              </button>
+            </div>
           </div>
-        )}
-        {product.category && (
-          <div style={{ marginTop: 8 }}>
-            <span style={{
-              display: 'inline-block',
-              background: '#ede9fe',
-              color: '#6d28d9',
-              fontSize: 12,
-              fontWeight: 600,
-              padding: '3px 10px',
-              borderRadius: 10,
-            }}>
-              {product.category}
-            </span>
-          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <h1 style={{ fontSize: 20, fontWeight: 700 }}>{product.name}</h1>
+                {product.maker && <p style={{ color: '#64748b', marginTop: 4 }}>{product.maker}</p>}
+                {product.item_code && <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 2 }}>品番: {product.item_code}</p>}
+              </div>
+              <button onClick={startEdit}
+                style={{ background: '#f1f5f9', color: '#475569', padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}>
+                ✏️ 編集
+              </button>
+            </div>
+            {product.supplier_url && (
+              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {product.supplier_url.split('\n').map(url => url.trim()).filter(Boolean).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', color: '#2563eb', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
+                    🛒 発注先{product.supplier_url.split('\n').filter(u => u.trim()).length > 1 ? ` ${i + 1}` : ''}を開く
+                  </a>
+                ))}
+              </div>
+            )}
+            {product.category && (
+              <div style={{ marginTop: 8 }}>
+                <span style={{ display: 'inline-block', background: '#ede9fe', color: '#6d28d9', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 10 }}>
+                  {product.category}
+                </span>
+              </div>
+            )}
+          </>
         )}
 
         <div style={{ marginTop: 16, padding: '14px 0', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
