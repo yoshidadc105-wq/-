@@ -2,6 +2,19 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
+const PRESET_CATEGORIES = [
+  'グローブ・マスク',
+  '印象材・石膏',
+  'セメント・接着材',
+  '麻酔',
+  '薬剤',
+  '消耗品',
+  '滅菌・清掃用品',
+  'レントゲン',
+  '器具・器材',
+  '事務用品',
+];
+
 export default function AddProductPage() {
   const [photo, setPhoto] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
@@ -20,8 +33,9 @@ export default function AddProductPage() {
 
   useEffect(() => {
     api.getProducts().then(products => {
-      const cats = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
-      setCategories(cats);
+      const custom = products.map(p => p.category).filter(Boolean);
+      const all = [...new Set([...PRESET_CATEGORIES, ...custom])];
+      setCategories(all);
     });
     api.getSuppliers().then(setSuppliers).catch(() => {});
   }, []);
@@ -171,6 +185,16 @@ export default function AddProductPage() {
         <Field label="商品名 *" value={form.name} onChange={v => setForm(p => ({ ...p, name: v }))} placeholder="例: グラスアイオノマーセメント" />
         <Field label="メーカー" value={form.maker} onChange={v => setForm(p => ({ ...p, maker: v }))} placeholder="例: GC" />
         <Field label="品番" value={form.item_code} onChange={v => setForm(p => ({ ...p, item_code: v }))} placeholder="例: ABC-1234" />
+        <div>
+          <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>カテゴリ</label>
+          <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 15, background: 'white' }}>
+            <option value="">（なし）</option>
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input type="text" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+            placeholder="または新しいカテゴリを入力" style={{ marginTop: 6 }} />
+        </div>
         <div>
           <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 4 }}>発注先URL（任意・複数行で複数登録可）</label>
           <textarea
