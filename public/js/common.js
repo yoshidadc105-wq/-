@@ -82,10 +82,12 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// 日時を表示用に整形
+// 日時を表示用に整形（DBはUTC保存のため末尾にZを付けてJSTへ変換）
 function formatDate(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr.replace(' ', 'T'));
+  // SQLiteはUTCで保存されているため、Zを付与してブラウザのローカル時刻（JST）に変換
+  const isoStr = dateStr.replace(' ', 'T') + 'Z';
+  const d = new Date(isoStr);
   return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
     + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }
