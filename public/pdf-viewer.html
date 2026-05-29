@@ -30,6 +30,7 @@
       white-space: nowrap;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
+      text-decoration: none;
     }
     .back-btn:active { background: rgba(255,255,255,0.4); }
     .pdf-title {
@@ -56,46 +57,32 @@
     .dl-btn:active { background: rgba(255,255,255,0.4); }
     .pdf-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     iframe { flex: 1; width: 100%; border: none; }
-    .ios-fallback {
-      display: none;
-      flex: 1;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 16px;
-      padding: 32px;
-      text-align: center;
-      color: #555;
-    }
-    .ios-fallback a {
-      background: #3b6fd4;
-      color: white;
-      padding: 12px 28px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 16px;
-    }
-    .redirect-msg {
+    .fallback-area {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
       padding: 32px;
       text-align: center;
-      color: #555;
+      background: #f8fafc;
     }
-    .redirect-msg p { font-size: 15px; }
-    .redirect-msg .spinner {
-      width: 36px; height: 36px;
-      border: 3px solid #e2e8f0;
-      border-top-color: #3b6fd4;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .fallback-area .pdf-icon { font-size: 72px; }
+    .fallback-area p { color: #555; font-size: 15px; line-height: 1.7; }
+    .fallback-area .hint { font-size: 13px; color: #888; }
+    .open-btn {
+      background: #3b6fd4;
+      color: white;
+      padding: 14px 32px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 16px;
+      display: inline-block;
+      -webkit-tap-highlight-color: transparent;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .open-btn:active { opacity: 0.8; }
   </style>
 </head>
 <body>
@@ -106,14 +93,6 @@
 </div>
 <div class="pdf-area" id="pdfArea">
   <iframe id="pdfFrame" src="" title="PDF"></iframe>
-  <div class="ios-fallback" id="iosFallback">
-    <p>PDFが表示されない場合は下のボタンをタップしてください</p>
-    <a id="directLink" href="#">📄 PDFを開く</a>
-  </div>
-  <div class="redirect-msg" id="redirectMsg" style="display:none;">
-    <div class="spinner"></div>
-    <p>PDFを開いています…</p>
-  </div>
 </div>
 <script>
 const params = new URLSearchParams(location.search);
@@ -126,16 +105,21 @@ document.title = title;
 
 const fileUrl = '/uploads/' + file;
 document.getElementById('dlBtn').href = fileUrl;
-document.getElementById('directLink').href = fileUrl;
 
-// iOS Safari cannot scroll inside PDF iframes — only page 1 shows.
-// Redirect to the raw PDF so iOS native viewer handles it (all pages).
+// iOS Safari cannot scroll inside PDF iframes — only page 1 is visible.
+// Instead, show a button that opens the PDF in a new tab (native viewer).
+// The user closes that tab to return here, where the ← 戻る button is waiting.
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 if (isIOS) {
-  document.getElementById('pdfFrame').style.display = 'none';
-  document.getElementById('redirectMsg').style.display = 'flex';
-  // Small delay so the header renders before redirect
-  setTimeout(() => { window.location.replace(fileUrl); }, 300);
+  document.getElementById('pdfFrame').remove();
+  document.getElementById('pdfArea').innerHTML = `
+    <div class="fallback-area">
+      <div class="pdf-icon">📄</div>
+      <p>下のボタンをタップしてPDFを開いてください<br>
+        <span class="hint">（読み終わったらタブを閉じて戻ってください）</span>
+      </p>
+      <a href="${fileUrl}" target="_blank" class="open-btn">PDFを開く（全ページ）</a>
+    </div>`;
 } else {
   const frame = document.getElementById('pdfFrame');
   frame.src = fileUrl;
@@ -146,8 +130,12 @@ if (isIOS) {
 }
 
 function showFallback() {
-  document.getElementById('iosFallback').style.display = 'flex';
-  document.getElementById('pdfFrame').style.display = 'none';
+  document.getElementById('pdfArea').innerHTML = `
+    <div class="fallback-area">
+      <div class="pdf-icon">📄</div>
+      <p>PDFが表示できませんでした</p>
+      <a href="${fileUrl}" target="_blank" class="open-btn">PDFを開く</a>
+    </div>`;
 }
 
 function goBack() {
