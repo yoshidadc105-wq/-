@@ -2,11 +2,19 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>PDF閲覧</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #525659;
+    }
     .pdf-header {
       display: flex;
       align-items: center;
@@ -16,7 +24,8 @@
       color: white;
       min-height: 52px;
       flex-shrink: 0;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 10;
     }
     .back-btn {
       background: rgba(255,255,255,0.2);
@@ -30,7 +39,6 @@
       white-space: nowrap;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
-      text-decoration: none;
     }
     .back-btn:active { background: rgba(255,255,255,0.4); }
     .pdf-title {
@@ -47,7 +55,6 @@
       color: white;
       padding: 8px 12px;
       border-radius: 8px;
-      cursor: pointer;
       font-size: 14px;
       white-space: nowrap;
       flex-shrink: 0;
@@ -55,34 +62,44 @@
       -webkit-tap-highlight-color: transparent;
     }
     .dl-btn:active { background: rgba(255,255,255,0.4); }
-    .pdf-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    iframe { flex: 1; width: 100%; border: none; }
-    .fallback-area {
+    .pdf-body {
       flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 20px;
-      padding: 32px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px;
+    }
+    .pdf-page-wrap {
+      margin-bottom: 10px;
       text-align: center;
-      background: #f8fafc;
     }
-    .fallback-area .pdf-icon { font-size: 72px; }
-    .fallback-area p { color: #555; font-size: 15px; line-height: 1.7; }
-    .fallback-area .hint { font-size: 13px; color: #888; }
-    .open-btn {
-      background: #3b6fd4;
+    canvas {
+      display: block;
+      width: 100%;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .pdf-status {
       color: white;
-      padding: 14px 32px;
-      border-radius: 10px;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 16px;
-      display: inline-block;
-      -webkit-tap-highlight-color: transparent;
+      text-align: center;
+      padding: 48px 24px;
+      font-size: 15px;
+      line-height: 2;
     }
-    .open-btn:active { opacity: 0.8; }
+    .pdf-status .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .page-info {
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 6px;
+    }
   </style>
 </head>
 <body>
@@ -91,10 +108,16 @@
   <div class="pdf-title" id="pdfTitle">PDF</div>
   <a class="dl-btn" id="dlBtn" href="#">⬇ 保存</a>
 </div>
-<div class="pdf-area" id="pdfArea">
-  <iframe id="pdfFrame" src="" title="PDF"></iframe>
+<div class="pdf-body" id="pdfBody">
+  <div class="pdf-status">
+    <div class="spinner"></div>
+    <div>PDFを読み込んでいます…</div>
+  </div>
 </div>
 <script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 const params = new URLSearchParams(location.search);
 const file = params.get('file') || '';
 const title = params.get('title') || 'PDF';
@@ -106,36 +129,48 @@ document.title = title;
 const fileUrl = '/uploads/' + file;
 document.getElementById('dlBtn').href = fileUrl;
 
-// iOS Safari cannot scroll inside PDF iframes — only page 1 is visible.
-// Instead, show a button that opens the PDF in a new tab (native viewer).
-// The user closes that tab to return here, where the ← 戻る button is waiting.
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-if (isIOS) {
-  document.getElementById('pdfFrame').remove();
-  document.getElementById('pdfArea').innerHTML = `
-    <div class="fallback-area">
-      <div class="pdf-icon">📄</div>
-      <p>下のボタンをタップしてPDFを開いてください<br>
-        <span class="hint">（読み終わったらタブを閉じて戻ってください）</span>
-      </p>
-      <a href="${fileUrl}" target="_blank" class="open-btn">PDFを開く（全ページ）</a>
-    </div>`;
-} else {
-  const frame = document.getElementById('pdfFrame');
-  frame.src = fileUrl;
-  frame.onerror = showFallback;
-  setTimeout(() => {
-    if (!frame.contentDocument && frame.src) showFallback();
-  }, 4000);
-}
+async function loadPDF() {
+  const body = document.getElementById('pdfBody');
+  try {
+    const pdf = await pdfjsLib.getDocument(fileUrl).promise;
+    body.innerHTML = '';
 
-function showFallback() {
-  document.getElementById('pdfArea').innerHTML = `
-    <div class="fallback-area">
-      <div class="pdf-icon">📄</div>
-      <p>PDFが表示できませんでした</p>
-      <a href="${fileUrl}" target="_blank" class="open-btn">PDFを開く</a>
-    </div>`;
+    const containerWidth = body.clientWidth || (window.innerWidth - 24);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const naturalVp = page.getViewport({ scale: 1 });
+      const scale = (containerWidth / naturalVp.width) * dpr;
+      const vp = page.getViewport({ scale });
+
+      const wrap = document.createElement('div');
+      wrap.className = 'pdf-page-wrap';
+
+      if (pdf.numPages > 1) {
+        const label = document.createElement('div');
+        label.className = 'page-info';
+        label.textContent = `${i} / ${pdf.numPages}`;
+        wrap.appendChild(label);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = vp.width;
+      canvas.height = vp.height;
+      canvas.style.width = containerWidth + 'px';
+      canvas.style.height = Math.round(containerWidth * naturalVp.height / naturalVp.width) + 'px';
+      wrap.appendChild(canvas);
+      body.appendChild(wrap);
+
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+    }
+  } catch (e) {
+    body.innerHTML = `
+      <div class="pdf-status">
+        <div>PDFの読み込みに失敗しました</div>
+        <a href="${fileUrl}" style="color:#93c5fd; text-decoration:underline;">直接開く</a>
+      </div>`;
+  }
 }
 
 function goBack() {
@@ -145,6 +180,8 @@ function goBack() {
     history.length > 1 ? history.back() : window.close();
   }
 }
+
+loadPDF();
 </script>
 </body>
 </html>
