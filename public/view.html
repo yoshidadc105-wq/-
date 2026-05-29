@@ -89,6 +89,10 @@ let manualData = null;
 let selectedCategoryId = undefined;
 let allCategories = [];
 
+// PWA standalone mode = launched from home screen icon (no Safari chrome)
+const isStandalone = window.navigator.standalone === true;
+const isMobile = window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
 async function init() {
   const params = new URLSearchParams(window.location.search);
   manualId = params.get('id');
@@ -119,7 +123,6 @@ async function loadManual() {
 
   const canEdit = currentUser.role === 'admin' || manualData.created_by === currentUser.id;
   const canDelete = currentUser.role === 'admin';
-  const isMobile = window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   let bodyHtml = '';
 
@@ -127,28 +130,33 @@ async function loadManual() {
     const pdfUrl = `/uploads/${manualData.file_path}`;
     const viewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(manualData.file_path)}&title=${encodeURIComponent(manualData.title)}&id=${manualId}`;
 
-    const actionBtns = `
+    const subBtns = `
       <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-        <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+        <a href="${pdfUrl}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
         ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
         ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
         ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
       </div>`;
 
     if (isMobile) {
-      // 1タップでPDFに直接移動。Safariの「<」でview.htmlに戻れる。
-      bodyHtml = actionBtns + `
+      // PWAモード（ホーム画面起動）: target=_blank でSafariモーダルを開く→「完了」で戻れる
+      // 通常Safari: 直接遷移→Safariの「<」で戻れる
+      const target = isStandalone ? ' target="_blank"' : '';
+      const hint = isStandalone
+        ? '読み終わったら画面上の「完了」で戻れます'
+        : 'Safariの「&lt;」ボタンで戻れます';
+      bodyHtml = subBtns + `
         <div style="text-align:center; padding:40px 20px; background:white; border-radius:8px; border:1px solid #e2e8f0;">
           <div style="font-size:64px; margin-bottom:12px;">📄</div>
           <p style="color:#64748b; font-size:14px; margin-bottom:4px;">${manualData.file_name || 'PDF'}</p>
-          <p style="color:#94a3b8; font-size:12px; margin-bottom:20px;">開いた後はSafariの「&lt;」で戻れます</p>
-          <a href="${pdfUrl}" class="btn btn-primary btn-lg">PDFを見る</a>
+          <p style="color:#94a3b8; font-size:12px; margin-bottom:20px;">${hint}</p>
+          <a href="${pdfUrl}"${target} class="btn btn-primary btn-lg">PDFを見る</a>
         </div>`;
     } else {
       bodyHtml = `
         <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
           <a href="${viewerUrl}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
-          <a href="/uploads/${manualData.file_path}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+          <a href="${pdfUrl}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
           ${canEdit ? `<a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>` : ''}
           ${canEdit ? `<button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>` : ''}
           ${canDelete ? `<button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : ''}
