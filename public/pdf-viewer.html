@@ -129,6 +129,14 @@
       cursor: pointer;
       white-space: nowrap;
     }
+    .scroll-hint {
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+      text-align: center;
+      padding: 10px 16px;
+      flex-shrink: 0;
+      background: rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 <body>
@@ -143,6 +151,7 @@
     <div>PDFを読み込んでいます…</div>
   </div>
 </div>
+<div class="scroll-hint" id="scrollHint" style="display:none">↓ 最後までスクロールすると確認ボタンが表示されます</div>
 <div class="pdf-footer" id="pdfFooter" style="display:none">
   <button class="check-btn" id="checkBtn" onclick="toggleCheck()"></button>
 </div>
@@ -162,9 +171,25 @@ const fileUrl = '/uploads/' + file;
 document.getElementById('dlBtn').href = fileUrl;
 
 let isChecked = false;
+let scrollUnlocked = false;
+
+function unlockFooter() {
+  if (scrollUnlocked) return;
+  scrollUnlocked = true;
+  document.getElementById('scrollHint').style.display = 'none';
+  document.getElementById('pdfFooter').style.display = '';
+}
+
+function checkScrollBottom() {
+  if (scrollUnlocked) return;
+  const body = document.getElementById('pdfBody');
+  // 80px threshold so it triggers just before the very last pixel
+  if (body.scrollTop + body.clientHeight >= body.scrollHeight - 80) {
+    unlockFooter();
+  }
+}
 
 async function initMeta() {
-  // ユーザー情報取得（ダウンロードボタンの表示制御）
   const meRes = await fetch('/api/auth/me');
   if (meRes.ok) {
     const user = await meRes.json();
@@ -172,14 +197,16 @@ async function initMeta() {
       document.getElementById('dlBtn').style.display = '';
     }
   }
-  // 確認ステータス取得
   if (backId) {
     const checkRes = await fetch(`/api/progress/check/${backId}`);
     if (checkRes.ok) {
       const data = await checkRes.json();
       isChecked = data.checked;
       renderCheckBtn();
-      document.getElementById('pdfFooter').style.display = '';
+      if (isChecked) {
+        // Already confirmed — show button immediately without requiring scroll
+        unlockFooter();
+      }
     }
   }
 }
@@ -238,12 +265,27 @@ async function loadPDF() {
       body.appendChild(wrap);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
     }
+    // Attach scroll listener
+    body.addEventListener('scroll', checkScrollBottom, { passive: true });
+    // Show hint if scroll is needed; check immediately if content fits
+    setTimeout(() => {
+      if (!scrollUnlocked) {
+        if (body.scrollHeight <= body.clientHeight + 80) {
+          // PDF fits on screen — no scrolling needed, reveal immediately
+          unlockFooter();
+        } else {
+          document.getElementById('scrollHint').style.display = '';
+        }
+      }
+    }, 300);
   } catch(e) {
     body.innerHTML = `
       <div class="pdf-status">
         <div>PDFの読み込みに失敗しました</div>
         <a href="${fileUrl}" style="color:#93c5fd; text-decoration:underline;">直接開く</a>
       </div>`;
+    // On error, show the footer anyway so the user can still confirm
+    unlockFooter();
   }
 }
 
