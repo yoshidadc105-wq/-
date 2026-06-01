@@ -7,8 +7,8 @@ export default function HomePage() {
   const [lowStock, setLowStock] = useState([]);
   const [expiring, setExpiring] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('すべて');
+  const [search, setSearch] = useState(() => sessionStorage.getItem('homeSearch') || '');
+  const [selectedCategory, setSelectedCategory] = useState(() => sessionStorage.getItem('homeCategory') || 'すべて');
   const [sheet, setSheet] = useState(null); // { product, mode: 'use'|'receive' }
   const [quantity, setQuantity] = useState(1);
   const [expiryDate, setExpiryDate] = useState('');
@@ -115,7 +115,7 @@ export default function HomePage() {
 
       <input
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={e => { setSearch(e.target.value); sessionStorage.setItem('homeSearch', e.target.value); }}
         placeholder="🔍  商品名・メーカーで検索"
         style={{ background: 'white' }}
       />
@@ -123,7 +123,7 @@ export default function HomePage() {
       {categories.length > 1 && (
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch' }}>
           {categories.map(cat => (
-            <button key={cat} onClick={() => setSelectedCategory(cat)} style={{
+            <button key={cat} onClick={() => { setSelectedCategory(cat); sessionStorage.setItem('homeCategory', cat); }} style={{
               flexShrink: 0, padding: '6px 14px', borderRadius: 20, fontSize: 13,
               fontWeight: selectedCategory === cat ? 700 : 400,
               background: selectedCategory === cat ? '#2563eb' : '#f1f5f9',
@@ -276,7 +276,7 @@ export default function HomePage() {
               />
               <button onClick={() => setQuantity(q => q + 1)} style={{
                 width: 52, height: 52, borderRadius: '50%',
-                background: sheet.mode === 'use' ? '#dc2626' : '#16a34a',
+                background: sheet.mode === 'use' ? '#dc2626' : sheet.mode === 'adjust' ? '#7c3aed' : '#16a34a',
                 color: 'white', fontSize: 28, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>＋</button>
