@@ -669,7 +669,7 @@ async function loadCategories() {
       .filter(c => parentId === null ? !c.parent_id : c.parent_id == parentId)
       .forEach(c => {
         const indent = depth * 20;
-        const nameEscaped = c.name.replace(/'/g, "\\'");
+        const nameEscaped = c.name.replace(/'/g, "\\'" );
         html += `<tr>
           <td style="font-weight:500; padding-left:${8 + indent}px;">${depth > 0 ? '└ ' : ''}${c.name}</td>
           <td class="text-muted">${c.description || '-'}</td>
@@ -943,8 +943,8 @@ async function scanPdfs() {
 }
 
 async function registerOne(btn) {
-  const sel = btn.previousElementSibling;
-  if (!sel.value) {
+  const sel = btn.closest('td').querySelector('select.scan-manual-sel');
+  if (!sel || !sel.value) {
     showAlert('alert', 'マニュアルを選択してください', 'error');
     return;
   }
