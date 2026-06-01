@@ -176,14 +176,14 @@ router.get('/stock/:product_id', authMiddleware, async (req, res) => {
 // 統合履歴（使用 + 入荷）
 router.get('/history/:product_id', authMiddleware, async (req, res) => {
   const { rows: useLogs } = await pool.query(`
-    SELECT ul.quantity, u.display_name, ul.logged_at, 'use' as type, NULL as expiry_date
+    SELECT ul.id, ul.quantity, u.display_name, ul.logged_at, 'use' as type, NULL as expiry_date
     FROM usage_logs ul
     LEFT JOIN users u ON ul.user_id = u.id
     WHERE ul.product_id = $1
   `, [req.params.product_id]);
 
   const { rows: stockLogs } = await pool.query(`
-    SELECT sl.quantity, u.display_name, sl.logged_at, 'receive' as type, sl.expiry_date
+    SELECT sl.id, sl.quantity, u.display_name, sl.logged_at, 'receive' as type, sl.expiry_date
     FROM stock_logs sl
     LEFT JOIN users u ON sl.user_id = u.id
     WHERE sl.product_id = $1
@@ -191,6 +191,34 @@ router.get('/history/:product_id', authMiddleware, async (req, res) => {
 
   const combined = [...useLogs, ...stockLogs].sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at));
   res.json(combined);
+});
+
+// 使用記録を削除して在庫を復元
+router.delete('/usage-log/:id', authMiddleware, async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM usage_logs WHERE id = $1', [req.params.id]);
+  const log = rows[0];
+  if (!log) return res.status(404).json({ error: '記録が見つかりません' });
+
+  await pool.query('DELETE FROM usage_logs WHERE id = $1', [req.params.id]);
+
+  const { rows: lots } = await pool.query(
+    'SELECT * FROM product_lots WHERE product_id = $1 AND quantity > 0',
+    [log.product_id]
+  );
+  if (lots.length > 0) {
+    await pool.query(
+      'INSERT INTO product_lots (product_id, quantity, package_label) VALUES ($1, $2, $3)',
+      [log.product_id, log.quantity, '使用削除']
+    );
+    await pool.query(
+      'UPDATE products SET stock = (SELECT COALESCE(SUM(quantity), 0) FROM product_lots WHERE product_id = $1) WHERE id = $1',
+      [log.product_id]
+    );
+  } else {
+    await pool.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [log.quantity, log.product_id]);
+  }
+
+  res.json({ success: true });
 });
 
 module.exports = router;

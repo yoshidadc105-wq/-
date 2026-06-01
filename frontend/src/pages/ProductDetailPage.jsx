@@ -113,6 +113,21 @@ export default function ProductDetailPage() {
     }
   };
 
+  const handleDeleteUsageLog = async (logId, qty) => {
+    if (!confirm(`この使用記録（${qty}個）を削除しますか？\n在庫数が${qty}個戻ります。`)) return;
+    try {
+      await api.deleteUsageLog(logId);
+      const [updatedLots, updatedProduct, updatedHistory] = await Promise.all([
+        api.getLots(id), api.getProduct(id), api.getHistory(id)
+      ]);
+      setLots(updatedLots);
+      setProduct(updatedProduct);
+      setHistory(updatedHistory);
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
   const handleDeleteLot = async (lotId) => {
     if (!confirm('このロットを削除しますか？在庫数も減らされます。')) return;
     try {
@@ -360,8 +375,8 @@ export default function ProductDetailPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {history.map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 18 }}>{item.type === 'receive' ? '📥' : '✂️'}</span>
                   <div>
                     <span style={{ fontWeight: 600, color: item.type === 'receive' ? '#16a34a' : '#dc2626' }}>
@@ -375,9 +390,17 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>
-                  {new Date(item.logged_at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {new Date(item.logged_at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {item.type === 'use' && item.id && (
+                    <button onClick={() => handleDeleteUsageLog(item.id, item.quantity)}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+                      削除
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
