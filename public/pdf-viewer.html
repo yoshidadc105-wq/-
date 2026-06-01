@@ -148,7 +148,7 @@
   </style>
 </head>
 <body>
-<div class="pdf-header">
+<div class="pdf-header" id="pdfHeader">
   <button class="back-btn" onclick="goBack()">← 戻る</button>
   <div class="pdf-title" id="pdfTitle">PDF</div>
   <a class="dl-btn" id="dlBtn" href="#" style="display:none">⬇ 保存</a>
@@ -171,12 +171,17 @@ const params = new URLSearchParams(location.search);
 const file = params.get('file') || '';
 const title = params.get('title') || 'PDF';
 const backId = params.get('id') || '';
+const embedded = params.get('embedded') === '1';
 
 document.getElementById('pdfTitle').textContent = title;
 document.title = title;
 
 const fileUrl = '/uploads/' + file;
 document.getElementById('dlBtn').href = fileUrl;
+
+if (embedded) {
+  document.getElementById('pdfHeader').style.display = 'none';
+}
 
 let isChecked = false;
 let scrollUnlocked = false;
@@ -200,7 +205,7 @@ async function initMeta() {
   const meRes = await fetch('/api/auth/me');
   if (meRes.ok) {
     const user = await meRes.json();
-    if (user.role === 'admin') document.getElementById('dlBtn').style.display = '';
+    if (user.role === 'admin') document.getElementById('dlBtn').style.display = embedded ? 'none' : '';
   }
   if (backId) {
     const checkRes = await fetch(`/api/progress/check/${backId}`);
@@ -238,13 +243,16 @@ async function toggleCheck(e) {
   btn.disabled = false;
 }
 
-// PDF内のリンクをクリックしたとき: 対応表を確認 → なければ新タブ
 async function openRedirect(url) {
   try {
     const res = await fetch('/api/url-redirects/resolve?url=' + encodeURIComponent(url));
     if (res.ok) {
       const data = await res.json();
-      location.href = '/view.html?id=' + data.manual_id;
+      if (embedded) {
+        window.parent.location.href = '/view.html?id=' + data.manual_id;
+      } else {
+        location.href = '/view.html?id=' + data.manual_id;
+      }
       return;
     }
   } catch (_) {}
@@ -280,7 +288,6 @@ async function loadPDF() {
       canvas.style.width = containerWidth + 'px';
       canvas.style.height = Math.round(containerWidth * naturalVp.height / naturalVp.width) + 'px';
 
-      // canvasBoxにcanvasとリンクオーバーレイをまとめる
       const canvasBox = document.createElement('div');
       canvasBox.className = 'pdf-canvas-box';
       canvasBox.appendChild(canvas);
@@ -289,7 +296,6 @@ async function loadPDF() {
 
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
 
-      // PDF内のリンクアノテーションをオーバーレイ
       const annotations = await page.getAnnotations();
       if (annotations.length > 0) {
         const displayVp = page.getViewport({ scale: containerWidth / naturalVp.width });

@@ -130,12 +130,13 @@ async function loadManual() {
           <a href="${viewerUrl}" class="btn btn-primary btn-lg">PDFを見る</a>
         </div>`;
     } else {
+      const embeddedViewerUrl = viewerUrl + '&embedded=1';
       bodyHtml = `
         <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-          <a href="${viewerUrl}" target="_blank" class="btn btn-primary btn-sm">🔍 別タブで開く（大きく見る）</a>
+          <a href="${viewerUrl}" target="_blank" class="btn btn-secondary btn-sm">🔍 別タブで開く</a>
           ${adminBtns}
         </div>
-        <iframe src="${pdfUrl}#toolbar=1&view=FitH" class="pdf-viewer" style="min-height:80vh;"></iframe>`;
+        <iframe src="${embeddedViewerUrl}" class="pdf-viewer" style="min-height:82vh; width:100%; border:none; border-radius:8px;"></iframe>`;
     }
   } else if (manualData.type === 'steps') {
     let stepsData = {};
@@ -172,7 +173,6 @@ async function loadManual() {
       <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>
     </div>` : '';
 
-  // PDFは pdf-viewer.html で確認できるので、view.htmlの「確認しました」欄は非表示
   const checkAreaHtml = manualData.type !== 'pdf' ? `
     <div class="card mt-2">
       <div class="card-body" style="text-align:center; padding:24px;" id="checkArea">
@@ -205,7 +205,7 @@ function escHtml(str) {
 
 async function loadCheckStatus() {
   const area = document.getElementById('checkArea');
-  if (!area) return; // PDFタイプは pdf-viewer.html で確認
+  if (!area) return;
   const res = await fetch(`/api/progress/check/${manualId}`);
   const data = await res.json();
   renderCheckButton(data.checked, data.checked_at);
