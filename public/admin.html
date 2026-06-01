@@ -158,14 +158,14 @@
       <div id="scanSection" style="display:none;">
         <div style="padding:12px 16px 16px;">
           <p id="scanSummary" class="text-sm text-muted mb-2"></p>
-          <p class="text-sm text-muted mb-2" style="color:#555;">💡 URLの横の <strong>「旧URLを開く」</strong> をクリックすると旧システムが開き、どのマニュアルか確認できます。確認できたものだけドロップダウンで選んで「登録」してください。</p>
+          <p class="text-sm mb-2" style="color:#555;">💡 URLの横の <strong>「旧URLを開く」</strong> で旧システムを確認し、テキストボックスで絞り込んでマニュアルを選んで「登録」してください。</p>
           <div id="scanTableWrap" class="table-wrap" style="display:none;">
             <table>
               <thead>
                 <tr>
                   <th style="width:22%;">PDFマニュアル</th>
-                  <th style="width:32%;">埋め込みURL</th>
-                  <th style="width:46%;">登録先マニュアル</th>
+                  <th style="width:30%;">埋め込みURL</th>
+                  <th style="width:48%;">登録先マニュアル</th>
                 </tr>
               </thead>
               <tbody id="scanTableBody"></tbody>
@@ -856,6 +856,18 @@ function htmlEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// スキャン行のドロップダウンをテキストで絞り込み
+function filterScanSelect(input) {
+  const q = input.value.toLowerCase();
+  const sel = input.parentElement.querySelector('select.scan-manual-sel');
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">—— 選択してください ——</option>' +
+    allManualsList
+      .filter(m => !q || m.title.toLowerCase().includes(q))
+      .map(m => `<option value="${m.id}"${String(m.id) === currentVal ? ' selected' : ''}>${htmlEsc(m.title)}</option>`)
+      .join('');
+}
+
 async function scanPdfs() {
   const btn = document.getElementById('scanBtn');
   btn.disabled = true;
@@ -899,7 +911,7 @@ async function scanPdfs() {
     pdfData.urls.forEach(urlInfo => {
       const isReg = urlInfo.already_registered;
       rows.push(`
-        <tr id="scan-row-${urlInfo.url.replace(/[^a-z0-9]/gi,'_')}">
+        <tr>
           <td class="text-sm">${htmlEsc(pdfData.manual_title)}</td>
           <td style="font-size:11px;">
             <div style="word-break:break-all; margin-bottom:3px;">${htmlEsc(urlInfo.url)}</div>
@@ -908,12 +920,15 @@ async function scanPdfs() {
           <td>
             ${isReg
               ? '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>'
-              : `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                   <select class="form-control scan-manual-sel" data-url="${htmlEsc(urlInfo.url)}" style="font-size:12px; padding:4px 6px; flex:1; min-width:120px;">
-                     <option value="" selected>-- 選択してください --</option>
-                     ${optionsHtml}
-                   </select>
-                   <button onclick="registerOne(this)" class="btn btn-primary btn-sm" style="white-space:nowrap;">登録</button>
+              : `<div>
+                   <input type="text" class="form-control" placeholder="マニュアルを検索..." oninput="filterScanSelect(this)" style="font-size:12px; padding:4px 6px; margin-bottom:4px;">
+                   <div style="display:flex; gap:6px; align-items:center;">
+                     <select class="form-control scan-manual-sel" data-url="${htmlEsc(urlInfo.url)}" style="font-size:12px; padding:4px 6px; flex:1;">
+                       <option value="" selected>—— 選択してください ——</option>
+                       ${optionsHtml}
+                     </select>
+                     <button onclick="registerOne(this)" class="btn btn-primary btn-sm" style="white-space:nowrap;">登録</button>
+                   </div>
                  </div>`
             }
           </td>
@@ -941,9 +956,7 @@ async function registerOne(btn) {
   });
   const data = await res.json();
   if (res.ok) {
-    // その行を「登録済み」表示に差し替え
-    const td = btn.parentElement.parentElement;
-    td.innerHTML = '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>';
+    btn.closest('td').innerHTML = '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>';
     showAlert('alert', data.message, 'success');
     loadUrlRedirects();
   } else {
