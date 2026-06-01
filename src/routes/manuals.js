@@ -128,10 +128,17 @@ router.put('/:id', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
   if (!manual) return res.status(404).json({ error: 'マニュアルが見つかりません' });
-  const { title, description, content, category_id } = req.body;
+  const { title, description, content, category_id, convert_to_type } = req.body;
   if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
-  db.prepare(`UPDATE manuals SET title = ?, description = ?, content = ?, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
-    .run(title, description || null, content || manual.content, category_id || null, req.session.userId, req.params.id);
+
+  if (convert_to_type && convert_to_type !== manual.type) {
+    // 形式変換（例: PDF → ステップ）
+    db.prepare(`UPDATE manuals SET title = ?, description = ?, type = ?, content = ?, file_path = NULL, file_name = NULL, file_size = NULL, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
+      .run(title, description || null, convert_to_type, content || '{}', category_id || null, req.session.userId, req.params.id);
+  } else {
+    db.prepare(`UPDATE manuals SET title = ?, description = ?, content = ?, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
+      .run(title, description || null, content || manual.content, category_id || null, req.session.userId, req.params.id);
+  }
   res.json({ message: 'マニュアルを更新しました' });
 });
 

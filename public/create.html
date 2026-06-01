@@ -49,10 +49,10 @@
 
   <div id="alert" class="hidden"></div>
 
-  <!-- 種別タブ（新規作成時のみ表示） -->
+  <!-- 種別タブ -->
   <div id="typeTabs" class="tabs">
-    <div class="tab active" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
-    <div class="tab" onclick="switchType('steps', this)">📋 ステップで作成</div>
+    <div class="tab active" id="tabPdf" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
+    <div class="tab" id="tabSteps" onclick="switchType('steps', this)">📋 ステップで作成</div>
   </div>
 
   <form id="manualForm">
@@ -225,9 +225,10 @@ async function loadEditData() {
   document.getElementById('description').value = editManual.description || '';
   document.getElementById('categorySelect').value = editManual.category_id || '';
 
-  document.getElementById('typeTabs').classList.add('hidden');
-
   if (editManual.type === 'pdf') {
+    // PDFマニュアル：タブを表示してステップへの変換を可能にする
+    document.getElementById('tabPdf').textContent = '📄 PDFのまま編集';
+    document.getElementById('tabSteps').textContent = '📋 ステップに変換';
     switchType('pdf');
     document.getElementById('uploadArea').innerHTML = `
       <div class="upload-area-icon">📄</div>
@@ -235,7 +236,9 @@ async function loadEditData() {
       <div class="upload-area-hint">${formatFileSize(editManual.file_size)}</div>
     `;
     document.getElementById('replacePdfOption').classList.remove('hidden');
+    // タブは表示したまま（変換できるようにする）
   } else if (editManual.type === 'steps') {
+    document.getElementById('typeTabs').classList.add('hidden');
     switchType('steps');
     let stepsData = {};
     try { stepsData = JSON.parse(editManual.content || '{}'); } catch(e) {}
@@ -252,6 +255,7 @@ async function loadEditData() {
     }));
     renderSteps();
   } else {
+    document.getElementById('typeTabs').classList.add('hidden');
     switchType('rich_text');
     quill.root.innerHTML = editManual.content || '';
   }
@@ -261,6 +265,11 @@ function switchType(type, tabEl) {
   currentType = type;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   if (tabEl) tabEl.classList.add('active');
+  // タブが指定されていない場合は該当タブをアクティブに
+  if (!tabEl) {
+    if (type === 'pdf') document.getElementById('tabPdf').classList.add('active');
+    if (type === 'steps') document.getElementById('tabSteps').classList.add('active');
+  }
   document.getElementById('textSection').classList.toggle('hidden', type !== 'rich_text');
   document.getElementById('pdfSection').classList.toggle('hidden', type !== 'pdf');
   document.getElementById('stepsSection').classList.toggle('hidden', type !== 'steps');
@@ -282,7 +291,6 @@ function toggleReplaceMode(checked) {
 function addStep() {
   steps.push({ id: ++stepCounter, title: '', imageName: null, description: '' });
   renderSteps();
-  // 追加されたステップにスクロール
   setTimeout(() => {
     const cards = document.querySelectorAll('.step-card');
     if (cards.length > 0) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -457,7 +465,24 @@ async function createManual(title, description, categoryId) {
 async function updateManual(title, description, categoryId) {
   let res, data;
 
-  if (editManual.type === 'steps') {
+  if (editManual.type === 'pdf' && currentType === 'steps') {
+    // PDFからステップへ変換
+    if (steps.length === 0) {
+      showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').textContent = '更新する';
+      return;
+    }
+    const content = JSON.stringify({
+      cover_image: coverImageName,
+      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
+    });
+    res = await fetch(`/api/manuals/${editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, content, category_id: categoryId || null, convert_to_type: 'steps' })
+    });
+  } else if (editManual.type === 'steps') {
     const content = JSON.stringify({
       cover_image: coverImageName,
       steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
