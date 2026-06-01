@@ -158,20 +158,21 @@
       <div id="scanSection" style="display:none;">
         <div style="padding:12px 16px 16px;">
           <p id="scanSummary" class="text-sm text-muted mb-2"></p>
+          <p class="text-sm text-muted mb-2" style="color:#555;">💡 URLの横の <strong>「旧URLを開く」</strong> をクリックすると旧システムが開き、どのマニュアルか確認できます。確認できたものだけドロップダウンで選んで「登録」してください。</p>
           <div id="scanTableWrap" class="table-wrap" style="display:none;">
             <table>
               <thead>
                 <tr>
-                  <th style="width:28%;">PDFマニュアル</th>
-                  <th style="width:38%;">埋め込みURL</th>
-                  <th style="width:34%;">登録先マニュアル</th>
+                  <th style="width:22%;">PDFマニュアル</th>
+                  <th style="width:32%;">埋め込みURL</th>
+                  <th style="width:46%;">登録先マニュアル</th>
                 </tr>
               </thead>
               <tbody id="scanTableBody"></tbody>
             </table>
           </div>
           <div id="bulkRegisterWrap" style="display:none; margin-top:12px;">
-            <button onclick="bulkRegister()" class="btn btn-primary">一括登録する</button>
+            <button onclick="bulkRegister()" class="btn btn-secondary">選択済みをまとめて登録</button>
           </div>
         </div>
       </div>
@@ -898,16 +899,22 @@ async function scanPdfs() {
     pdfData.urls.forEach(urlInfo => {
       const isReg = urlInfo.already_registered;
       rows.push(`
-        <tr>
+        <tr id="scan-row-${urlInfo.url.replace(/[^a-z0-9]/gi,'_')}">
           <td class="text-sm">${htmlEsc(pdfData.manual_title)}</td>
-          <td style="word-break:break-all; font-size:12px;">${htmlEsc(urlInfo.url)}</td>
+          <td style="font-size:11px;">
+            <div style="word-break:break-all; margin-bottom:3px;">${htmlEsc(urlInfo.url)}</div>
+            <a href="${htmlEsc(urlInfo.url)}" target="_blank" rel="noopener" style="color:var(--primary); font-size:11px;">旧URLを開く ↗</a>
+          </td>
           <td>
             ${isReg
               ? '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>'
-              : `<select class="form-control scan-manual-sel" data-url="${htmlEsc(urlInfo.url)}" style="font-size:12px; padding:4px 6px;">
-                   <option value="">-- 選択してください --</option>
-                   ${optionsHtml}
-                 </select>`
+              : `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                   <select class="form-control scan-manual-sel" data-url="${htmlEsc(urlInfo.url)}" style="font-size:12px; padding:4px 6px; flex:1; min-width:120px;">
+                     <option value="" selected>-- 選択してください --</option>
+                     ${optionsHtml}
+                   </select>
+                   <button onclick="registerOne(this)" class="btn btn-primary btn-sm" style="white-space:nowrap;">登録</button>
+                 </div>`
             }
           </td>
         </tr>
@@ -918,6 +925,31 @@ async function scanPdfs() {
   tbody.innerHTML = rows.join('');
   tableWrap.style.display = '';
   bulkWrap.style.display = unregistered > 0 ? '' : 'none';
+}
+
+async function registerOne(btn) {
+  const sel = btn.previousElementSibling;
+  if (!sel.value) {
+    showAlert('alert', 'マニュアルを選択してください', 'error');
+    return;
+  }
+  btn.disabled = true;
+  const res = await fetch('/api/url-redirects/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mappings: [{ old_url: sel.dataset.url, manual_id: parseInt(sel.value) }] })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    // その行を「登録済み」表示に差し替え
+    const td = btn.parentElement.parentElement;
+    td.innerHTML = '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>';
+    showAlert('alert', data.message, 'success');
+    loadUrlRedirects();
+  } else {
+    btn.disabled = false;
+    showAlert('alert', data.error || '登録に失敗しました', 'error');
+  }
 }
 
 async function bulkRegister() {
