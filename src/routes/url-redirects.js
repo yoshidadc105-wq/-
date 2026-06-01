@@ -15,7 +15,12 @@ router.get('/resolve', requireLogin, (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'url parameter required' });
   const db = getDb();
-  const mapping = db.prepare('SELECT manual_id FROM url_redirects WHERE old_url = ?').get(url);
+  const trimmed = url.trim();
+  const withoutSlash = trimmed.replace(/\/$/, '');
+  const mapping =
+    db.prepare('SELECT manual_id FROM url_redirects WHERE old_url = ?').get(trimmed) ||
+    db.prepare('SELECT manual_id FROM url_redirects WHERE old_url = ?').get(withoutSlash) ||
+    db.prepare('SELECT manual_id FROM url_redirects WHERE old_url = ?').get(withoutSlash + '/');
   if (!mapping) return res.status(404).json({ error: 'Not found' });
   res.json({ manual_id: mapping.manual_id });
 });
@@ -100,18 +105,16 @@ router.post('/bulk', requireAdmin, (req, res) => {
   const db = getDb();
   let inserted = 0, skipped = 0;
   const insert = db.prepare('INSERT OR IGNORE INTO url_redirects (old_url, manual_id) VALUES (?, ?)');
-  const doInsert = db.transaction(() => {
-    for (const { old_url, manual_id } of mappings) {
-      if (!old_url || !manual_id) continue;
-      const result = insert.run(old_url.trim(), parseInt(manual_id));
-      if (result.changes > 0) inserted++;
-      else skipped++;
-    }
-  });
-  doInsert();
+  for (const { old_url, manual_id } of mappings) {
+    if (!old_url || !manual_id) continue;
+    const result = insert.run(old_url.trim(), parseInt(manual_id));
+    if (result.changes > 0) inserted++;
+    else skipped++;
+  }
   res.json({
     message: `${inserted}件を登録しました${skipped > 0 ? `（${skipped}件はすでに登録済みのためスキップ）` : ''}`,
-    inserted, skipped
+    inserted,
+    skipped
   });
 });
 
