@@ -17,6 +17,7 @@ export default function HomePage() {
   const [otherSupplier, setOtherSupplier] = useState(false);
   const [unitPrice, setUnitPrice] = useState('');
   const [selectedLotId, setSelectedLotId] = useState(null);
+  const [adjustDir, setAdjustDir] = useState('add');
   const [submitting, setSubmitting] = useState(false);
   const [flashMessage, setFlashMessage] = useState('');
   const [suppliers, setSuppliers] = useState([]);
@@ -45,6 +46,7 @@ export default function HomePage() {
     setExpiryDate('');
     setPackageLabel('');
     setSelectedLotId(null);
+    setAdjustDir('add');
     setSupplierName(product.default_supplier || '');
     setOtherSupplier(false);
     setUnitPrice(product.default_price ? String(product.default_price) : '');
@@ -59,9 +61,13 @@ export default function HomePage() {
       if (sheet.mode === 'use') {
         await api.useProduct(sheet.product.id, quantity, null, selectedLotId || undefined);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 使用しました`);
-      } else {
+      } else if (sheet.mode === 'receive') {
         await api.receiveProduct(sheet.product.id, quantity, null, expiryDate || undefined, packageLabel || undefined, supplierName || undefined, unitPrice ? parseInt(unitPrice) : undefined);
         setFlashMessage(`✅ ${sheet.product.name} を ${quantity}個 入荷しました`);
+      } else {
+        const delta = adjustDir === 'add' ? quantity : -quantity;
+        await api.adjustProduct(sheet.product.id, delta);
+        setFlashMessage(`✅ ${sheet.product.name} の在庫を修正しました`);
       }
       closeSheet();
       await load();
@@ -197,16 +203,20 @@ export default function HomePage() {
             </div>
 
             {/* Mode tabs */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-              {['use', 'receive'].map(mode => (
-                <button key={mode} onClick={() => { setSheet(s => ({ ...s, mode })); setQuantity(1); setExpiryDate(''); }}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+              {[
+                { key: 'use',     label: '✂️ 使用',  color: '#dc2626' },
+                { key: 'receive', label: '📥 入荷',  color: '#16a34a' },
+                { key: 'adjust',  label: '📝 修正',  color: '#7c3aed' },
+              ].map(({ key, label, color }) => (
+                <button key={key} onClick={() => { setSheet(s => ({ ...s, mode: key })); setQuantity(1); setExpiryDate(''); setAdjustDir('add'); }}
                   style={{
-                    flex: 1, padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: 15,
-                    background: sheet.mode === mode ? (mode === 'use' ? '#dc2626' : '#16a34a') : '#f1f5f9',
-                    color: sheet.mode === mode ? 'white' : '#64748b',
+                    flex: 1, padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: 14,
+                    background: sheet.mode === key ? color : '#f1f5f9',
+                    color: sheet.mode === key ? 'white' : '#64748b',
                     border: 'none', cursor: 'pointer',
                   }}>
-                  {mode === 'use' ? '✂️ 使用' : '📥 入荷'}
+                  {label}
                 </button>
               ))}
             </div>
@@ -272,6 +282,37 @@ export default function HomePage() {
               }}>＋</button>
             </div>
 
+            {/* Adjust mode: add/subtract toggle */}
+            {sheet.mode === 'adjust' && (() => {
+              const currentStock = sheet.product.lots && sheet.product.lots.length > 0
+                ? sheet.product.lots.reduce((s, l) => s + l.quantity, 0)
+                : sheet.product.stock;
+              const afterStock = currentStock + (adjustDir === 'add' ? quantity : -quantity);
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <button onClick={() => setAdjustDir('add')} style={{
+                      flex: 1, padding: 10, borderRadius: 8, fontWeight: 700, fontSize: 14,
+                      background: adjustDir === 'add' ? '#7c3aed' : '#f1f5f9',
+                      color: adjustDir === 'add' ? 'white' : '#64748b',
+                      border: 'none', cursor: 'pointer',
+                    }}>＋ 追加</button>
+                    <button onClick={() => setAdjustDir('subtract')} style={{
+                      flex: 1, padding: 10, borderRadius: 8, fontWeight: 700, fontSize: 14,
+                      background: adjustDir === 'subtract' ? '#dc2626' : '#f1f5f9',
+                      color: adjustDir === 'subtract' ? 'white' : '#64748b',
+                      border: 'none', cursor: 'pointer',
+                    }}>－ 減らす</button>
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: 14, color: '#64748b' }}>
+                    修正後: <strong style={{ color: afterStock < 0 ? '#dc2626' : '#1e293b', fontSize: 18 }}>
+                      {afterStock}{sheet.product.unit || '個'}
+                    </strong>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Package label, expiry, supplier, price for receive */}
             {sheet.mode === 'receive' && (
               <>
@@ -335,10 +376,13 @@ export default function HomePage() {
 
             <button onClick={handleSubmit} disabled={submitting} style={{
               width: '100%', padding: 16, borderRadius: 12, fontWeight: 700, fontSize: 16,
-              background: sheet.mode === 'use' ? '#dc2626' : '#16a34a',
+              background: sheet.mode === 'use' ? '#dc2626' : sheet.mode === 'receive' ? '#16a34a' : '#7c3aed',
               color: 'white', border: 'none', cursor: 'pointer',
             }}>
-              {submitting ? '記録中...' : sheet.mode === 'use' ? `${quantity}個 使用を記録` : `${quantity}個 入荷を記録`}
+              {submitting ? '記録中...' :
+                sheet.mode === 'use' ? `${quantity}個 使用を記録` :
+                sheet.mode === 'receive' ? `${quantity}個 入荷を記録` :
+                `在庫を${adjustDir === 'add' ? `${quantity}個 追加` : `${quantity}個 減らす`}（修正）`}
             </button>
           </div>
         </>

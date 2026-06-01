@@ -97,6 +97,58 @@ router.post('/receive', authMiddleware, async (req, res) => {
   res.json({ message: '入荷を記録しました', current_stock: updatedRows[0].stock });
 });
 
+// 在庫修正（入荷・使用記録なし）
+router.post('/adjust', authMiddleware, async (req, res) => {
+  const { product_id, delta } = req.body;
+  const qty = parseInt(delta);
+  if (!product_id || isNaN(qty) || qty === 0) {
+    return res.status(400).json({ error: '商品と数量を入力してください' });
+  }
+
+  const { rows: productRows } = await pool.query('SELECT * FROM products WHERE id = $1', [product_id]);
+  const product = productRows[0];
+  if (!product) return res.status(404).json({ error: '商品が見つかりません' });
+
+  const { rows: lots } = await pool.query(
+    'SELECT * FROM product_lots WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC NULLS LAST',
+    [product_id]
+  );
+
+  if (lots.length > 0) {
+    if (qty > 0) {
+      await pool.query(
+        'INSERT INTO product_lots (product_id, quantity, package_label) VALUES ($1, $2, $3)',
+        [product_id, qty, '在庫修正']
+      );
+    } else {
+      const absQty = Math.abs(qty);
+      if (product.stock < absQty) {
+        return res.status(400).json({ error: `在庫が不足しています（現在: ${product.stock}${product.unit || '個'}）` });
+      }
+      let remaining = absQty;
+      for (const lot of lots) {
+        if (remaining <= 0) break;
+        const deduct = Math.min(lot.quantity, remaining);
+        await pool.query('UPDATE product_lots SET quantity = quantity - $1 WHERE id = $2', [deduct, lot.id]);
+        remaining -= deduct;
+      }
+      await pool.query('DELETE FROM product_lots WHERE product_id = $1 AND quantity <= 0', [product_id]);
+    }
+    await pool.query(
+      'UPDATE products SET stock = (SELECT COALESCE(SUM(quantity), 0) FROM product_lots WHERE product_id = $1) WHERE id = $1',
+      [product_id]
+    );
+  } else {
+    if (qty < 0 && product.stock < Math.abs(qty)) {
+      return res.status(400).json({ error: `在庫が不足しています（現在: ${product.stock}${product.unit || '個'}）` });
+    }
+    await pool.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [qty, product_id]);
+  }
+
+  const { rows: updated } = await pool.query('SELECT stock FROM products WHERE id = $1', [product_id]);
+  res.json({ message: '在庫を修正しました', current_stock: updated[0].stock });
+});
+
 // 使用履歴
 router.get('/usage/:product_id', authMiddleware, async (req, res) => {
   const { rows } = await pool.query(`

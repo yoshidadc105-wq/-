@@ -46,6 +46,7 @@ export const api = {
 
   useProduct: (product_id, quantity, note, lot_id) => request('POST', '/inventory/use', { product_id, quantity, note, lot_id }),
   receiveProduct: (product_id, quantity, note, expiry_date, package_label, supplier_name, unit_price) => request('POST', '/inventory/receive', { product_id, quantity, note, expiry_date, package_label, supplier_name, unit_price }),
+  adjustProduct: (product_id, delta) => request('POST', '/inventory/adjust', { product_id, delta }),
   getUsageLogs: (product_id) => request('GET', `/inventory/usage/${product_id}`),
 
   getLots: (productId) => request('GET', `/products/${productId}/lots`),
