@@ -1,8 +1,14 @@
 const express = require('express');
 const { getDb } = require('../db');
 const { requireLogin, requireAdmin } = require('../middleware/auth');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const router = express.Router();
+
+const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemData');
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 
 // URL解決（ログイン済みユーザー向け）
 router.get('/resolve', requireLogin, (req, res) => {
@@ -12,6 +18,51 @@ router.get('/resolve', requireLogin, (req, res) => {
   const mapping = db.prepare('SELECT manual_id FROM url_redirects WHERE old_url = ?').get(url);
   if (!mapping) return res.status(404).json({ error: 'Not found' });
   res.json({ manual_id: mapping.manual_id });
+});
+
+// PDFをスキャンして埋め込みURLを抽出（管理者のみ）
+router.get('/scan-pdfs', requireAdmin, (req, res) => {
+  const db = getDb();
+  const pdfManuals = db.prepare(
+    "SELECT id, title, file_path FROM manuals WHERE type = 'pdf' AND file_path IS NOT NULL AND is_deleted = 0"
+  ).all();
+
+  const registeredUrls = new Set(
+    db.prepare('SELECT old_url FROM url_redirects').all().map(r => r.old_url)
+  );
+
+  const results = [];
+
+  for (const manual of pdfManuals) {
+    const filePath = path.join(UPLOAD_DIR, manual.file_path);
+    if (!fs.existsSync(filePath)) continue;
+
+    try {
+      const buffer = fs.readFileSync(filePath);
+      const text = buffer.toString('latin1');
+      const urls = new Set();
+      const pattern = /\/URI\s*\(([^)]+)\)/g;
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const url = match[1].trim();
+        if (url.startsWith('http')) urls.add(url);
+      }
+      if (urls.size > 0) {
+        results.push({
+          manual_id: manual.id,
+          manual_title: manual.title,
+          urls: [...urls].map(url => ({
+            url,
+            already_registered: registeredUrls.has(url)
+          }))
+        });
+      }
+    } catch (e) {
+      // skip unreadable files
+    }
+  }
+
+  res.json(results);
 });
 
 // 一覧取得（管理者のみ）
@@ -38,6 +89,30 @@ router.post('/', requireAdmin, (req, res) => {
     if (e.message.includes('UNIQUE')) return res.status(400).json({ error: 'このURLはすでに登録されています' });
     throw e;
   }
+});
+
+// 一括登録（管理者のみ）
+router.post('/bulk', requireAdmin, (req, res) => {
+  const { mappings } = req.body;
+  if (!Array.isArray(mappings) || mappings.length === 0) {
+    return res.status(400).json({ error: 'mappings配列が必要です' });
+  }
+  const db = getDb();
+  let inserted = 0, skipped = 0;
+  const insert = db.prepare('INSERT OR IGNORE INTO url_redirects (old_url, manual_id) VALUES (?, ?)');
+  const doInsert = db.transaction(() => {
+    for (const { old_url, manual_id } of mappings) {
+      if (!old_url || !manual_id) continue;
+      const result = insert.run(old_url.trim(), parseInt(manual_id));
+      if (result.changes > 0) inserted++;
+      else skipped++;
+    }
+  });
+  doInsert();
+  res.json({
+    message: `${inserted}件を登録しました${skipped > 0 ? `（${skipped}件はすでに登録済みのためスキップ）` : ''}`,
+    inserted, skipped
+  });
 });
 
 // 削除（管理者のみ）

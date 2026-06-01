@@ -148,6 +148,36 @@
   <!-- URLリンク管理 -->
   <div id="tab-urls" class="hidden">
     <div class="alert alert-info mb-2">PDFに埋め込まれた旧システムのURLを、新しいマニュアルに対応づけます。PDFを閲覧中にそのURLをタップすると、対応するマニュアルが開きます。</div>
+
+    <!-- PDF自動スキャン -->
+    <div class="card mb-2">
+      <div class="card-header">
+        <span class="card-title">PDFから自動検出</span>
+        <button onclick="scanPdfs()" id="scanBtn" class="btn btn-primary btn-sm">PDFをスキャン</button>
+      </div>
+      <div id="scanSection" style="display:none;">
+        <div style="padding:12px 16px 16px;">
+          <p id="scanSummary" class="text-sm text-muted mb-2"></p>
+          <div id="scanTableWrap" class="table-wrap" style="display:none;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:28%;">PDFマニュアル</th>
+                  <th style="width:38%;">埋め込みURL</th>
+                  <th style="width:34%;">登録先マニュアル</th>
+                </tr>
+              </thead>
+              <tbody id="scanTableBody"></tbody>
+            </table>
+          </div>
+          <div id="bulkRegisterWrap" style="display:none; margin-top:12px;">
+            <button onclick="bulkRegister()" class="btn btn-primary">一括登録する</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 手動追加 -->
     <div class="card mb-2">
       <div class="card-header"><span class="card-title">URLリンクを追加</span></div>
       <div class="card-body">
@@ -163,6 +193,8 @@
         <button onclick="addUrlRedirect()" class="btn btn-primary">登録する</button>
       </div>
     </div>
+
+    <!-- 登録済み一覧 -->
     <div class="card">
       <div class="card-header"><span class="card-title">登録済みリンク</span></div>
       <div class="table-wrap">
@@ -814,6 +846,103 @@ async function deleteUrlRedirect(id) {
   const data = await res.json();
   if (res.ok) { showAlert('alert', data.message, 'success'); loadUrlRedirects(); }
   else showAlert('alert', data.error, 'error');
+}
+
+// ── PDFスキャン ──
+let scanResults = [];
+
+function htmlEsc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function scanPdfs() {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = 'スキャン中...';
+  try {
+    const res = await fetch('/api/url-redirects/scan-pdfs');
+    if (!res.ok) throw new Error();
+    scanResults = await res.json();
+  } catch(e) {
+    showAlert('alert', 'スキャンに失敗しました', 'error');
+    btn.disabled = false;
+    btn.textContent = 'PDFをスキャン';
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = 'PDFをスキャン';
+
+  const section = document.getElementById('scanSection');
+  const summary = document.getElementById('scanSummary');
+  const tableWrap = document.getElementById('scanTableWrap');
+  const bulkWrap = document.getElementById('bulkRegisterWrap');
+  const tbody = document.getElementById('scanTableBody');
+  section.style.display = '';
+
+  let totalUrls = 0, unregistered = 0;
+  scanResults.forEach(p => p.urls.forEach(u => { totalUrls++; if (!u.already_registered) unregistered++; }));
+
+  if (totalUrls === 0) {
+    summary.textContent = '埋め込みURLが入ったPDFは見つかりませんでした';
+    tableWrap.style.display = 'none';
+    bulkWrap.style.display = 'none';
+    return;
+  }
+
+  summary.textContent = `${scanResults.length}個のPDFで計${totalUrls}件のURLを検出（未登録: ${unregistered}件）`;
+
+  const optionsHtml = allManualsList.map(m => `<option value="${m.id}">${htmlEsc(m.title)}</option>`).join('');
+
+  const rows = [];
+  scanResults.forEach(pdfData => {
+    pdfData.urls.forEach(urlInfo => {
+      const isReg = urlInfo.already_registered;
+      rows.push(`
+        <tr>
+          <td class="text-sm">${htmlEsc(pdfData.manual_title)}</td>
+          <td style="word-break:break-all; font-size:12px;">${htmlEsc(urlInfo.url)}</td>
+          <td>
+            ${isReg
+              ? '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>'
+              : `<select class="form-control scan-manual-sel" data-url="${htmlEsc(urlInfo.url)}" style="font-size:12px; padding:4px 6px;">
+                   <option value="">-- 選択してください --</option>
+                   ${optionsHtml}
+                 </select>`
+            }
+          </td>
+        </tr>
+      `);
+    });
+  });
+
+  tbody.innerHTML = rows.join('');
+  tableWrap.style.display = '';
+  bulkWrap.style.display = unregistered > 0 ? '' : 'none';
+}
+
+async function bulkRegister() {
+  const selects = document.querySelectorAll('.scan-manual-sel');
+  const mappings = [];
+  selects.forEach(sel => {
+    if (sel.value) mappings.push({ old_url: sel.dataset.url, manual_id: parseInt(sel.value) });
+  });
+  if (mappings.length === 0) {
+    showAlert('alert', 'マニュアルを1件以上選択してください', 'error');
+    return;
+  }
+  const res = await fetch('/api/url-redirects/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mappings })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    showAlert('alert', data.message, 'success');
+    loadUrlRedirects();
+    scanPdfs();
+  } else {
+    showAlert('alert', data.error || '登録に失敗しました', 'error');
+  }
 }
 
 // ── パスワード変更 ──
