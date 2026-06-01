@@ -7,6 +7,7 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const QUIZ_ADMIN_PASSWORD = process.env.QUIZ_ADMIN_PASSWORD || 'admin';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const MANUAL_API_URL = process.env.MANUAL_API_URL || '';
 const MANUAL_API_KEY = process.env.MANUAL_API_KEY || '';
@@ -15,7 +16,6 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '10mb' }));
 
-// ========== Storage (MongoDB with file fallback) ==========
 const DATA_DIR = path.join(__dirname, 'data');
 const SETS_FILE = path.join(DATA_DIR, 'quiz-sets.json');
 const SUBS_FILE = path.join(DATA_DIR, 'submissions.json');
@@ -101,7 +101,6 @@ async function saveStaff(data) {
   fs.writeFileSync(path.join(DATA_DIR, 'staff.json'), JSON.stringify(data, null, 2));
 }
 
-// ========== Helpers ==========
 function checkAuth(req, res) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Basic ')) { res.status(401).json({ error: 'unauthorized' }); return false; }
@@ -111,40 +110,16 @@ function checkAuth(req, res) {
   return true;
 }
 
-// Normalize answer for flexible fill comparison
 function normalizeAns(s) {
   return String(s == null ? '' : s)
     .trim()
     .toLowerCase()
-    // katakana → hiragana (Unicode offset 0x60)
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
-    // full-width alphanumeric → half-width
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    // remove spaces and common punctuation
     .replace(/[\s　]+/g, '')
     .replace(/[、。，．・〜～ー]/g, '');
 }
 
-function extractJsonArray(text) {
-  const start = text.indexOf('[');
-  if (start === -1) return null;
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < text.length; i++) {
-    const c = text[i];
-    if (escape) { escape = false; continue; }
-    if (c === '\\' && inString) { escape = true; continue; }
-    if (c === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (c === '[' || c === '{') depth++;
-    else if (c === ']' || c === '}') {
-      depth--;
-      if (depth === 0) return text.substring(start, i + 1);
-    }
-  }
-  return null;
-}
-
-// ========== Routes ==========
 app.get('/api/sets', async (req, res) => {
   if (!checkAuth(req, res)) return;
   res.json(await loadSets());
@@ -164,78 +139,228 @@ app.get('/api/sets/public', async (req, res) => {
   res.json(sets);
 });
 
+function buildQuizPrompt(manualText, count) {
+  return `以下のマニュアルテキストだけを根拠に、歯科クリニックのスタッフ向け理解度確認クイズを${count}問作成してください。
+
+【厳守事項】
+- マニュアルテキストに書かれていない内容を出題しないでください。
+- 一般論、IT、Python、システム管理など、マニュアル外の架空問題を作らないでください。
+- 問題・選択肢・解説はすべて日本語にしてください。
+- 出力はJSONオブジェクトのみです。前置き、説明文、Markdownコードブロックは禁止です。
+- ${count}問ちょうど作成してください。
+
+【問題の種類】4種類からランダムに選んでください：
+1. truefalse（マルバツ）: 文章が正しいか間違いかを問う。answerは"true"または"false"。
+2. choice（選択式）: 4択問題。optionsは4個、answerは正解の選択肢テキスト。
+3. fill（穴埋め）: 文章の___に入る言葉を問う。answerは文字列または文字列配列。
+4. sort（並び替え）: 手順を正しい順番に並べる。手順が明確な場合のみ使用し、answerは正しい順番の配列。
+
+【マニュアルテキスト】
+${manualText}
+
+【出力形式】JSONオブジェクトのみ：
+{
+  "questions": [
+    {"type":"truefalse","question":"問題文","options":[],"answer":"true","explanation":"マニュアルに基づく解説"},
+    {"type":"choice","question":"問題文","options":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":"選択肢1","explanation":"マニュアルに基づく解説"},
+    {"type":"fill","question":"___は___する。","options":[],"answer":["答1","答2"],"explanation":"マニュアルに基づく解説"},
+    {"type":"sort","question":"次の手順を正しい順番に並べてください。","options":["手順1","手順2","手順3"],"answer":["手順1","手順2","手順3"],"explanation":"マニュアルに基づく解説"}
+  ]
+}`;
+}
+
+function extractJsonArray(responseText) {
+  const text = String(responseText || '').trim();
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed.questions)) return parsed.questions;
+  } catch (_) {}
+
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) {
+    try {
+      const parsed = JSON.parse(fenced[1]);
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed.questions)) return parsed.questions;
+    } catch (_) {}
+  }
+
+  const jsonMatch = text.match(/\[[\s\S]*\]/) || text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('JSON形式の回答が見つかりませんでした');
+  const parsed = JSON.parse(jsonMatch[0]);
+  return Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
+}
+
+async function generateWithGemini(prompt) {
+  const geminiRes = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
+    },
+    { timeout: 60000 }
+  );
+  const responseText = geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return extractJsonArray(responseText);
+}
+
+async function generateWithGroq(prompt) {
+  const groqRes = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: '必ず日本語のJSONオブジェクトのみを返してください。' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+    },
+    { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
+  );
+  const responseText = groqRes.data.choices?.[0]?.message?.content || '';
+  return extractJsonArray(responseText);
+}
+
+function normalizeGeneratedQuestions(raw, count) {
+  return raw.map(q => {
+    const questionText = q.question || q.text || q['問題'] || q['問題文'] || '';
+    const explanation = q.explanation || q['解説'] || q['説明'] || '';
+    let options = q.options || q.choices || q['選択肢'] || [];
+    if (!Array.isArray(options)) {
+      options = (options && typeof options === 'object') ? Object.values(options) : [];
+    }
+
+    let type = q.type || 'truefalse';
+    if (!['truefalse', 'choice', 'fill', 'sort'].includes(type)) type = 'truefalse';
+
+    if (type === 'sort' && options.length > 0) {
+      const expanded = [];
+      options.forEach(o => {
+        const s = String(o).trim();
+        if (s.includes('、') && s.split('、').every(p => p.length < 20)) {
+          s.split('、').forEach(p => { if (p.trim()) expanded.push(p.trim()); });
+        } else if (s.includes(',') && s.split(',').every(p => p.trim().length < 25)) {
+          s.split(',').forEach(p => { if (p.trim()) expanded.push(p.trim()); });
+        } else {
+          expanded.push(s);
+        }
+      });
+      options = expanded;
+    }
+
+    const answer = q.answer != null ? q.answer : q.correct_answer != null ? q.correct_answer : q['答え'] != null ? q['答え'] : q['正解'] != null ? q['正解'] : '';
+    const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
+    return { type, question: questionText, options, answer: finalAnswer, explanation };
+  }).filter(q => q.question && String(q.question).trim().length > 0).slice(0, count);
+}
+
+function splitManualSentences(manualText) {
+  return String(manualText || '')
+    .replace(/\r/g, '\n')
+    .split(/[\n。！？!?]+/)
+    .map(s => s.replace(/^[\s\-・*●■◆□0-9０-９.)）(（]+/, '').trim())
+    .filter(s => s.length >= 12 && s.length <= 140)
+    .filter(s => !/^https?:\/\//i.test(s));
+}
+
+function pickBlankTarget(sentence) {
+  const parts = String(sentence || '')
+    .split(/[、,\s　「」『』（）()\[\]【】]|(?:について)|[はをがにでへともの]/)
+    .map(s => s.replace(/します$|してください$|する$|です$|ます$/g, '').trim())
+    .filter(s => s.length >= 2 && s.length <= 8);
+  const candidates = parts.length ? parts : (sentence.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]{2,8}/g) || []);
+  const stopwords = new Set(['してください', 'します', 'あります', 'できます', 'について', '場合', 'ため', 'こと', 'もの', 'ように', 'スタッフ', 'マニュアル']);
+  return candidates.find(w => !stopwords.has(w) && !/^[0-9０-９]+$/.test(w)) || candidates[0] || '';
+}
+
+function makeLocalQuizQuestions(manualText, count) {
+  const sentences = splitManualSentences(manualText);
+  const source = sentences.length ? sentences : [String(manualText || '').trim()].filter(Boolean);
+  const questions = [];
+
+  for (let i = 0; questions.length < count && i < Math.max(source.length, count * 2); i++) {
+    const sentence = source[i % source.length];
+    const mode = questions.length % 3;
+
+    if (mode === 0) {
+      questions.push({
+        type: 'truefalse',
+        question: `マニュアルでは「${sentence}」とされています。`,
+        options: [],
+        answer: 'true',
+        explanation: `マニュアル本文に「${sentence}」と記載されているためです。`,
+      });
+      continue;
+    }
+
+    if (mode === 1) {
+      const target = pickBlankTarget(sentence);
+      if (target && sentence.includes(target)) {
+        questions.push({
+          type: 'fill',
+          question: sentence.replace(target, '___'),
+          options: [],
+          answer: target,
+          explanation: `マニュアル本文の該当箇所は「${sentence}」です。`,
+        });
+        continue;
+      }
+    }
+
+    const options = [
+      sentence,
+      '確認せずに自己判断で進める',
+      '必要な記録や共有を省略する',
+      '患者さんへの説明や配慮を行わない',
+    ];
+    questions.push({
+      type: 'choice',
+      question: '次のうち、このマニュアルに記載されている内容として最も適切なものはどれですか。',
+      options,
+      answer: sentence,
+      explanation: `マニュアル本文に「${sentence}」と記載されているためです。`,
+    });
+  }
+
+  return questions.slice(0, count);
+}
+
 app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { manualText, count = 5 } = req.body;
+  const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 1), 20);
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
-  if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEYが設定されていません' });
 
-  const prompt = `以下のマニュアルテキストを読んで、スタッフ研修用のクイズを${count}問作成してください。\n\nマニュアルテキスト:\n${manualText}\n\n問題タイプを混ぜて作成してください:\n- truefalse: ○×問題。answerは"true"（正しい）または"false"（誤り）\n- choice: 4択問題。optionsは4つの選択肢テキストの配列。answerは正解の選択肢テキスト\n- fill: 穴埋め問題。問題文に___を使う。answerは穴埋め答えの配列（___の数と同じ要素数）\n- sort: 手順並び替え問題。以下のルールを必ず守ること:\n  * questionは「〇〇の手順を正しい順番に並べてください」という形式\n  * optionsは3〜5個の手順ステップの配列（各ステップは独立した短い行動）\n  * 各ステップはカンマで区切らず、別々の配列要素にすること\n  * answerはoptionsと同じ配列（正しい順番で）\n  * 悪い例: options:["手袋をつける,消毒する","準備する"]\n  * 良い例: options:["手洗いをする","手袋をつける","消毒する","患者に説明する"]\n\n日本語で問題を作成してください。JSONの配列のみを返してください（他のテキストは不要）:\n[{"type":"...","question":"...","options":[...],"answer":"...","explanation":"..."}]`;
+  const prompt = buildQuizPrompt(manualText, safeCount);
+  const attempts = [];
 
-  try {
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: 'あなたはクイズ作成AIです。有効なJSON配列のみを返してください。説明やコメントは不要です。並び替え問題のoptionsは必ず個別の配列要素にしてください。カンマ区切りの文字列は使わないでください。' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.5,
-      },
-      { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 60000 }
-    );
-    const text = response.data.choices[0].message.content;
-    console.log('Groq raw response:', text.substring(0, 500));
-    const jsonStr = extractJsonArray(text);
-    if (!jsonStr) throw new Error('JSON配列が見つかりませんでした');
-    const parsed = JSON.parse(jsonStr);
-    const raw = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.questions) ? parsed.questions : []);
+  if (GEMINI_API_KEY) attempts.push(['Gemini 2.0 Flash', () => generateWithGemini(prompt)]);
+  if (GROQ_API_KEY) attempts.push(['Groq llama-3.3', () => generateWithGroq(prompt)]);
 
-    const questions = raw.map(q => {
-      const questionText =
-        q.question || q.text || q.content || q.question_text ||
-        q['問題'] || q['問題文'] || q['質問'] || '';
-      const explanation =
-        q.explanation || q.reason || q.description ||
-        q['解説'] || q['説明'] || '';
-      let options = q.options || q.choices || q.selections || q['選択肢'] || [];
-      if (!Array.isArray(options)) {
-        options = (options && typeof options === 'object') ? Object.values(options) : [];
-      }
-      // Fix sort options that may have been comma-joined into single strings
-      const type = q.type || q['タイプ'] || q['種類'] || 'truefalse';
-      if (type === 'sort' && options.length > 0) {
-        const expanded = [];
-        options.forEach(o => {
-          const s = String(o).trim();
-          if (s.includes('、') && s.split('、').every(p => p.length < 20)) {
-            s.split('、').forEach(p => { if (p.trim()) expanded.push(p.trim()); });
-          } else if (s.includes(',') && s.split(',').every(p => p.trim().length < 25)) {
-            s.split(',').forEach(p => { if (p.trim()) expanded.push(p.trim()); });
-          } else {
-            expanded.push(s);
-          }
-        });
-        options = expanded;
-      }
-      const answer =
-        q.answer != null ? q.answer :
-        q.correct_answer != null ? q.correct_answer :
-        q.correct != null ? q.correct :
-        q['答え'] != null ? q['答え'] :
-        q['正解'] != null ? q['正解'] : '';
-      // For sort type, answer should match options
-      const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
-      return { type, question: questionText, options, answer: finalAnswer, explanation };
-    }).filter(q => q.question && String(q.question).trim().length > 0);
-
-    if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。もう一度お試しください。' });
-    res.json({ questions });
-  } catch (err) {
-    console.error('Groq error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'AI生成エラー: ' + (err.response?.data?.error?.message || err.message) });
+  const errors = [];
+  for (const [providerName, fn] of attempts) {
+    try {
+      const raw = await fn();
+      const questions = normalizeGeneratedQuestions(raw, safeCount);
+      console.log(`AI provider success: ${providerName}, questions: ${questions.length}`);
+      if (!questions.length) throw new Error('有効な問題が生成されませんでした');
+      return res.json({ questions, provider: providerName });
+    } catch (err) {
+      const detail = err.response?.data?.error?.message || err.response?.data?.error || err.message;
+      console.error(`AI provider failed: ${providerName}`, err.response?.data || err.message);
+      errors.push(`${providerName}: ${detail}`);
+    }
   }
+
+  const questions = makeLocalQuizQuestions(manualText, safeCount);
+  if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。マニュアル本文を長めに入力してください。' });
+  console.log('AI provider fallback: Local rule-based generator', errors.join(' / '));
+  return res.json({ questions, provider: 'Local rule-based generator', warning: errors.length ? errors.join(' / ') : undefined });
 });
 
 app.post('/api/sets', async (req, res) => {
@@ -381,6 +506,14 @@ app.delete('/api/staff/:id', async (req, res) => {
   const filtered = staff.filter(s => s.id !== req.params.id);
   if (filtered.length === staff.length) return res.status(404).json({ error: '見つかりません' });
   await saveStaff(filtered);
+  res.json({ ok: true });
+});
+
+app.put('/api/staff', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staff } = req.body;
+  if (!Array.isArray(staff)) return res.status(400).json({ error: 'staffが必要です' });
+  await saveStaff(staff);
   res.json({ ok: true });
 });
 
