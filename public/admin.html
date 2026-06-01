@@ -159,6 +159,7 @@
         <div style="padding:12px 16px 16px;">
           <p id="scanSummary" class="text-sm text-muted mb-2"></p>
           <p class="text-sm mb-2" style="color:#555;">💡 URLの横の <strong>「旧URLを開く」</strong> で旧システムを確認し、テキストボックスで絞り込んでマニュアルを選んで「登録」してください。</p>
+          <div id="scanAlert" class="hidden mb-2"></div>
           <div id="scanTableWrap" class="table-wrap" style="display:none;">
             <table>
               <thead>
@@ -339,7 +340,7 @@
         <p class="text-sm text-muted mt-1">サブカテゴリにする場合は親を選択</p>
       </div>
       <div class="form-group">
-        <label class="form-label">カテゴリ名 <span class="required">*</span></label>
+        <label class="form-label">カテグリ名 <span class="required">*</span></label>
         <input type="text" id="cName" class="form-control" placeholder="例: 01.診療関係">
       </div>
       <div class="form-group">
@@ -856,7 +857,15 @@ function htmlEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// スキャン行のドロップダウンをテキストで絞り込み
+function showScanAlert(msg, type) {
+  const el = document.getElementById('scanAlert');
+  el.className = `alert alert-${type === 'error' ? 'danger' : 'success'} mb-2`;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => el.classList.add('hidden'), 5000);
+}
+
 function filterScanSelect(input) {
   const q = input.value.toLowerCase();
   const sel = input.parentElement.querySelector('select.scan-manual-sel');
@@ -943,25 +952,34 @@ async function scanPdfs() {
 }
 
 async function registerOne(btn) {
-  const sel = btn.closest('td').querySelector('select.scan-manual-sel');
+  const td = btn.closest('td');
+  const sel = td.querySelector('select.scan-manual-sel');
   if (!sel || !sel.value) {
-    showAlert('alert', 'マニュアルを選択してください', 'error');
+    showScanAlert('マニュアルをドロップダウンから選択してから「登録」を押してください', 'error');
     return;
   }
   btn.disabled = true;
-  const res = await fetch('/api/url-redirects/bulk', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mappings: [{ old_url: sel.dataset.url, manual_id: parseInt(sel.value) }] })
-  });
-  const data = await res.json();
-  if (res.ok) {
-    btn.closest('td').innerHTML = '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>';
-    showAlert('alert', data.message, 'success');
-    loadUrlRedirects();
-  } else {
+  btn.textContent = '登録中…';
+  try {
+    const res = await fetch('/api/url-redirects/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mappings: [{ old_url: sel.dataset.url, manual_id: parseInt(sel.value) }] })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      td.innerHTML = '<span class="text-sm" style="color:var(--success);">✓ 登録済み</span>';
+      showScanAlert(data.message, 'success');
+      loadUrlRedirects();
+    } else {
+      btn.disabled = false;
+      btn.textContent = '登録';
+      showScanAlert(data.error || '登録に失敗しました', 'error');
+    }
+  } catch (e) {
     btn.disabled = false;
-    showAlert('alert', data.error || '登録に失敗しました', 'error');
+    btn.textContent = '登録';
+    showScanAlert('通信エラーが発生しました。再度お試しください', 'error');
   }
 }
 
@@ -972,7 +990,7 @@ async function bulkRegister() {
     if (sel.value) mappings.push({ old_url: sel.dataset.url, manual_id: parseInt(sel.value) });
   });
   if (mappings.length === 0) {
-    showAlert('alert', 'マニュアルを1件以上選択してください', 'error');
+    showScanAlert('マニュアルを1件以上選択してください', 'error');
     return;
   }
   const res = await fetch('/api/url-redirects/bulk', {
@@ -982,11 +1000,11 @@ async function bulkRegister() {
   });
   const data = await res.json();
   if (res.ok) {
-    showAlert('alert', data.message, 'success');
+    showScanAlert(data.message, 'success');
     loadUrlRedirects();
     scanPdfs();
   } else {
-    showAlert('alert', data.error || '登録に失敗しました', 'error');
+    showScanAlert(data.error || '登録に失敗しました', 'error');
   }
 }
 
