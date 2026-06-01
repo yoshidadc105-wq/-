@@ -68,11 +68,19 @@
       padding: 12px;
     }
     .pdf-page-wrap { margin-bottom: 10px; text-align: center; }
+    .pdf-canvas-box { position: relative; display: block; line-height: 0; }
     canvas {
       display: block;
       width: 100%;
       border-radius: 4px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .pdf-link-overlay {
+      position: absolute;
+      cursor: pointer;
+      background: rgba(59,111,212,0.06);
+      border-bottom: 1px solid rgba(59,111,212,0.5);
+      box-sizing: border-box;
     }
     .pdf-status {
       color: white;
@@ -183,7 +191,6 @@ function unlockFooter() {
 function checkScrollBottom() {
   if (scrollUnlocked) return;
   const body = document.getElementById('pdfBody');
-  // 80px threshold so it triggers just before the very last pixel
   if (body.scrollTop + body.clientHeight >= body.scrollHeight - 80) {
     unlockFooter();
   }
@@ -193,9 +200,7 @@ async function initMeta() {
   const meRes = await fetch('/api/auth/me');
   if (meRes.ok) {
     const user = await meRes.json();
-    if (user.role === 'admin') {
-      document.getElementById('dlBtn').style.display = '';
-    }
+    if (user.role === 'admin') document.getElementById('dlBtn').style.display = '';
   }
   if (backId) {
     const checkRes = await fetch(`/api/progress/check/${backId}`);
@@ -203,10 +208,7 @@ async function initMeta() {
       const data = await checkRes.json();
       isChecked = data.checked;
       renderCheckBtn();
-      if (isChecked) {
-        // Already confirmed — show button immediately without requiring scroll
-        unlockFooter();
-      }
+      if (isChecked) unlockFooter();
     }
   }
 }
@@ -236,6 +238,19 @@ async function toggleCheck(e) {
   btn.disabled = false;
 }
 
+// PDF内のリンクをクリックしたとき: 対応表を確認 → なければ新タブ
+async function openRedirect(url) {
+  try {
+    const res = await fetch('/api/url-redirects/resolve?url=' + encodeURIComponent(url));
+    if (res.ok) {
+      const data = await res.json();
+      location.href = '/view.html?id=' + data.manual_id;
+      return;
+    }
+  } catch (_) {}
+  window.open(url, '_blank', 'noopener noreferrer');
+}
+
 async function loadPDF() {
   const body = document.getElementById('pdfBody');
   try {
@@ -243,11 +258,13 @@ async function loadPDF() {
     body.innerHTML = '';
     const containerWidth = body.clientWidth || (window.innerWidth - 24);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const naturalVp = page.getViewport({ scale: 1 });
       const scale = (containerWidth / naturalVp.width) * dpr;
       const vp = page.getViewport({ scale });
+
       const wrap = document.createElement('div');
       wrap.className = 'pdf-page-wrap';
       if (pdf.numPages > 1) {
@@ -256,22 +273,52 @@ async function loadPDF() {
         label.textContent = `${i} / ${pdf.numPages}`;
         wrap.appendChild(label);
       }
+
       const canvas = document.createElement('canvas');
       canvas.width = vp.width;
       canvas.height = vp.height;
       canvas.style.width = containerWidth + 'px';
       canvas.style.height = Math.round(containerWidth * naturalVp.height / naturalVp.width) + 'px';
-      wrap.appendChild(canvas);
+
+      // canvasBoxにcanvasとリンクオーバーレイをまとめる
+      const canvasBox = document.createElement('div');
+      canvasBox.className = 'pdf-canvas-box';
+      canvasBox.appendChild(canvas);
+      wrap.appendChild(canvasBox);
       body.appendChild(wrap);
+
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+      // PDF内のリンクアノテーションをオーバーレイ
+      const annotations = await page.getAnnotations();
+      if (annotations.length > 0) {
+        const displayVp = page.getViewport({ scale: containerWidth / naturalVp.width });
+        for (const ann of annotations) {
+          if (ann.subtype !== 'Link') continue;
+          const url = ann.url || (ann.action && ann.action.url);
+          if (!url) continue;
+          const r = displayVp.convertToViewportRectangle(ann.rect);
+          const left = Math.min(r[0], r[2]);
+          const top = Math.min(r[1], r[3]);
+          const width = Math.abs(r[2] - r[0]);
+          const height = Math.abs(r[3] - r[1]);
+          const overlay = document.createElement('span');
+          overlay.className = 'pdf-link-overlay';
+          overlay.style.left = left + 'px';
+          overlay.style.top = top + 'px';
+          overlay.style.width = width + 'px';
+          overlay.style.height = height + 'px';
+          overlay.title = url;
+          overlay.addEventListener('click', () => openRedirect(url));
+          canvasBox.appendChild(overlay);
+        }
+      }
     }
-    // Attach scroll listener
+
     body.addEventListener('scroll', checkScrollBottom, { passive: true });
-    // Show hint if scroll is needed; check immediately if content fits
     setTimeout(() => {
       if (!scrollUnlocked) {
         if (body.scrollHeight <= body.clientHeight + 80) {
-          // PDF fits on screen — no scrolling needed, reveal immediately
           unlockFooter();
         } else {
           document.getElementById('scrollHint').style.display = '';
@@ -284,7 +331,6 @@ async function loadPDF() {
         <div>PDFの読み込みに失敗しました</div>
         <a href="${fileUrl}" style="color:#93c5fd; text-decoration:underline;">直接開く</a>
       </div>`;
-    // On error, show the footer anyway so the user can still confirm
     unlockFooter();
   }
 }

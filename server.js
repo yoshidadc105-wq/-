@@ -15,11 +15,11 @@ const progressRoutes = require('./src/routes/progress');
 const restoreRoutes = require('./src/routes/restore');
 const quizApiRoutes = require('./src/routes/quiz-api');
 const settingsRoutes = require('./src/routes/settings');
+const urlRedirectRoutes = require('./src/routes/url-redirects');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// データ保存先：Render環境変数 DATA_DIR > ユーザーフォルダ
 const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemData');
 const uploadDir = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -29,12 +29,10 @@ const sessionDir = process.env.DATA_DIR
   : path.join(__dirname, 'sessions');
 if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
 
-// ミドルウェア
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// セッション設定
 app.use(session({
   store: new FileStore({ path: sessionDir, retries: 1 }),
   secret: process.env.SESSION_SECRET || 'manual-system-secret-change-in-production',
@@ -47,7 +45,6 @@ app.use(session({
   }
 }));
 
-// ルーティング
 app.use('/api/auth', authRoutes);
 app.use('/api/manuals', manualRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -57,16 +54,13 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/restore', restoreRoutes);
 app.use('/api/quiz', quizApiRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/url-redirects', urlRedirectRoutes);
 
-// PDFファイルの配信（認証済みのみ）
 app.use('/uploads', (req, res, next) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: '認証が必要です' });
-  }
+  if (!req.session.userId) return res.status(401).json({ error: '認証が必要です' });
   next();
 }, express.static(uploadDir));
 
-// SPAのフォールバック（認証チェック付き）
 app.get(['/', '/index.html'], (req, res) => {
   if (!req.session.userId) return res.redirect('/login.html');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -98,7 +92,6 @@ app.get('/progress.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'progress.html'));
 });
 
-// DB初期化してサーバー起動
 initializeDb();
 app.listen(PORT, () => {
   console.log(`\nマニュアルシステム起動中...`);

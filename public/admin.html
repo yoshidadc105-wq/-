@@ -63,6 +63,7 @@
     <div class="tab active" onclick="showTab('users', this)">ユーザー管理</div>
     <div class="tab" onclick="showTab('groups', this)">グループ管理</div>
     <div class="tab" onclick="showTab('categories', this)">カテゴリ管理</div>
+    <div class="tab" onclick="showTab('urls', this)">URLリンク管理</div>
     <div class="tab" onclick="showTab('password', this)">パスワード変更</div>
   </div>
 
@@ -139,6 +140,35 @@
           <tbody id="categoryTableBody">
             <tr><td colspan="5" class="loading">読み込み中</td></tr>
           </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- URLリンク管理 -->
+  <div id="tab-urls" class="hidden">
+    <div class="alert alert-info mb-2">PDFに埋め込まれた旧システムのURLを、新しいマニュアルに対応づけます。PDFを閲覧中にそのURLをタップすると、対応するマニュアルが開きます。</div>
+    <div class="card mb-2">
+      <div class="card-header"><span class="card-title">URLリンクを追加</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">旧システムのURL <span class="required">*</span></label>
+          <input type="url" id="urlOld" class="form-control" placeholder="https://teachme.jp/...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">対応するマニュアル <span class="required">*</span></label>
+          <input type="text" id="urlSearch" class="form-control" placeholder="マニュアル名で検索..." oninput="filterUrlManuals()" style="margin-bottom:6px;">
+          <select id="urlManualId" class="form-control" size="6" style="height:auto;"></select>
+        </div>
+        <button onclick="addUrlRedirect()" class="btn btn-primary">登録する</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">登録済みリンク</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>旧URL</th><th>対応マニュアル</th><th>操作</th></tr></thead>
+          <tbody id="urlTableBody"><tr><td colspan="3" class="loading">読み込み中</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -310,8 +340,8 @@
 <script src="/js/common.js"></script>
 <script>
 let currentUser = null;
-
 let quizModeEnabled = false;
+let allManualsList = [];
 
 async function loadQuizMode() {
   const res = await fetch('/api/settings/quiz-mode');
@@ -377,7 +407,7 @@ async function loadStats() {
 }
 
 function showTab(name, el) {
-  ['users', 'groups', 'categories', 'password'].forEach(t => {
+  ['users', 'groups', 'categories', 'urls', 'password'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.add('hidden');
   });
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -387,6 +417,7 @@ function showTab(name, el) {
   if (name === 'users') loadUsers();
   if (name === 'groups') loadGroups();
   if (name === 'categories') { loadGroups(); loadCategories(); }
+  if (name === 'urls') loadUrlRedirects();
 }
 
 // ── ユーザー管理 ──
@@ -400,7 +431,7 @@ async function loadUsers() {
       <td>${u.display_name}</td>
       <td>${u.email}</td>
       <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${u.role === 'admin' ? '管理者' : '一般'}</span></td>
-      <td><span style="color: ${u.is_active ? 'var(--success)' : 'var(--danger)'};">${u.is_active ? '有効' : '無効'}</span></td>
+      <td><span style="color: ${u.is_active ? 'var(--success)' : 'var(--danger)'};"> ${u.is_active ? '有効' : '無効'}</span></td>
       <td class="text-sm text-muted">${u.last_login ? formatDate(u.last_login) : '未ログイン'}</td>
       <td>
         <div class="flex gap-2">
@@ -468,17 +499,10 @@ async function saveUser() {
     role: document.getElementById('uRole').value,
     is_active: document.getElementById('uActive').checked
   };
-
   const url = id ? `/api/admin/users/${id}` : '/api/admin/users';
   const method = id ? 'PUT' : 'POST';
-
-  const res = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json();
-
   if (res.ok) {
     closeModal('userModal');
     showAlert('alert', data.message, 'success');
@@ -493,13 +517,8 @@ async function deleteUser(id, name) {
   if (!confirmDialog(`「${name}」を削除しますか？`)) return;
   const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
   const data = await res.json();
-  if (res.ok) {
-    showAlert('alert', data.message, 'success');
-    loadUsers();
-    loadStats();
-  } else {
-    showAlert('alert', data.error || '削除に失敗しました', 'error');
-  }
+  if (res.ok) { showAlert('alert', data.message, 'success'); loadUsers(); loadStats(); }
+  else showAlert('alert', data.error || '削除に失敗しました', 'error');
 }
 
 // ── グループ管理 ──
@@ -570,7 +589,6 @@ async function deleteGroup(id, name) {
 async function openGroupMembers(groupId, groupName) {
   document.getElementById('editGroupMemberId').value = groupId;
   document.getElementById('groupMemberTitle').textContent = `${groupName} - メンバー管理`;
-
   const [usersRes, membersRes] = await Promise.all([
     fetch('/api/admin/users'),
     fetch(`/api/groups/${groupId}/members`)
@@ -578,7 +596,6 @@ async function openGroupMembers(groupId, groupName) {
   const users = await usersRes.json();
   const members = await membersRes.json();
   const memberIds = new Set(members.map(m => m.id));
-
   document.getElementById('memberCheckList').innerHTML = users.map(u => `
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}>
@@ -613,7 +630,6 @@ async function loadCategories() {
     return;
   }
   const visLabel = { all: '全員', admin: '管理者のみ', group: '特定グループ' };
-
   function renderRows(parentId, depth) {
     let html = '';
     allCategories
@@ -645,7 +661,6 @@ function populateParentSelect(excludeId) {
   const sel = document.getElementById('cParentId');
   const current = sel.value;
   sel.innerHTML = '<option value="">なし（最上位）</option>';
-
   const excluded = new Set();
   if (excludeId) {
     function collectDesc(id) {
@@ -654,7 +669,6 @@ function populateParentSelect(excludeId) {
     }
     collectDesc(excludeId);
   }
-
   function addOpts(parentId, depth) {
     allCategories
       .filter(c => (parentId === null ? !c.parent_id : c.parent_id == parentId) && !excluded.has(c.id))
@@ -718,36 +732,88 @@ async function saveCategory() {
     group_ids: groupIds,
     parent_id: parentId ? parseInt(parentId) : null
   };
-
   const url = id ? `/api/categories/${id}` : '/api/categories';
   const method = id ? 'PUT' : 'POST';
-
-  const res = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json();
-
-  if (res.ok) {
-    closeModal('categoryModal');
-    showAlert('alert', data.message, 'success');
-    loadCategories();
-  } else {
-    showAlert('alert', data.error || '操作に失敗しました', 'error');
-  }
+  if (res.ok) { closeModal('categoryModal'); showAlert('alert', data.message, 'success'); loadCategories(); }
+  else showAlert('alert', data.error || '操作に失敗しました', 'error');
 }
 
 async function deleteCategory(id, name) {
   if (!confirmDialog(`「${name}」を削除しますか？\nこのカテゴリのマニュアルはカテゴリなしになります。`)) return;
   const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
   const data = await res.json();
+  if (res.ok) { showAlert('alert', data.message, 'success'); loadCategories(); }
+  else showAlert('alert', data.error || '削除に失敗しました', 'error');
+}
+
+// ── URLリンク管理 ──
+async function loadUrlRedirects() {
+  const [redirectsRes, manualsRes] = await Promise.all([
+    fetch('/api/url-redirects'),
+    fetch('/api/manuals?limit=1000')
+  ]);
+  const redirects = await redirectsRes.json();
+  const manualsData = await manualsRes.json();
+  allManualsList = manualsData.manuals || [];
+  renderUrlManualSelect(allManualsList);
+
+  const tbody = document.getElementById('urlTableBody');
+  if (redirects.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding:24px;">登録されたリンクがありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML = redirects.map(r => `
+    <tr>
+      <td class="text-sm" style="word-break:break-all; max-width:280px;">${r.old_url}</td>
+      <td><a href="/view.html?id=${r.manual_id}" style="color:var(--primary);">${r.manual_title}</a></td>
+      <td><button onclick="deleteUrlRedirect(${r.id})" class="btn btn-danger btn-sm">削除</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderUrlManualSelect(manuals) {
+  const sel = document.getElementById('urlManualId');
+  sel.innerHTML = manuals.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+}
+
+function filterUrlManuals() {
+  const q = document.getElementById('urlSearch').value.toLowerCase();
+  const filtered = allManualsList.filter(m => m.title.toLowerCase().includes(q));
+  renderUrlManualSelect(filtered);
+}
+
+async function addUrlRedirect() {
+  const old_url = document.getElementById('urlOld').value.trim();
+  const sel = document.getElementById('urlManualId');
+  const manual_id = sel.value;
+  if (!old_url || !manual_id) {
+    showAlert('alert', 'URLとマニュアルを選択してください', 'error');
+    return;
+  }
+  const res = await fetch('/api/url-redirects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ old_url, manual_id })
+  });
+  const data = await res.json();
   if (res.ok) {
     showAlert('alert', data.message, 'success');
-    loadCategories();
+    document.getElementById('urlOld').value = '';
+    document.getElementById('urlSearch').value = '';
+    loadUrlRedirects();
   } else {
-    showAlert('alert', data.error || '削除に失敗しました', 'error');
+    showAlert('alert', data.error || '登録に失敗しました', 'error');
   }
+}
+
+async function deleteUrlRedirect(id) {
+  if (!confirmDialog('このURLリンクを削除しますか？')) return;
+  const res = await fetch(`/api/url-redirects/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (res.ok) { showAlert('alert', data.message, 'success'); loadUrlRedirects(); }
+  else showAlert('alert', data.error, 'error');
 }
 
 // ── パスワード変更 ──
@@ -755,12 +821,7 @@ async function changePassword() {
   const current = document.getElementById('currentPw').value;
   const newPw = document.getElementById('newPw').value;
   const confirm = document.getElementById('confirmPw').value;
-
-  if (newPw !== confirm) {
-    showAlert('alert', '新しいパスワードが一致しません', 'error');
-    return;
-  }
-
+  if (newPw !== confirm) { showAlert('alert', '新しいパスワードが一致しません', 'error'); return; }
   const res = await fetch('/api/auth/change-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

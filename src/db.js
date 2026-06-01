@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// データ保存先：Render環境変数 DATA_DIR > ユーザーフォルダ
 const DATA_DIR = process.env.DATA_DIR || path.join(os.homedir(), 'ManualSystemData');
 const DB_PATH = path.join(DATA_DIR, 'manual_system.db');
 
@@ -51,13 +50,10 @@ function initializeDb() {
     )
   `);
 
-  // 既存DBへのマイグレーション（parent_idカラムがない場合は追加）
   try {
     db.exec('ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL');
-  } catch (e) { /* すでに存在する場合は無視 */ }
+  } catch (e) { /* already exists */ }
 
-
-  // グループテーブル（スタッフの部署・役割グループ）
   db.exec(`
     CREATE TABLE IF NOT EXISTS groups_table (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +63,6 @@ function initializeDb() {
     )
   `);
 
-  // ユーザーとグループの紐付け
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_groups (
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -76,7 +71,6 @@ function initializeDb() {
     )
   `);
 
-  // カテゴリとグループの紐付け（特定グループのみ閲覧可能）
   db.exec(`
     CREATE TABLE IF NOT EXISTS category_groups (
       category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
@@ -172,12 +166,23 @@ function initializeDb() {
   `);
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('quiz_mode', '0')").run();
 
+  // 旧システムURL → 新マニュアルID の対応表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS url_redirects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      old_url TEXT UNIQUE NOT NULL,
+      manual_id INTEGER NOT NULL REFERENCES manuals(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_manuals_category ON manuals(category_id);
     CREATE INDEX IF NOT EXISTS idx_manuals_deleted ON manuals(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_view_history_user ON view_history(user_id);
     CREATE INDEX IF NOT EXISTS idx_manual_checks_user ON manual_checks(user_id);
     CREATE INDEX IF NOT EXISTS idx_manual_checks_manual ON manual_checks(manual_id);
+    CREATE INDEX IF NOT EXISTS idx_url_redirects_url ON url_redirects(old_url);
   `);
 
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
@@ -192,7 +197,6 @@ function initializeDb() {
 
   const categoryExists = db.prepare('SELECT id FROM categories LIMIT 1').get();
   if (!categoryExists) {
-    // Level 1
     const l1names = [
       ['01.のびのびマニュアル', 1], ['02.技工', 2], ['03.Dr.', 3],
       ['04.プライムスキャン / プライムミル', 4], ['05.入社時に確認する内容', 5],
@@ -203,13 +207,11 @@ function initializeDb() {
     const stL1 = db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
     for (const [n, s] of l1names) stL1.run(n, s);
 
-    // Level 2 - INSERT...SELECT でparent IDをSQL内で解決
     const stL2 = db.prepare(`
       INSERT INTO categories (name, sort_order, parent_id)
       SELECT ?, ?, id FROM categories WHERE name = ? AND parent_id IS NULL
     `);
     const l2data = [
-      // [子名, sort, 親名]
       ['01.診療関係', 1, '01.のびのびマニュアル'],
       ['02.滅菌・消毒室', 2, '01.のびのびマニュアル'],
       ['03.ユニット関係、案内', 3, '01.のびのびマニュアル'],
@@ -241,7 +243,6 @@ function initializeDb() {
     ];
     for (const [n, s, p] of l2data) stL2.run(n, s, p);
 
-    // Level 3 - INSERT...SELECT with JOIN to resolve grandparent
     const stL3 = db.prepare(`
       INSERT INTO categories (name, sort_order, parent_id)
       SELECT ?, ?, c.id
@@ -250,7 +251,6 @@ function initializeDb() {
       WHERE c.name = ? AND p.name = ?
     `);
     const l3data = [
-      // [子名, sort, 親名, 祖父母名]
       ['01.C処・形成・セット関係', 1, '01.診療関係', '01.のびのびマニュアル'],
       ['02.根治関係・コア', 2, '01.診療関係', '01.のびのびマニュアル'],
       ['03.外科関係', 3, '01.診療関係', '01.のびのびマニュアル'],
@@ -274,7 +274,6 @@ function initializeDb() {
     for (const [n, s, p, gp] of l3data) stL3.run(n, s, p, gp);
   }
 
-  // 既存DBマイグレーション：サブカテゴリが未登録なら追加
   const hasSubCats = db.prepare('SELECT id FROM categories WHERE parent_id IS NOT NULL LIMIT 1').get();
   if (!hasSubCats) {
     const stL2m = db.prepare(`
