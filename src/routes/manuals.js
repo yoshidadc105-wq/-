@@ -100,7 +100,7 @@ router.get('/', requireLogin, (req, res) => {
     LEFT JOIN users u ON u.id = m.created_by
     LEFT JOIN manual_checks mc ON mc.manual_id = m.id AND mc.user_id = ?
     WHERE ${where}
-    ORDER BY m.updated_at DESC
+    ORDER BY is_checked ASC, m.updated_at DESC
     LIMIT ? OFFSET ?
   `).all(userId, ...whereParams, parseInt(limit), offset);
 
