@@ -139,32 +139,96 @@ app.get('/api/sets/public', async (req, res) => {
   res.json(sets);
 });
 
-function buildQuizPrompt(manualText, count) {
-  return `以下のマニュアルテキストだけを根拠に、歯科クリニックのスタッフ向け理解度確認クイズを${count}問作成してください。
+const META_PATTERNS = [
+  /\b(?:exported|updated?|created|modified|imported|revision|rev\.?|version|author|owner)\b/i,
+  /\b(?:id|uuid|url|file|filename|path|sheet|row|column)\s*[:：]/i,
+  /\b\d{4}[./-]\d{1,2}[./-]\d{1,2}\b/,
+  /\b\d{1,2}:\d{2}(?::\d{2})?\b/,
+  /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/,
+  /^https?:\/\//i,
+  /(?:作成者|更新者|登録者|担当者|氏名|名前|ユーザー|ログ|履歴|タイムスタンプ|エクスポート|インポート)\s*[:：]/,
+  /(?:吉田|秋葉|髙橋|高橋|佐藤|鈴木|田中|伊藤|渡辺|山本|中村|小林|加藤|山田|斎藤|林|清水|山崎|森|池田|橋本|阿部|石川|山下|中島|前田|藤田|後藤|岡田|村上|長谷川|近藤|石井|齋藤|坂本|遠藤|青木|藤井|西村|福田|太田|三浦|藤原|岡本|松田|中川|中野|原田|小野|竹内|金子|和田|中山|石田|上田|森田|柴田|原|酒井|工藤|横山|宮崎|宮本|内田|高木|安藤|谷口|大野|丸山|今井|武田|藤本|村田|上野|杉山|増田|菅原|平野|大塚|千葉|久保|松井|岩崎|桜井|野口|木下|松尾|菊地|野村|新井|佐野|杉本|古川|浜田|市川|大西|小松|高田|水野|酒井|上田|東|西|南|北)[\p{Script=Han}ぁ-んァ-ヶー]{1,6}/u,
+];
 
-【厳守事項】
-- マニュアルテキストに書かれていない内容を出題しないでください。
-- 一般論、IT、Python、システム管理など、マニュアル外の架空問題を作らないでください。
-- 問題・選択肢・解説はすべて日本語にしてください。
+function normalizeManualLine(line) {
+  return String(line || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[|｜]/g, ' ')
+    .replace(/^[\s\-・*●■◆□◇○◎▶▷>]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function containsMetaInfo(text) {
+  const s = String(text || '').trim();
+  if (!s) return true;
+  if (META_PATTERNS.some(re => re.test(s))) return true;
+  if (/^[A-Za-z0-9_ .:/-]{3,}$/.test(s) && !/[ぁ-んァ-ヶ一-龥]/.test(s)) return true;
+  if (/^[\p{Script=Han}ぁ-んァ-ヶー]{2,8}$/u.test(s) && !/(患者|スタッフ|院長|歯科|衛生士|助手|受付)/.test(s)) return true;
+  return false;
+}
+
+function looksLikeTrainingContent(text) {
+  const s = String(text || '').trim();
+  if (containsMetaInfo(s)) return false;
+  if (s.length < 12 || s.length > 180) return false;
+  if (!/[ぁ-んァ-ヶ一-龥]/.test(s)) return false;
+  if (/^[「『]?[^。！？!?]{2,30}[」』]?$/.test(s) && !/[はをがにでへと]/.test(s)) return false;
+  if (/^[「『]?[^。！？!?]{2,30}[」』]?$/.test(s) && !/(確認|説明|実施|対応|記録|入力|共有|洗浄|消毒|保管|連絡|案内|予約|準備|診療|清掃|滅菌|会計|受付|問診|同意|装着|撮影|印象|スキャン|患者|してください|します|する|行う|行います|必要|注意|禁止|徹底)/.test(s)) return false;
+  return /(確認|説明|実施|対応|記録|入力|共有|洗浄|消毒|保管|連絡|案内|予約|準備|診療|検査|清掃|滅菌|会計|受付|問診|同意|装着|撮影|印象|スキャン|患者|スタッフ|院長|歯科|衛生士|助手|ください|します|する|行う|行います|必要|注意|禁止|徹底)/.test(s);
+}
+
+function cleanManualText(manualText) {
+  const rawLines = String(manualText || '')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map(normalizeManualLine)
+    .filter(Boolean);
+
+  const sentences = [];
+  for (const line of rawLines) {
+    if (containsMetaInfo(line)) continue;
+    const pieces = line
+      .split(/(?<=[。！？!?])|\n+/)
+      .map(normalizeManualLine)
+      .filter(Boolean);
+    for (const piece of pieces) {
+      if (looksLikeTrainingContent(piece)) sentences.push(piece);
+    }
+  }
+
+  return [...new Set(sentences)].slice(0, 80).join('\n');
+}
+
+function buildQuizPrompt(manualText, count) {
+  return `以下の【整理済みマニュアル本文】だけを根拠に、歯科クリニックのスタッフ研修に使える理解度確認クイズを${count}問作成してください。
+
+【最重要ルール】
+- 出題対象は、患者対応、検査、診療補助、受付、説明、記録、感染対策、器具管理など、スタッフが実務で判断・行動する内容だけです。
+- 名前、担当者名、作成者名、更新者名、日時、日付、ID、URL、Exported、Update、Created、履歴、ログ、ファイル名、タイトルだけの行は絶対に出題・選択肢・解説に含めないでください。
+- マニュアル名や項目名だけを問う問題は禁止です。例：「マニュアルでは『○○検査』とされています」は不合格です。
+- 本文に書かれた手順・注意点・確認事項・禁止事項・説明事項を、現場で使える問いに言い換えてください。
+- マニュアル本文に書かれていない内容、一般論、IT、Python、システム管理などの架空問題は作らないでください。
+- 問題・選択肢・解説はすべて自然な日本語にしてください。
 - 出力はJSONオブジェクトのみです。前置き、説明文、Markdownコードブロックは禁止です。
 - ${count}問ちょうど作成してください。
 
-【問題の種類】4種類からランダムに選んでください：
-1. truefalse（マルバツ）: 文章が正しいか間違いかを問う。answerは"true"または"false"。
+【問題の種類】本文に合うものだけを使ってください：
+1. truefalse（マルバツ）: 実務上の判断を問う。answerは"true"または"false"。
 2. choice（選択式）: 4択問題。optionsは4個、answerは正解の選択肢テキスト。
-3. fill（穴埋め）: 文章の___に入る言葉を問う。answerは文字列または文字列配列。
-4. sort（並び替え）: 手順を正しい順番に並べる。手順が明確な場合のみ使用し、answerは正しい順番の配列。
+3. fill（穴埋め）: 重要語句や確認項目を問う。answerは文字列または文字列配列。
+4. sort（並び替え）: 手順が明確な場合のみ使用し、answerは正しい順番の配列。
 
-【マニュアルテキスト】
+【整理済みマニュアル本文】
 ${manualText}
 
 【出力形式】JSONオブジェクトのみ：
 {
   "questions": [
-    {"type":"truefalse","question":"問題文","options":[],"answer":"true","explanation":"マニュアルに基づく解説"},
-    {"type":"choice","question":"問題文","options":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":"選択肢1","explanation":"マニュアルに基づく解説"},
-    {"type":"fill","question":"___は___する。","options":[],"answer":["答1","答2"],"explanation":"マニュアルに基づく解説"},
-    {"type":"sort","question":"次の手順を正しい順番に並べてください。","options":["手順1","手順2","手順3"],"answer":["手順1","手順2","手順3"],"explanation":"マニュアルに基づく解説"}
+    {"type":"truefalse","question":"実務判断を問う問題文","options":[],"answer":"true","explanation":"マニュアル本文に基づく解説"},
+    {"type":"choice","question":"実務上の適切な対応を問う問題文","options":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":"選択肢1","explanation":"マニュアル本文に基づく解説"},
+    {"type":"fill","question":"重要な確認事項は___です。","options":[],"answer":"答え","explanation":"マニュアル本文に基づく解説"},
+    {"type":"sort","question":"次の手順を正しい順番に並べてください。","options":["手順1","手順2","手順3"],"answer":["手順1","手順2","手順3"],"explanation":"マニュアル本文に基づく解説"}
   ]
 }`;
 }
@@ -228,8 +292,8 @@ async function generateWithGroq(prompt) {
 
 function normalizeGeneratedQuestions(raw, count) {
   return raw.map(q => {
-    const questionText = q.question || q.text || q['問題'] || q['問題文'] || '';
-    const explanation = q.explanation || q['解説'] || q['説明'] || '';
+    const questionText = String(q.question || q.text || q['問題'] || q['問題文'] || '').trim();
+    const explanation = String(q.explanation || q['解説'] || q['説明'] || '').trim();
     let options = q.options || q.choices || q['選択肢'] || [];
     if (!Array.isArray(options)) {
       options = (options && typeof options === 'object') ? Object.values(options) : [];
@@ -253,19 +317,27 @@ function normalizeGeneratedQuestions(raw, count) {
       options = expanded;
     }
 
+    options = options.map(o => String(o).trim()).filter(o => o && !containsMetaInfo(o));
+
     const answer = q.answer != null ? q.answer : q.correct_answer != null ? q.correct_answer : q['答え'] != null ? q['答え'] : q['正解'] != null ? q['正解'] : '';
     const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
     return { type, question: questionText, options, answer: finalAnswer, explanation };
-  }).filter(q => q.question && String(q.question).trim().length > 0).slice(0, count);
+  }).filter(q => {
+    const answerText = Array.isArray(q.answer) ? q.answer.join(' ') : String(q.answer || '');
+    const combined = [q.question, q.explanation, answerText].join(' ');
+    if (!q.question || containsMetaInfo(combined)) return false;
+    if (!looksLikeTrainingContent(q.question + ' ' + q.explanation) && q.type !== 'choice') return false;
+    if (q.type === 'choice' && q.options.length < 4) return false;
+    if (q.type === 'sort' && q.options.length < 2) return false;
+    return true;
+  }).slice(0, count);
 }
 
 function splitManualSentences(manualText) {
-  return String(manualText || '')
-    .replace(/\r/g, '\n')
-    .split(/[\n。！？!?]+/)
+  return cleanManualText(manualText)
+    .split('\n')
     .map(s => s.replace(/^[\s\-・*●■◆□0-9０-９.)）(（]+/, '').trim())
-    .filter(s => s.length >= 12 && s.length <= 140)
-    .filter(s => !/^https?:\/\//i.test(s));
+    .filter(looksLikeTrainingContent);
 }
 
 function pickBlankTarget(sentence) {
@@ -290,7 +362,7 @@ function makeLocalQuizQuestions(manualText, count) {
     if (mode === 0) {
       questions.push({
         type: 'truefalse',
-        question: `マニュアルでは「${sentence}」とされています。`,
+        question: `次の内容は、このマニュアルに記載された実務対応として正しいですか。「${sentence}」`,
         options: [],
         answer: 'true',
         explanation: `マニュアル本文に「${sentence}」と記載されているためです。`,
@@ -335,8 +407,10 @@ app.post('/api/generate', async (req, res) => {
   const { manualText, count = 5 } = req.body;
   const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 1), 20);
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
+  const cleanedManualText = cleanManualText(manualText);
+  if (!cleanedManualText) return res.status(400).json({ error: '出題できる実務本文が見つかりませんでした。名前・日時・履歴ではなく、手順や注意点を含む本文を入力してください。' });
 
-  const prompt = buildQuizPrompt(manualText, safeCount);
+  const prompt = buildQuizPrompt(cleanedManualText, safeCount);
   const attempts = [];
 
   if (GEMINI_API_KEY) attempts.push(['Gemini 2.0 Flash', () => generateWithGemini(prompt)]);
@@ -346,7 +420,11 @@ app.post('/api/generate', async (req, res) => {
   for (const [providerName, fn] of attempts) {
     try {
       const raw = await fn();
-      const questions = normalizeGeneratedQuestions(raw, safeCount);
+      let questions = normalizeGeneratedQuestions(raw, safeCount);
+      if (questions.length < safeCount) {
+        const local = makeLocalQuizQuestions(cleanedManualText, safeCount - questions.length);
+        questions = questions.concat(local).slice(0, safeCount);
+      }
       console.log(`AI provider success: ${providerName}, questions: ${questions.length}`);
       if (!questions.length) throw new Error('有効な問題が生成されませんでした');
       return res.json({ questions, provider: providerName });
@@ -357,7 +435,7 @@ app.post('/api/generate', async (req, res) => {
     }
   }
 
-  const questions = makeLocalQuizQuestions(manualText, safeCount);
+  const questions = makeLocalQuizQuestions(cleanedManualText, safeCount);
   if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。マニュアル本文を長めに入力してください。' });
   console.log('AI provider fallback: Local rule-based generator', errors.join(' / '));
   return res.json({ questions, provider: 'Local rule-based generator', warning: errors.length ? errors.join(' / ') : undefined });
