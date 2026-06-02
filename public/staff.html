@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>スタッフ実績入力 | のびのび歯科</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Hiragino Kaku Gothic Pro", "Meiryo", sans-serif; background: #f4f7f9; color: #333; font-size: 15px; line-height: 1.6; }
+    header { background: #2aab96; color: #fff; padding: 16px 20px; text-align: center; }
+    header h1 { font-size: 18px; font-weight: bold; }
+    header p { font-size: 12px; margin-top: 4px; opacity: .85; }
+    .container { max-width: 480px; margin: 24px auto; padding: 0 16px 60px; }
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 24px 20px; margin-bottom: 20px; }
+    .card-title { font-size: 15px; font-weight: bold; color: #fff; background: #2aab96; border-radius: 6px; padding: 6px 14px; margin-bottom: 18px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+    .required::after { content: "必須"; font-size: 11px; color: #fff; background: #e05; border-radius: 3px; padding: 1px 5px; margin-left: 6px; }
+    input[type="text"], input[type="date"], input[type="number"], select, textarea {
+      width: 100%; border: 1px solid #ccc; border-radius: 6px; padding: 9px 12px;
+      font-size: 15px; font-family: inherit; outline: none; transition: border .2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #2aab96; }
+    .counter-row { display: flex; align-items: center; gap: 12px; }
+    .counter-row input[type="number"] { width: 80px; text-align: center; font-size: 18px; font-weight: bold; }
+    .counter-btn { background: #2aab96; color: #fff; border: none; border-radius: 6px; width: 36px; height: 36px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .counter-btn.minus { background: #9ca3af; }
+    .counter-btn:hover { opacity: .85; }
+    .unit { font-size: 13px; color: #666; }
+    .submit-btn { display: block; width: 100%; background: #2aab96; color: #fff; border: none; border-radius: 30px; padding: 16px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background .2s; }
+    .submit-btn:hover { background: #228f7c; }
+    .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+    #success { display: none; text-align: center; padding: 40px 20px; }
+    #success .icon { font-size: 60px; }
+    #success h2 { font-size: 22px; color: #2aab96; margin: 16px 0 10px; }
+    #success p { color: #666; }
+    #success .again-btn { display: inline-block; margin-top: 20px; background: #2aab96; color: #fff; border: none; border-radius: 20px; padding: 10px 28px; font-size: 15px; cursor: pointer; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>スタッフ実績入力</h1>
+  <p>のびのび歯科・矯正歯科</p>
+</header>
+<div class="container">
+  <div id="success" class="card">
+    <div class="icon">✅</div>
+    <h2>登録しました</h2>
+    <p>実績を記録しました。</p>
+    <button class="again-btn" onclick="resetForm()">続けて入力する</button>
+  </div>
+  <form id="staff-form">
+    <div class="card">
+      <div class="card-title">基本情報</div>
+      <div class="form-group">
+        <label class="required">日付</label>
+        <input type="date" name="date" id="dateInput" required />
+      </div>
+      <div class="form-group">
+        <label class="required">スタッフ名</label>
+        <input type="text" name="staffName" placeholder="例：田中" required />
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">実績入力</div>
+      <div class="form-group">
+        <label>物品販売数</label>
+        <div class="counter-row">
+          <button type="button" class="counter-btn minus" onclick="change('items', -1)">−</button>
+          <input type="number" name="items" id="items" value="0" min="0" />
+          <button type="button" class="counter-btn" onclick="change('items', 1)">＋</button>
+          <span class="unit">件</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>カウンセリング成約数</label>
+        <div class="counter-row">
+          <button type="button" class="counter-btn minus" onclick="change('counseling', -1)">−</button>
+          <input type="number" name="counseling" id="counseling" value="0" min="0" />
+          <button type="button" class="counter-btn" onclick="change('counseling', 1)">＋</button>
+          <span class="unit">件</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>口コミ獲得数</label>
+        <div class="counter-row">
+          <button type="button" class="counter-btn minus" onclick="change('reviews', -1)">−</button>
+          <input type="number" name="reviews" id="reviews" value="0" min="0" />
+          <button type="button" class="counter-btn" onclick="change('reviews', 1)">＋</button>
+          <span class="unit">件</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>メモ（任意）</label>
+        <textarea name="note" placeholder="気づきや特記事項など" rows="3"></textarea>
+      </div>
+      <button type="submit" class="submit-btn" id="submitBtn">実績を登録する</button>
+    </div>
+  </form>
+</div>
+<script>
+  document.getElementById('dateInput').value = new Date().toLocaleDateString('sv-SE');
+
+  function change(field, delta) {
+    const el = document.getElementById(field);
+    el.value = Math.max(0, parseInt(el.value || '0') + delta);
+  }
+
+  document.getElementById('staff-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '登録中...';
+    const fd = new FormData(this);
+    const data = {};
+    for (const [k, v] of fd.entries()) data[k] = v;
+    data.items = parseInt(data.items) || 0;
+    data.counseling = parseInt(data.counseling) || 0;
+    data.reviews = parseInt(data.reviews) || 0;
+    try {
+      const res = await fetch('/staff-submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (res.ok) {
+        document.getElementById('staff-form').style.display = 'none';
+        document.getElementById('success').style.display = 'block';
+        window.scrollTo(0, 0);
+      } else { throw new Error(); }
+    } catch {
+      alert('登録に失敗しました。再度お試しください。');
+      btn.disabled = false;
+      btn.textContent = '実績を登録する';
+    }
+  });
+
+  function resetForm() {
+    document.getElementById('staff-form').reset();
+    document.getElementById('dateInput').value = new Date().toLocaleDateString('sv-SE');
+    ['items','counseling','reviews'].forEach(f => document.getElementById(f).value = 0);
+    document.getElementById('staff-form').style.display = '';
+    document.getElementById('success').style.display = 'none';
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = '実績を登録する';
+    window.scrollTo(0, 0);
+  }
+</script>
+</body>
+</html>
