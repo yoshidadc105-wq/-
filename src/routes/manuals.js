@@ -148,6 +148,7 @@ router.post('/pdf', requireLogin, upload.single('pdf'), (req, res) => {
 });
 
 // マニュアル更新（管理者のみ）
+// 内容が変わるので全スタッフの確認記録をリセット
 router.put('/:id', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
@@ -162,10 +163,12 @@ router.put('/:id', requireAdmin, (req, res) => {
     db.prepare(`UPDATE manuals SET title = ?, description = ?, content = ?, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
       .run(title, description || null, content || manual.content, category_id || null, req.session.userId, req.params.id);
   }
-  res.json({ message: 'マニュアルを更新しました' });
+  db.prepare('DELETE FROM manual_checks WHERE manual_id = ?').run(req.params.id);
+  res.json({ message: 'マニュアルを更新しました（全スタッフの確認がリセットされました）' });
 });
 
 // PDFの差し替え（管理者のみ）
+// PDFを差し替えたので全スタッフの確認記録をリセット
 router.put('/:id/pdf', requireAdmin, upload.single('pdf'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'PDFファイルを選択してください' });
   const db = getDb();
@@ -178,10 +181,11 @@ router.put('/:id/pdf', requireAdmin, upload.single('pdf'), (req, res) => {
   const { title, description, category_id } = req.body;
   db.prepare(`UPDATE manuals SET title = ?, description = ?, file_path = ?, file_name = ?, file_size = ?, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
     .run(title || manual.title, description || manual.description, req.file.filename, req.file.originalname, req.file.size, category_id || null, req.session.userId, req.params.id);
-  res.json({ message: 'PDFを更新しました' });
+  db.prepare('DELETE FROM manual_checks WHERE manual_id = ?').run(req.params.id);
+  res.json({ message: 'PDFを更新しました（全スタッフの確認がリセットされました）' });
 });
 
-// カテゴリ移動（管理者のみ）
+// カテゴリ移動（管理者のみ）—内容は変わらないので確認はリセットしない
 router.patch('/:id/category', requireAdmin, (req, res) => {
   const db = getDb();
   const manual = db.prepare('SELECT * FROM manuals WHERE id = ? AND is_deleted = 0').get(req.params.id);
