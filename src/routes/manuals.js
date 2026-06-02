@@ -58,28 +58,52 @@ const uploadImage = multer({
 
 // マニュアル一覧取得
 router.get('/', requireLogin, (req, res) => {
-  const { search, category_id, type, page = 1, limit = 20 } = req.query;
+  const { search, category_id, type, check_filter, page = 1, limit = 20 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
+  const userId = req.session.userId;
   const db = getDb();
+
   let conditions = ['m.is_deleted = 0'];
-  const params = [];
-  if (search) { conditions.push('(m.title LIKE ? OR m.description LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
-  if (category_id) { conditions.push('m.category_id = ?'); params.push(parseInt(category_id)); }
-  if (type) { conditions.push('m.type = ?'); params.push(type); }
+  const whereParams = [];
+
+  if (search) {
+    conditions.push('(m.title LIKE ? OR m.description LIKE ?)');
+    whereParams.push(`%${search}%`, `%${search}%`);
+  }
+  if (category_id) {
+    conditions.push('m.category_id = ?');
+    whereParams.push(parseInt(category_id));
+  }
+  if (type) {
+    conditions.push('m.type = ?');
+    whereParams.push(type);
+  }
+  if (check_filter === 'checked') {
+    conditions.push('EXISTS (SELECT 1 FROM manual_checks mc2 WHERE mc2.manual_id = m.id AND mc2.user_id = ?)');
+    whereParams.push(userId);
+  } else if (check_filter === 'unchecked') {
+    conditions.push('NOT EXISTS (SELECT 1 FROM manual_checks mc2 WHERE mc2.manual_id = m.id AND mc2.user_id = ?)');
+    whereParams.push(userId);
+  }
+
   const where = conditions.join(' AND ');
-  const total = db.prepare(`SELECT COUNT(*) as count FROM manuals m WHERE ${where}`).get(...params).count;
+
+  const total = db.prepare(`SELECT COUNT(*) as count FROM manuals m WHERE ${where}`).get(...whereParams).count;
   const manuals = db.prepare(`
     SELECT m.id, m.title, m.description, m.type, m.file_name, m.file_size,
       m.category_id, c.name as category_name,
       m.created_by, u.display_name as created_by_name,
-      m.created_at, m.updated_at
+      m.created_at, m.updated_at,
+      CASE WHEN mc.id IS NOT NULL THEN 1 ELSE 0 END as is_checked
     FROM manuals m
     LEFT JOIN categories c ON c.id = m.category_id
     LEFT JOIN users u ON u.id = m.created_by
+    LEFT JOIN manual_checks mc ON mc.manual_id = m.id AND mc.user_id = ?
     WHERE ${where}
     ORDER BY m.updated_at DESC
     LIMIT ? OFFSET ?
-  `).all(...params, parseInt(limit), offset);
+  `).all(userId, ...whereParams, parseInt(limit), offset);
+
   res.json({ manuals, total, page: parseInt(page), limit: parseInt(limit) });
 });
 
@@ -132,7 +156,6 @@ router.put('/:id', requireAdmin, (req, res) => {
   if (!title) return res.status(400).json({ error: 'タイトルは必須です' });
 
   if (convert_to_type && convert_to_type !== manual.type) {
-    // 形式変換（例: PDF → ステップ）
     db.prepare(`UPDATE manuals SET title = ?, description = ?, type = ?, content = ?, file_path = NULL, file_name = NULL, file_size = NULL, category_id = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = ?`)
       .run(title, description || null, convert_to_type, content || '{}', category_id || null, req.session.userId, req.params.id);
   } else {
