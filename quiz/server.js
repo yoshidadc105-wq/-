@@ -207,6 +207,7 @@ function buildQuizPrompt(manualText, count) {
 - 出題対象は、患者対応、検査、診療補助、受付、説明、記録、感染対策、器具管理など、スタッフが実務で判断・行動する内容だけです。
 - 名前、担当者名、作成者名、更新者名、日時、日付、ID、URL、Exported、Update、Created、履歴、ログ、ファイル名、タイトルだけの行は絶対に出題・選択肢・解説に含めないでください。
 - マニュアル名や項目名だけを問う問題は禁止です。例：「マニュアルでは『○○検査』とされています」は不合格です。
+- 「このマニュアルに記載」「マニュアル本文」「次の内容は正しいですか」のような丸写し確認は禁止です。現場で迷う判断・行動・確認事項を問う自然な問題文にしてください。
 - 本文に書かれた手順・注意点・確認事項・禁止事項・説明事項を、現場で使える問いに言い換えてください。
 - マニュアル本文に書かれていない内容、一般論、IT、Python、システム管理などの架空問題は作らないでください。
 - 問題・選択肢・解説はすべて自然な日本語にしてください。
@@ -290,6 +291,11 @@ async function generateWithGroq(prompt) {
   return extractJsonArray(responseText);
 }
 
+function isGenericManualQuestion(text) {
+  const s = String(text || '');
+  return /このマニュアル|マニュアル本文|マニュアルに記載|記載されている内容|次の内容は.*正しいですか|該当箇所/.test(s);
+}
+
 function normalizeGeneratedQuestions(raw, count) {
   return raw.map(q => {
     const questionText = String(q.question || q.text || q['問題'] || q['問題文'] || '').trim();
@@ -326,6 +332,7 @@ function normalizeGeneratedQuestions(raw, count) {
     const answerText = Array.isArray(q.answer) ? q.answer.join(' ') : String(q.answer || '');
     const combined = [q.question, q.explanation, answerText].join(' ');
     if (!q.question || containsMetaInfo(combined)) return false;
+    if (isGenericManualQuestion(q.question)) return false;
     if (!looksLikeTrainingContent(q.question + ' ' + q.explanation) && q.type !== 'choice') return false;
     if (q.type === 'choice' && q.options.length < 4) return false;
     if (q.type === 'sort' && q.options.length < 2) return false;
@@ -362,10 +369,10 @@ function makeLocalQuizQuestions(manualText, count) {
     if (mode === 0) {
       questions.push({
         type: 'truefalse',
-        question: `次の内容は、このマニュアルに記載された実務対応として正しいですか。「${sentence}」`,
+        question: `スタッフが現場で行う対応として、次の行動は適切ですか。「${sentence}」`,
         options: [],
         answer: 'true',
-        explanation: `マニュアル本文に「${sentence}」と記載されているためです。`,
+        explanation: `この対応は、研修本文で求められている手順・確認事項に沿っています。`,
       });
       continue;
     }
@@ -378,7 +385,7 @@ function makeLocalQuizQuestions(manualText, count) {
           question: sentence.replace(target, '___'),
           options: [],
           answer: target,
-          explanation: `マニュアル本文の該当箇所は「${sentence}」です。`,
+          explanation: `研修本文では、この確認・対応が必要であることが示されています。`,
         });
         continue;
       }
@@ -392,10 +399,10 @@ function makeLocalQuizQuestions(manualText, count) {
     ];
     questions.push({
       type: 'choice',
-      question: '次のうち、このマニュアルに記載されている内容として最も適切なものはどれですか。',
+      question: '現場対応として最も適切なものはどれですか。',
       options,
       answer: sentence,
-      explanation: `マニュアル本文に「${sentence}」と記載されているためです。`,
+      explanation: `正解は、研修本文で求められている具体的な対応に沿った選択肢です。`,
     });
   }
 
