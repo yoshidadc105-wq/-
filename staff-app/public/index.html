@@ -118,7 +118,7 @@
     data.counseling = parseInt(data.counseling) || 0;
     data.reviews = parseInt(data.reviews) || 0;
     try {
-      const res = await fetch('/staff-submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const res = await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (res.ok) {
         document.getElementById('staff-form').style.display = 'none';
         document.getElementById('success').style.display = 'block';
