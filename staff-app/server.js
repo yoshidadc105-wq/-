@@ -14,14 +14,50 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB接続
 let mongoCol = null;
+let staffNamesCol = null;
 if (MONGODB_URI) {
   const client = new MongoClient(MONGODB_URI);
   client.connect()
     .then(() => {
       mongoCol = client.db('nobinobi').collection('staff_records');
+      staffNamesCol = client.db('nobinobi').collection('staff_names');
       console.log('MongoDB接続成功');
     })
     .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
+}
+
+const NAMES_FILE = path.join(__dirname, 'data', 'staff_names.json');
+
+async function loadStaffNames() {
+  if (staffNamesCol) {
+    const docs = await staffNamesCol.find({}).sort({ name: 1 }).toArray();
+    return docs.map(d => d.name);
+  }
+  try { return JSON.parse(fs.readFileSync(NAMES_FILE, 'utf8')); } catch { return []; }
+}
+
+async function addStaffName(name) {
+  if (staffNamesCol) {
+    await staffNamesCol.updateOne({ name }, { $set: { name } }, { upsert: true });
+    return;
+  }
+  const names = await loadStaffNames();
+  if (!names.includes(name)) {
+    names.push(name);
+    names.sort();
+    fs.mkdirSync(path.dirname(NAMES_FILE), { recursive: true });
+    fs.writeFileSync(NAMES_FILE, JSON.stringify(names, null, 2));
+  }
+}
+
+async function deleteStaffName(name) {
+  if (staffNamesCol) {
+    await staffNamesCol.deleteOne({ name });
+    return;
+  }
+  const names = (await loadStaffNames()).filter(n => n !== name);
+  fs.mkdirSync(path.dirname(NAMES_FILE), { recursive: true });
+  fs.writeFileSync(NAMES_FILE, JSON.stringify(names, null, 2));
 }
 
 async function loadDB() {
@@ -68,9 +104,23 @@ function esc(str) {
 
 // スタッフ名一覧（プルダウン用）
 app.get('/api/staff-names', async (req, res) => {
-  const records = await loadDB();
-  const names = [...new Set(records.map(r => r.staffName).filter(Boolean))].sort();
-  res.json(names);
+  res.json(await loadStaffNames());
+});
+
+// スタッフ名追加（管理画面から）
+app.post('/admin/staff-names', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'invalid' });
+  await addStaffName(name.trim());
+  res.json({ ok: true });
+});
+
+// スタッフ名削除（管理画面から）
+app.delete('/admin/staff-names/:name', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  await deleteStaffName(decodeURIComponent(req.params.name));
+  res.json({ ok: true });
 });
 
 // 最近の入力を全員分返す（フォーム画面用）
@@ -275,7 +325,48 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
     <tbody>${detailRows || '<tr><td colspan="7" class="empty">まだデータがありません</td></tr>'}</tbody>
   </table>
   </div>
+
+  <h2>スタッフ名管理</h2>
+  <div id="staff-mgmt" style="background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:30px;max-width:400px;">
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <input type="text" id="newStaffInput" placeholder="新しいスタッフ名" style="flex:1;border:1px solid #ccc;border-radius:6px;padding:7px 10px;font-size:14px;" />
+      <button onclick="addStaffName()" style="background:#2aab96;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:14px;cursor:pointer;white-space:nowrap;">追加</button>
+    </div>
+    <div id="staffNameMsg" style="font-size:12px;margin-bottom:10px;min-height:16px;"></div>
+    <ul id="staffNameList" style="list-style:none;padding:0;margin:0;"></ul>
+  </div>
 </div>
+<script>
+async function loadMgmtStaffNames() {
+  const res = await fetch('/api/staff-names');
+  const names = await res.json();
+  const ul = document.getElementById('staffNameList');
+  ul.innerHTML = '';
+  names.forEach(n => {
+    const li = document.createElement('li');
+    li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:14px;';
+    li.innerHTML = '<span>' + n + '</span><button onclick="deleteStaffName(' + JSON.stringify(n) + ')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer;">削除</button>';
+    ul.appendChild(li);
+  });
+}
+async function addStaffName() {
+  const input = document.getElementById('newStaffInput');
+  const name = input.value.trim();
+  if (!name) return;
+  const msg = document.getElementById('staffNameMsg');
+  const res = await fetch('/admin/staff-names', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+  if (res.ok) { input.value=''; msg.style.color='#059669'; msg.textContent='追加しました'; loadMgmtStaffNames(); }
+  else { const e = await res.json(); msg.style.color='#dc2626'; msg.textContent = e.error || 'エラー'; }
+}
+async function deleteStaffName(name) {
+  if (!confirm(name + ' を削除しますか？')) return;
+  const msg = document.getElementById('staffNameMsg');
+  const res = await fetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; loadMgmtStaffNames(); }
+  else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
+}
+loadMgmtStaffNames();
+</script>
 </body>
 </html>`);
 });
