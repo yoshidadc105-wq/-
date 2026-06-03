@@ -152,7 +152,7 @@ const META_PATTERNS = [
 
 function normalizeManualLine(line) {
   return String(line || '')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[​-‍﻿]/g, '')
     .replace(/[|｜]/g, ' ')
     .replace(/^[\s\-・*●■◆□◇○◎▶▷>]+/, '')
     .replace(/\s+/g, ' ')
@@ -366,7 +366,7 @@ function normalizeForSimilarity(text) {
   return String(text || '')
     .toLowerCase()
     .replace(/___/g, '')
-    .replace(/[\s　、。,.，．・「」『』（）()【】\[\]！？!?]/g, '')
+    .replace(/[\s　、。,.，．・「」『』（）()[\]！？!?【】]/g, '')
     .replace(/について|の場合|として|スタッフ|現場|対応|適切|正しい|誤り|必要|してください|します|する|です|ます|どれですか|何ですか|次の行動/g, '')
     .trim();
 }
@@ -395,7 +395,10 @@ function isDuplicateQuestion(candidate, accepted) {
     const answerNorm = normalizeForSimilarity(answerText);
     const existingAnswerNorm = normalizeForSimilarity(existingAnswer);
     if (answerNorm && !['true', 'false'].includes(answerNorm) && answerNorm.length >= 4 && answerNorm === existingAnswerNorm) return true;
-    return similarityScore(candidate.question + ' ' + answerText, q.question + ' ' + existingAnswer) >= 0.72;
+    // 同じ出題場面かつ同じ問題タイプは低い閾値でも重複と判定
+    const sameContext = candidate.context && q.context && candidate.context === q.context;
+    const threshold = sameContext ? 0.45 : 0.62;
+    return similarityScore(candidate.question + ' ' + answerText, q.question + ' ' + existingAnswer) >= threshold;
   });
 }
 
@@ -434,7 +437,7 @@ function splitManualSentences(manualText) {
 
 function pickBlankTarget(sentence) {
   const parts = String(sentence || '')
-    .split(/[、,\s　「」『』（）()\[\]【】]|(?:について)|(?:または)|[はをがにでへともの]/)
+    .split(/[、,\s　「」『』（）()[\]【】]|(?:について)|(?:または)|[はをがにでへともの]/)
     .map(s => s.replace(/します$|してください$|する$|です$|ます$/g, '').trim())
     .filter(s => s.length >= 2 && s.length <= 8);
   const candidates = parts.length ? parts : (sentence.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]{2,8}/g) || []);
@@ -447,8 +450,9 @@ function makeLocalQuizQuestions(manualText, count, manualName = '') {
   const source = sentences.length ? sentences : [String(manualText || '').trim()].filter(Boolean);
   const questions = [];
 
-  for (let i = 0; questions.length < count && i < Math.max(source.length, count * 2); i++) {
-    const sentence = source[i % source.length];
+  // 各文を一度だけ使用して重複を防ぐ
+  for (let i = 0; questions.length < count && i < source.length; i++) {
+    const sentence = source[i];
     const context = inferQuestionContext(sentence, manualName);
     const mode = questions.length % 3;
 
