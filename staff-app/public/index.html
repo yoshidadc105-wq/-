@@ -10,31 +10,44 @@
     header { background: #2aab96; color: #fff; padding: 16px 20px; text-align: center; }
     header h1 { font-size: 18px; font-weight: bold; }
     header p { font-size: 12px; margin-top: 4px; opacity: .85; }
-    .container { max-width: 480px; margin: 24px auto; padding: 0 16px 60px; }
-    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 24px 20px; margin-bottom: 20px; }
-    .card-title { font-size: 15px; font-weight: bold; color: #fff; background: #2aab96; border-radius: 6px; padding: 6px 14px; margin-bottom: 18px; }
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
-    .required::after { content: "必須"; font-size: 11px; color: #fff; background: #e05; border-radius: 3px; padding: 1px 5px; margin-left: 6px; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
+    .container { max-width: 560px; margin: 20px auto; padding: 0 16px 60px; }
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 14px; font-weight: bold; color: #fff; background: #2aab96; border-radius: 6px; padding: 5px 12px; margin-bottom: 14px; }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; font-weight: bold; }
+    .required::after { content: "必須"; font-size: 11px; color: #fff; background: #e05; border-radius: 3px; padding: 1px 5px; margin-left: 6px; font-weight: normal; }
+    input[type="text"], input[type="date"], select, textarea {
       width: 100%; border: 1px solid #ccc; border-radius: 6px; padding: 9px 12px;
-      font-size: 15px; font-family: inherit; outline: none; transition: border .2s;
+      font-size: 15px; font-family: inherit; outline: none; transition: border .2s; background: #fff;
     }
     input:focus, select:focus, textarea:focus { border-color: #2aab96; }
-    .counter-row { display: flex; align-items: center; gap: 12px; }
-    .counter-row input[type="number"] { width: 80px; text-align: center; font-size: 18px; font-weight: bold; }
-    .counter-btn { background: #2aab96; color: #fff; border: none; border-radius: 6px; width: 36px; height: 36px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .counter-btn.minus { background: #9ca3af; }
-    .counter-btn:hover { opacity: .85; }
-    .unit { font-size: 13px; color: #666; }
-    .submit-btn { display: block; width: 100%; background: #2aab96; color: #fff; border: none; border-radius: 30px; padding: 16px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background .2s; }
+    textarea { resize: vertical; min-height: 80px; }
+    .row2 { display: flex; gap: 10px; }
+    .row2 > * { flex: 1; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .patient-check { font-size: 12px; margin-top: 4px; min-height: 18px; }
+    .check-ok { color: #059669; }
+    .check-ng { color: #dc2626; font-weight: bold; }
+    .submit-btn { display: block; width: 100%; background: #2aab96; color: #fff; border: none; border-radius: 30px; padding: 14px; font-size: 17px; font-weight: bold; cursor: pointer; transition: background .2s; }
     .submit-btn:hover { background: #228f7c; }
     .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
-    #success { display: none; text-align: center; padding: 40px 20px; }
-    #success .icon { font-size: 60px; }
-    #success h2 { font-size: 22px; color: #2aab96; margin: 16px 0 10px; }
-    #success p { color: #666; }
-    #success .again-btn { display: inline-block; margin-top: 20px; background: #2aab96; color: #fff; border: none; border-radius: 20px; padding: 10px 28px; font-size: 15px; cursor: pointer; }
+    #success { display: none; text-align: center; padding: 36px 20px; }
+    #success .icon { font-size: 56px; }
+    #success h2 { font-size: 20px; color: #2aab96; margin: 14px 0 8px; }
+    #success p { color: #666; font-size: 14px; }
+    #success .again-btn { display: inline-block; margin-top: 16px; background: #2aab96; color: #fff; border: none; border-radius: 20px; padding: 10px 28px; font-size: 15px; cursor: pointer; }
+    .recent-section { margin-top: 10px; }
+    .recent-title { font-size: 14px; font-weight: bold; color: #065f46; margin-bottom: 10px; border-left: 4px solid #2aab96; padding-left: 8px; }
+    .record-item { background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
+    .record-item .staff-name { font-weight: bold; color: #2aab96; }
+    .record-item .record-detail { color: #555; margin-top: 4px; }
+    .record-item .record-date { font-size: 11px; color: #9ca3af; float: right; }
+    .badge { display: inline-block; background: #e8f7f5; color: #065f46; border-radius: 4px; padding: 1px 6px; font-size: 11px; margin: 1px; }
+    .badge-orange { background: #fef3c7; color: #92400e; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-pink { background: #fce7f3; color: #9d174d; }
+    .loading { text-align: center; color: #9ca3af; padding: 20px; font-size: 13px; }
+    @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -43,68 +56,182 @@
   <p>のびのび歯科・矯正歯科</p>
 </header>
 <div class="container">
+
   <div id="success" class="card">
     <div class="icon">✅</div>
     <h2>登録しました</h2>
     <p>実績を記録しました。</p>
     <button class="again-btn" onclick="resetForm()">続けて入力する</button>
   </div>
+
   <form id="staff-form">
     <div class="card">
       <div class="card-title">基本情報</div>
-      <div class="form-group">
-        <label class="required">日付</label>
-        <input type="date" name="date" id="dateInput" required />
+      <div class="row2">
+        <div class="form-group">
+          <label class="required">日付</label>
+          <input type="date" name="date" id="dateInput" required />
+        </div>
+        <div class="form-group">
+          <label class="required">スタッフ名</label>
+          <input type="text" name="staffName" placeholder="例：田中" required />
+        </div>
       </div>
       <div class="form-group">
-        <label class="required">スタッフ名</label>
-        <input type="text" name="staffName" placeholder="例：田中" required />
+        <label class="required">患者番号</label>
+        <input type="text" name="patientNo" id="patientNo" placeholder="例：P-1234" required autocomplete="off" />
+        <div class="patient-check" id="patientCheck"></div>
       </div>
     </div>
+
     <div class="card">
-      <div class="card-title">実績入力</div>
+      <div class="card-title">実績項目</div>
       <div class="form-group">
-        <label>物品販売数</label>
-        <div class="counter-row">
-          <button type="button" class="counter-btn minus" onclick="change('items', -1)">−</button>
-          <input type="number" name="items" id="items" value="0" min="0" />
-          <button type="button" class="counter-btn" onclick="change('items', 1)">＋</button>
-          <span class="unit">件</span>
-        </div>
+        <label>物品販売</label>
+        <select name="items">
+          <option value="なし">なし</option>
+          <option value="1">1件</option>
+          <option value="2">2件</option>
+          <option value="3">3件</option>
+          <option value="4">4件</option>
+          <option value="5以上">5件以上</option>
+        </select>
       </div>
       <div class="form-group">
-        <label>カウンセリング成約数</label>
-        <div class="counter-row">
-          <button type="button" class="counter-btn minus" onclick="change('counseling', -1)">−</button>
-          <input type="number" name="counseling" id="counseling" value="0" min="0" />
-          <button type="button" class="counter-btn" onclick="change('counseling', 1)">＋</button>
-          <span class="unit">件</span>
-        </div>
+        <label>カウンセリング成約</label>
+        <select name="counseling">
+          <option value="なし">なし</option>
+          <option value="インプラント">インプラント</option>
+          <option value="ワイヤー矯正">ワイヤー矯正</option>
+          <option value="マウスピース矯正">マウスピース矯正</option>
+          <option value="ホワイトニング">ホワイトニング</option>
+          <option value="セラミック・審美">セラミック・審美</option>
+          <option value="入れ歯・義歯">入れ歯・義歯</option>
+          <option value="歯周病治療">歯周病治療</option>
+          <option value="予防・定期検診">予防・定期検診</option>
+          <option value="その他">その他</option>
+        </select>
       </div>
       <div class="form-group">
-        <label>口コミ獲得数</label>
-        <div class="counter-row">
-          <button type="button" class="counter-btn minus" onclick="change('reviews', -1)">−</button>
-          <input type="number" name="reviews" id="reviews" value="0" min="0" />
-          <button type="button" class="counter-btn" onclick="change('reviews', 1)">＋</button>
-          <span class="unit">件</span>
-        </div>
+        <label>口コミ獲得</label>
+        <select name="reviews">
+          <option value="なし">なし</option>
+          <option value="獲得">獲得</option>
+        </select>
       </div>
-      <div class="form-group">
-        <label>メモ（任意）</label>
-        <textarea name="note" placeholder="気づきや特記事項など" rows="3"></textarea>
-      </div>
-      <button type="submit" class="submit-btn" id="submitBtn">実績を登録する</button>
     </div>
+
+    <div class="card">
+      <div class="card-title">処置項目</div>
+      <div class="grid2">
+        <div class="form-group">
+          <label>シーラント</label>
+          <select name="sealant">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>レントゲン</label>
+          <select name="xray">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>フッ素塗布</label>
+          <select name="fluoride">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>クリーニング</label>
+          <select name="cleaning">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>歯磨き指導（TBI）</label>
+          <select name="tbi">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">行動・取り組み（自由記入）</div>
+      <div class="form-group">
+        <label>特記事項・頑張ったこと</label>
+        <textarea name="freeText" id="freeText" placeholder="下のボタンから選ぶか、自由に入力してください"></textarea>
+        <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;" id="phraseButtons"></div>
+      </div>
+    </div>
+
+    <button type="submit" class="submit-btn" id="submitBtn">実績を登録する</button>
   </form>
+
+  <div class="recent-section" style="margin-top:24px">
+    <div class="recent-title">みんなの最近の入力（直近50件）</div>
+    <div id="recentList"><div class="loading">読み込み中...</div></div>
+  </div>
+
 </div>
+
 <script>
+  const PHRASES = [
+    'だれよりもトイレ掃除を丁寧に行った',
+    '患者さんに笑顔で対応できた',
+    '毎日マニュアルを確認している',
+    '院内の整理整頓を率先して行った',
+    '患者さんのお名前を覚えて声かけした',
+    'チームへの報連相を徹底した',
+    '新人スタッフのサポートをした',
+    '器具の準備・片付けを迅速に行った',
+    '患者さんへの治療説明をわかりやすく行った',
+    '時間に正確で遅刻ゼロだった',
+    '自主的に勉強・スキルアップに取り組んだ',
+    'クレームゼロで患者満足度を高めた',
+    'チームの雰囲気づくりに貢献した',
+  ];
+
+  const phraseButtons = document.getElementById('phraseButtons');
+  PHRASES.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = p;
+    btn.style.cssText = 'background:#e8f7f5;border:1px solid #2aab96;color:#065f46;border-radius:20px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;';
+    btn.onclick = () => { document.getElementById('freeText').value = p; };
+    phraseButtons.appendChild(btn);
+  });
+
   document.getElementById('dateInput').value = new Date().toLocaleDateString('sv-SE');
 
-  function change(field, delta) {
-    const el = document.getElementById(field);
-    el.value = Math.max(0, parseInt(el.value || '0') + delta);
-  }
+  let checkTimer;
+  document.getElementById('patientNo').addEventListener('input', function() {
+    clearTimeout(checkTimer);
+    const val = this.value.trim();
+    const el = document.getElementById('patientCheck');
+    if (!val) { el.textContent = ''; return; }
+    el.textContent = '確認中...';
+    el.className = 'patient-check';
+    checkTimer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/check-patient/' + encodeURIComponent(val));
+        const data = await res.json();
+        if (data.exists) {
+          el.textContent = '⚠ この患者番号はすでに登録されています';
+          el.className = 'patient-check check-ng';
+        } else {
+          el.textContent = '✓ 未登録です（入力可）';
+          el.className = 'patient-check check-ok';
+        }
+      } catch { el.textContent = ''; }
+    }, 500);
+  });
 
   document.getElementById('staff-form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -114,15 +241,24 @@
     const fd = new FormData(this);
     const data = {};
     for (const [k, v] of fd.entries()) data[k] = v;
-    data.items = parseInt(data.items) || 0;
-    data.counseling = parseInt(data.counseling) || 0;
-    data.reviews = parseInt(data.reviews) || 0;
     try {
-      const res = await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const res = await fetch('/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.status === 409) {
+        const err = await res.json();
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = '実績を登録する';
+        return;
+      }
       if (res.ok) {
         document.getElementById('staff-form').style.display = 'none';
         document.getElementById('success').style.display = 'block';
         window.scrollTo(0, 0);
+        loadRecent();
       } else { throw new Error(); }
     } catch {
       alert('登録に失敗しました。再度お試しください。');
@@ -134,13 +270,41 @@
   function resetForm() {
     document.getElementById('staff-form').reset();
     document.getElementById('dateInput').value = new Date().toLocaleDateString('sv-SE');
-    ['items','counseling','reviews'].forEach(f => document.getElementById(f).value = 0);
+    document.getElementById('patientCheck').textContent = '';
     document.getElementById('staff-form').style.display = '';
     document.getElementById('success').style.display = 'none';
     document.getElementById('submitBtn').disabled = false;
     document.getElementById('submitBtn').textContent = '実績を登録する';
     window.scrollTo(0, 0);
   }
+
+  async function loadRecent() {
+    const list = document.getElementById('recentList');
+    try {
+      const res = await fetch('/api/records');
+      const records = await res.json();
+      if (!records.length) {
+        list.innerHTML = '<div class="loading">まだ入力がありません</div>';
+        return;
+      }
+      list.innerHTML = records.map(r => {
+        const badges = [];
+        if (r.items && r.items !== 'なし') badges.push(`<span class="badge badge-orange">物品${r.items}件</span>`);
+        if (r.counseling && r.counseling !== 'なし') badges.push(`<span class="badge badge-blue">${r.counseling}</span>`);
+        if (r.reviews === '獲得') badges.push(`<span class="badge badge-pink">口コミ獲得</span>`);
+        return `<div class="record-item">
+          <span class="record-date">${r.date}</span>
+          <span class="staff-name">${r.staffName}</span>
+          <span style="color:#9ca3af;font-size:12px"> 患者:${r.patientNo}</span>
+          <div class="record-detail">${badges.join('') || '<span style="color:#ccc;font-size:12px">処置のみ</span>'}${r.freeText ? `<br><span style="font-size:12px;color:#555">「${r.freeText}」</span>` : ''}</div>
+        </div>`;
+      }).join('');
+    } catch {
+      list.innerHTML = '<div class="loading">読み込みに失敗しました</div>';
+    }
+  }
+
+  loadRecent();
 </script>
 </body>
 </html>
