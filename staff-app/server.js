@@ -250,6 +250,7 @@ app.get('/dashboard', async (req, res) => {
 
   const summaryRows = staffList.map(([name, s]) => {
     const itemsTotal = Object.values(s.itemsMap).reduce((x,y)=>x+y,0);
+    const itemsDetail = Object.entries(s.itemsMap).map(([k,v])=>`${k}:${v}`).join('、') || '';
     const counselingTotal = Object.values(s.counselingMap).reduce((x,y)=>x+y,0);
     const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
@@ -258,7 +259,7 @@ app.get('/dashboard', async (req, res) => {
         <td><strong>${esc(name)}</strong></td>
         <td class="num">${s.count}</td>
         <td class="num">${s.patients.size}</td>
-        <td class="num">${itemsTotal}</td>
+        <td class="num">${itemsTotal}${itemsDetail ? `<br><small style="color:#666;font-size:11px">${esc(itemsDetail)}</small>` : ''}</td>
         <td class="num">${counselingTotal}<br><small style="color:#666;font-size:11px">${esc(counselingDetail)}</small></td>
         <td class="num">${s.reviews}</td>
         <td style="font-size:12px;color:#555">${esc(treatmentDetail)}</td>
@@ -324,7 +325,7 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
   <div style="overflow-x:auto">
   <table>
     <thead><tr>
-      <th>スタッフ名</th><th class="num">書き込み件数</th><th class="num">担当患者数</th><th class="num">物品販売</th>
+      <th>スタッフ名</th><th class="num">書き込み件数</th><th class="num">登録患者数</th><th class="num">物品販売</th>
       <th class="num">カウンセリング成約</th><th class="num">口コミ獲得</th>
       <th>処置内訳</th><th>出力</th>
     </tr></thead>
