@@ -277,14 +277,8 @@
     el.textContent = '';
     checkTimer = setTimeout(async () => {
       try {
-        const res = await fetch('/api/check-patient/' + encodeURIComponent(val));
-        const data = await res.json();
-        if (data.count > 0) {
-          el.textContent = `ℹ この患者番号はすでに ${data.count} 件登録あり（項目・スタッフが異なれば追加可）`;
-          el.className = 'patient-check';
-          el.style.color = '#6b7280';
-        }
-      } catch { el.textContent = ''; }
+        await fetch('/api/check-patient/' + encodeURIComponent(val));
+      } catch {}
     }, 500);
   });
 
