@@ -212,9 +212,10 @@ app.get('/dashboard', async (req, res) => {
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
-      byStaff[r.staffName] = { itemsMap: {}, counselingMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
+      byStaff[r.staffName] = { count: 0, itemsMap: {}, counselingMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
     }
     const s = byStaff[r.staffName];
+    s.count++;
     if (r.entryType === 'behavior') {
       if (r.freeText) s.freePhrases.push(r.freeText);
     } else {
@@ -228,20 +229,17 @@ app.get('/dashboard', async (req, res) => {
     }
   }
 
-  const staffList = Object.entries(byStaff).sort((a, b) => {
-    const score = s => Object.values(s.itemsMap).reduce((x,y)=>x+y,0) + Object.values(s.counselingMap).reduce((x,y)=>x+y,0) + s.reviews;
-    return score(b[1]) - score(a[1]);
-  });
+  const staffList = Object.entries(byStaff).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
 
-  const summaryRows = staffList.map(([name, s], i) => {
+  const summaryRows = staffList.map(([name, s]) => {
     const itemsTotal = Object.values(s.itemsMap).reduce((x,y)=>x+y,0);
     const counselingTotal = Object.values(s.counselingMap).reduce((x,y)=>x+y,0);
     const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
-    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
     return `
       <tr>
-        <td>${medal} <strong>${esc(name)}</strong></td>
+        <td><strong>${esc(name)}</strong></td>
+        <td class="num">${s.count}</td>
         <td class="num">${s.patients.size}</td>
         <td class="num">${itemsTotal}</td>
         <td class="num">${counselingTotal}<br><small style="color:#666;font-size:11px">${esc(counselingDetail)}</small></td>
@@ -309,7 +307,7 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
   <div style="overflow-x:auto">
   <table>
     <thead><tr>
-      <th>スタッフ名</th><th class="num">担当患者数</th><th class="num">物品販売</th>
+      <th>スタッフ名</th><th class="num">書き込み件数</th><th class="num">担当患者数</th><th class="num">物品販売</th>
       <th class="num">カウンセリング成約</th><th class="num">口コミ獲得</th>
       <th>処置内訳</th><th>出力</th>
     </tr></thead>
