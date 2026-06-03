@@ -213,12 +213,14 @@ ${contextTitle}
 - マニュアル名や項目名だけを問う問題は禁止です。例：「マニュアルでは『○○検査』とされています」は不合格です。
 - 「このマニュアルに記載」「マニュアル本文」「次の内容は正しいですか」のような丸写し確認は禁止です。現場で迷う判断・行動・確認事項を問う自然な問題文にしてください。
 - 本文に書かれた手順・注意点・確認事項・禁止事項・説明事項を、現場で使える問いに言い換えてください。
+- 同じ確認事項・同じ正解・同じ操作を、問題形式だけ変えて繰り返すことは禁止です。各問題は必ず別の操作、判断、注意点、確認項目を扱ってください。
+- 操作マニュアルでは、「どの画面を開くか」「どのボタンを押すか」「保存前に何を確認するか」「登録後に何を確認するか」のように、操作単位を分けて出題してください。
 - マニュアル本文に書かれていない内容、一般論、IT、Python、システム管理などの架空問題は作らないでください。
 - 問題文だけを見ても何について問われているか分かるように、患者対応・受付・保険証/医療証確認・診療補助などの場面を自然に含めてください。
 - 各問題には必ず"context"を付け、20字以内で出題場面を示してください。例：「医療証変更時の受付対応」「患者情報確認」「感染対策」
 - 問題・選択肢・解説はすべて自然な日本語にしてください。
 - 出力はJSONオブジェクトのみです。前置き、説明文、Markdownコードブロックは禁止です。
-- ${count}問ちょうど作成してください。
+- ${count}問ちょうど作成してください。ただし、同じ内容の言い換えで水増ししてはいけません。
 
 【問題の種類】本文に合うものだけを使ってください：
 1. truefalse（マルバツ）: 実務上の判断を問う。answerは"true"または"false"。
@@ -305,6 +307,7 @@ function isGenericManualQuestion(text) {
 function inferQuestionContext(text, manualName = '') {
   const source = `${manualName} ${text || ''}`;
   if (/医療証|保険証|資格確認|受給者証|公費/.test(source)) return '医療証変更時の受付対応';
+  if (/アポツール|写真|添付|撮影/.test(source)) return 'アポツール写真登録';
   if (/受付|会計|予約|電話/.test(source)) return '受付対応';
   if (/感染|手指|消毒|滅菌|洗浄|清掃/.test(source)) return '感染対策・器具管理';
   if (/問診|同意|説明|患者/.test(source)) return '患者説明・確認';
@@ -314,7 +317,7 @@ function inferQuestionContext(text, manualName = '') {
 }
 
 function normalizeGeneratedQuestions(raw, count, manualName = '') {
-  return raw.map(q => {
+  const normalized = raw.map(q => {
     const questionText = String(q.question || q.text || q['問題'] || q['問題文'] || '').trim();
     const explanation = String(q.explanation || q['解説'] || q['説明'] || '').trim();
     const context = String(q.context || q['出題場面'] || q['場面'] || '').trim() || inferQuestionContext(`${questionText} ${explanation}`, manualName);
@@ -345,7 +348,7 @@ function normalizeGeneratedQuestions(raw, count, manualName = '') {
 
     const answer = q.answer != null ? q.answer : q.correct_answer != null ? q.correct_answer : q['答え'] != null ? q['答え'] : q['正解'] != null ? q['正解'] : '';
     const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
-    return { type, context, question: questionText, options, answer: finalAnswer, explanation };
+    return { type, context: context.slice(0, 24), question: questionText, options, answer: finalAnswer, explanation };
   }).filter(q => {
     const answerText = Array.isArray(q.answer) ? q.answer.join(' ') : String(q.answer || '');
     const combined = [q.question, q.explanation, answerText].join(' ');
@@ -355,7 +358,71 @@ function normalizeGeneratedQuestions(raw, count, manualName = '') {
     if (q.type === 'choice' && q.options.length < 4) return false;
     if (q.type === 'sort' && q.options.length < 2) return false;
     return true;
-  }).slice(0, count);
+  });
+  return dedupeQuestions(normalized).slice(0, count);
+}
+
+function normalizeForSimilarity(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/___/g, '')
+    .replace(/[\s　、。,.，．・「」『』（）()【】\[\]！？!?]/g, '')
+    .replace(/について|の場合|として|スタッフ|現場|対応|適切|正しい|誤り|必要|してください|します|する|です|ます|どれですか|何ですか|次の行動/g, '')
+    .trim();
+}
+
+function similarityScore(a, b) {
+  const as = new Set(normalizeForSimilarity(a).match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]{2,}/g) || []);
+  const bs = new Set(normalizeForSimilarity(b).match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]{2,}/g) || []);
+  if (!as.size || !bs.size) return 0;
+  let intersection = 0;
+  as.forEach(w => { if (bs.has(w)) intersection++; });
+  return intersection / Math.min(as.size, bs.size);
+}
+
+function questionSignature(q) {
+  const answerText = Array.isArray(q.answer) ? q.answer.join(' ') : String(q.answer || '');
+  return normalizeForSimilarity([q.context, q.question, answerText].join(' '));
+}
+
+function isDuplicateQuestion(candidate, accepted) {
+  const sig = questionSignature(candidate);
+  const answerText = Array.isArray(candidate.answer) ? candidate.answer.join(' ') : String(candidate.answer || '');
+  return accepted.some(q => {
+    const existingSig = questionSignature(q);
+    const existingAnswer = Array.isArray(q.answer) ? q.answer.join(' ') : String(q.answer || '');
+    if (sig && existingSig && (sig === existingSig || sig.includes(existingSig) || existingSig.includes(sig))) return true;
+    const answerNorm = normalizeForSimilarity(answerText);
+    const existingAnswerNorm = normalizeForSimilarity(existingAnswer);
+    if (answerNorm && !['true', 'false'].includes(answerNorm) && answerNorm.length >= 4 && answerNorm === existingAnswerNorm) return true;
+    return similarityScore(candidate.question + ' ' + answerText, q.question + ' ' + existingAnswer) >= 0.72;
+  });
+}
+
+function dedupeQuestions(questions) {
+  const accepted = [];
+  for (const q of questions) {
+    if (!isDuplicateQuestion(q, accepted)) accepted.push(q);
+  }
+  return accepted;
+}
+
+function estimateAppropriateQuestionCount(cleanedManualText, requestedCount) {
+  const sentences = splitManualSentences(cleanedManualText);
+  const uniqueIdeas = [];
+  for (const sentence of sentences) {
+    const norm = normalizeForSimilarity(sentence);
+    if (!norm) continue;
+    if (!uniqueIdeas.some(existing => existing === norm || existing.includes(norm) || norm.includes(existing) || similarityScore(existing, norm) >= 0.78)) {
+      uniqueIdeas.push(norm);
+    }
+  }
+  const maxByContent = Math.max(1, Math.min(requestedCount, uniqueIdeas.length + Math.floor(uniqueIdeas.length / 2)));
+  const adjustedCount = Math.min(requestedCount, maxByContent);
+  const warning = adjustedCount < requestedCount
+    ? `マニュアル本文の実務ポイントが少ないため、重複を避けて${adjustedCount}問に抑えました。問題数を増やす場合は、操作手順・注意点・確認事項をもう少し詳しく入力してください。`
+    : '';
+  return { adjustedCount, warning, sourceItemCount: uniqueIdeas.length };
 }
 
 function splitManualSentences(manualText) {
@@ -367,7 +434,7 @@ function splitManualSentences(manualText) {
 
 function pickBlankTarget(sentence) {
   const parts = String(sentence || '')
-    .split(/[、,\s　「」『』（）()\[\]【】]|(?:について)|[はをがにでへともの]/)
+    .split(/[、,\s　「」『』（）()\[\]【】]|(?:について)|(?:または)|[はをがにでへともの]/)
     .map(s => s.replace(/します$|してください$|する$|です$|ます$/g, '').trim())
     .filter(s => s.length >= 2 && s.length <= 8);
   const candidates = parts.length ? parts : (sentence.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]{2,8}/g) || []);
@@ -439,24 +506,29 @@ app.post('/api/generate', async (req, res) => {
   const cleanedManualText = cleanManualText(manualText);
   if (!cleanedManualText) return res.status(400).json({ error: '出題できる実務本文が見つかりませんでした。名前・日時・履歴ではなく、手順や注意点を含む本文を入力してください。' });
 
-  const prompt = buildQuizPrompt(cleanedManualText, safeCount, manualName);
+  const { adjustedCount, warning: countWarning, sourceItemCount } = estimateAppropriateQuestionCount(cleanedManualText, safeCount);
+  const prompt = buildQuizPrompt(cleanedManualText, adjustedCount, manualName);
   const attempts = [];
 
   if (GEMINI_API_KEY) attempts.push(['Gemini 2.0 Flash', () => generateWithGemini(prompt)]);
   if (GROQ_API_KEY) attempts.push(['Groq llama-3.3', () => generateWithGroq(prompt)]);
 
   const errors = [];
+  const buildWarning = (extra = '') => [countWarning, extra].filter(Boolean).join(' / ');
   for (const [providerName, fn] of attempts) {
     try {
       const raw = await fn();
-      let questions = normalizeGeneratedQuestions(raw, safeCount, manualName);
-      if (questions.length < safeCount) {
-        const local = makeLocalQuizQuestions(cleanedManualText, safeCount - questions.length, manualName);
-        questions = questions.concat(local).slice(0, safeCount);
+      let questions = normalizeGeneratedQuestions(raw, adjustedCount, manualName);
+      if (questions.length < adjustedCount) {
+        const local = makeLocalQuizQuestions(cleanedManualText, adjustedCount - questions.length, manualName);
+        questions = dedupeQuestions(questions.concat(local)).slice(0, adjustedCount);
       }
-      console.log(`AI provider success: ${providerName}, questions: ${questions.length}`);
+      console.log(`AI provider success: ${providerName}, questions: ${questions.length}, source items: ${sourceItemCount}`);
       if (!questions.length) throw new Error('有効な問題が生成されませんでした');
-      return res.json({ questions, provider: providerName });
+      const shortageWarning = questions.length < safeCount && !countWarning
+        ? `重複を除外した結果、${questions.length}問になりました。問題数を増やす場合は、操作手順・注意点・確認事項をもう少し詳しく入力してください。`
+        : '';
+      return res.json({ questions, provider: providerName, requestedCount: safeCount, generatedCount: questions.length, sourceItemCount, warning: buildWarning(shortageWarning) || undefined });
     } catch (err) {
       const detail = err.response?.data?.error?.message || err.response?.data?.error || err.message;
       console.error(`AI provider failed: ${providerName}`, err.response?.data || err.message);
@@ -464,10 +536,11 @@ app.post('/api/generate', async (req, res) => {
     }
   }
 
-  const questions = makeLocalQuizQuestions(cleanedManualText, safeCount, manualName);
+  const questions = dedupeQuestions(makeLocalQuizQuestions(cleanedManualText, adjustedCount, manualName)).slice(0, adjustedCount);
   if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。マニュアル本文を長めに入力してください。' });
   console.log('AI provider fallback: Local rule-based generator', errors.join(' / '));
-  return res.json({ questions, provider: 'Local rule-based generator', warning: errors.length ? errors.join(' / ') : undefined });
+  const providerWarning = errors.length ? errors.join(' / ') : '';
+  return res.json({ questions, provider: 'Local rule-based generator', requestedCount: safeCount, generatedCount: questions.length, sourceItemCount, warning: buildWarning(providerWarning) || undefined });
 });
 
 app.post('/api/sets', async (req, res) => {
