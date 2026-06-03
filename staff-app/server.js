@@ -49,46 +49,77 @@ app.get('/api/records', (req, res) => {
   res.json(records.slice(0, 50).map(r => ({
     date: r.date,
     staffName: r.staffName,
-    patientNo: r.patientNo,
-    selectedItems: JSON.stringify(r.selectedItems || []),
-    freeText: r.freeText,
+    patientNo: r.patientNo || '',
+    entryType: r.entryType || 'patient',
+    action: r.action || '',
+    actionCategory: r.actionCategory || '',
+    itemName: r.itemName || '',
+    otherText: r.otherText || '',
+    freeText: r.freeText || '',
   })));
 });
 
-// 患者番号の重複チェック
+// 患者番号の重複チェック（患者実績のみ対象）
 app.get('/api/check-patient/:patientNo', (req, res) => {
   const records = loadDB();
-  const exists = records.some(r => r.patientNo === req.params.patientNo);
+  const exists = records.some(r => r.entryType !== 'behavior' && r.patientNo === req.params.patientNo);
   res.json({ exists });
 });
 
+const ACTION_CATEGORY = {
+  '物品販売': 'item',
+  '口コミ獲得': 'review',
+  'インプラント': 'counseling',
+  'マウスピース矯正': 'counseling',
+  'ホワイトニング': 'counseling',
+  'シーラント': 'treatment',
+  'レントゲン': 'treatment',
+  'フッ素塗布': 'treatment',
+  'その他': 'treatment',
+};
+
 app.post('/submit', (req, res) => {
   const d = req.body;
-  if (!d || !d.staffName || !d.date || !d.patientNo) {
-    return res.status(400).json({ error: 'invalid data' });
-  }
+  if (!d || !d.staffName || !d.date) return res.status(400).json({ error: 'invalid data' });
 
   const records = loadDB();
 
-  // 患者番号の重複チェック
-  if (records.some(r => r.patientNo === d.patientNo.trim())) {
-    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} はすでに登録されています` });
+  if (d.entryType === 'behavior') {
+    // 行動・取り組み記録（患者番号不要）
+    if (!d.freeText) return res.status(400).json({ error: 'invalid data' });
+    records.unshift({
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      entryType: 'behavior',
+      date: d.date,
+      staffName: d.staffName.trim(),
+      freeText: d.freeText.trim(),
+    });
+    saveDB(records);
+    console.log(`行動記録: ${d.staffName} (${d.date})`);
+    return res.status(200).json({ ok: true });
   }
 
-  let selectedItems = [];
-  try { selectedItems = JSON.parse(d.selectedItems || '[]'); } catch {}
+  // 患者実績記録
+  if (!d.patientNo || !d.action) return res.status(400).json({ error: 'invalid data' });
+  if (records.some(r => r.entryType !== 'behavior' && r.patientNo === d.patientNo.trim())) {
+    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} はすでに登録されています` });
+  }
 
   records.unshift({
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
+    entryType: 'patient',
     date: d.date,
     staffName: d.staffName.trim(),
     patientNo: d.patientNo.trim(),
-    selectedItems,
-    freeText: d.freeText || '',
+    action: d.action,
+    actionCategory: ACTION_CATEGORY[d.action] || 'treatment',
+    itemName: d.itemName ? d.itemName.trim() : '',
+    otherText: d.otherText ? d.otherText.trim() : '',
   });
   saveDB(records);
-  console.log(`実績登録: ${d.staffName} 患者${d.patientNo} (${d.date})`);
+  console.log(`患者実績登録: ${d.staffName} 患者${d.patientNo} ${d.action} (${d.date})`);
   res.status(200).json({ ok: true });
 });
 
@@ -102,15 +133,17 @@ app.get('/dashboard', (req, res) => {
       byStaff[r.staffName] = { itemsMap: {}, counselingMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
     }
     const s = byStaff[r.staffName];
-    const items = Array.isArray(r.selectedItems) ? r.selectedItems : [];
-    for (const it of items) {
-      if (it.type === 'item')       s.itemsMap[it.label] = (s.itemsMap[it.label] || 0) + 1;
-      if (it.type === 'counseling') s.counselingMap[it.label] = (s.counselingMap[it.label] || 0) + 1;
-      if (it.type === 'review')     s.reviews++;
-      if (it.type === 'treatment')  s.treatmentMap[it.label] = (s.treatmentMap[it.label] || 0) + 1;
+    if (r.entryType === 'behavior') {
+      if (r.freeText) s.freePhrases.push(r.freeText);
+    } else {
+      const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+      const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
+      if (cat === 'item')       s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
+      if (cat === 'counseling') s.counselingMap[r.action] = (s.counselingMap[r.action] || 0) + 1;
+      if (cat === 'review')     s.reviews++;
+      if (cat === 'treatment')  s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
+      if (r.patientNo) s.patients.add(r.patientNo);
     }
-    s.patients.add(r.patientNo);
-    if (r.freeText) s.freePhrases.push(r.freeText);
   }
 
   const staffList = Object.entries(byStaff).sort((a, b) => {
@@ -209,12 +242,11 @@ app.get('/certificate', (req, res) => {
   const staffRecords = records.filter(r => r.staffName === name);
   let itemsTotal = 0, counselingTotal = 0, reviewsTotal = 0;
   for (const r of staffRecords) {
-    const its = Array.isArray(r.selectedItems) ? r.selectedItems : [];
-    for (const it of its) {
-      if (it.type === 'item') itemsTotal++;
-      if (it.type === 'counseling') counselingTotal++;
-      if (it.type === 'review') reviewsTotal++;
-    }
+    if (r.entryType === 'behavior') continue;
+    const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+    if (cat === 'item') itemsTotal++;
+    if (cat === 'counseling') counselingTotal++;
+    if (cat === 'review') reviewsTotal++;
   }
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
   const freePhrases = [...new Set(staffRecords.filter(r => r.freeText).map(r => r.freeText))].slice(0, 3);
@@ -273,15 +305,16 @@ app.get('/evaluation', (req, res) => {
   const freePhrases2 = [];
 
   for (const r of staffRecords) {
-    const its = Array.isArray(r.selectedItems) ? r.selectedItems : [];
-    for (const it of its) {
-      if (it.type === 'item')       itemsMap2[it.label] = (itemsMap2[it.label] || 0) + 1;
-      if (it.type === 'counseling') counselingMap2[it.label] = (counselingMap2[it.label] || 0) + 1;
-      if (it.type === 'review')     reviews2++;
-      if (it.type === 'treatment' || it.type === 'other')
-        treatmentMap2[it.label] = (treatmentMap2[it.label] || 0) + 1;
+    if (r.entryType === 'behavior') {
+      if (r.freeText) freePhrases2.push({ date: r.date, text: r.freeText });
+      continue;
     }
-    if (r.freeText) freePhrases2.push({ date: r.date, text: r.freeText });
+    const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+    const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
+    if (cat === 'item')       itemsMap2[label] = (itemsMap2[label] || 0) + 1;
+    if (cat === 'counseling') counselingMap2[r.action] = (counselingMap2[r.action] || 0) + 1;
+    if (cat === 'review')     reviews2++;
+    if (cat === 'treatment')  treatmentMap2[r.action] = (treatmentMap2[r.action] || 0) + 1;
   }
   const itemsTotal2 = Object.values(itemsMap2).reduce((a,b)=>a+b,0);
   const counselingTotal2 = Object.values(counselingMap2).reduce((a,b)=>a+b,0);
