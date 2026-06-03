@@ -139,11 +139,23 @@ app.get('/api/records', async (req, res) => {
   })));
 });
 
-// 患者番号の重複チェック（患者実績のみ対象）
+// 患者番号の重複チェック（同一患者・同一項目・同一スタッフのみNG）
 app.get('/api/check-patient/:patientNo', async (req, res) => {
   const records = await loadDB();
-  const exists = records.some(r => r.entryType !== 'behavior' && r.patientNo === req.params.patientNo);
-  res.json({ exists });
+  const { action, staffName } = req.query;
+  // action・staffName 指定あり → 完全一致チェック
+  if (action && staffName) {
+    const exists = records.some(r =>
+      r.entryType !== 'behavior' &&
+      r.patientNo === req.params.patientNo &&
+      r.action === action &&
+      r.staffName === staffName
+    );
+    return res.json({ exists });
+  }
+  // 指定なし（入力中リアルタイム）→ 患者番号だけで件数を返す
+  const count = records.filter(r => r.entryType !== 'behavior' && r.patientNo === req.params.patientNo).length;
+  res.json({ exists: false, count });
 });
 
 const ACTION_CATEGORY = {
@@ -179,8 +191,13 @@ app.post('/submit', async (req, res) => {
   // 患者実績記録
   if (!d.patientNo || !d.action) return res.status(400).json({ error: 'invalid data' });
   const records = await loadDB();
-  if (records.some(r => r.entryType !== 'behavior' && r.patientNo === d.patientNo.trim())) {
-    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} はすでに登録されています` });
+  if (records.some(r =>
+    r.entryType !== 'behavior' &&
+    r.patientNo === d.patientNo.trim() &&
+    r.action === d.action &&
+    r.staffName === d.staffName.trim()
+  )) {
+    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} の「${d.action}」はあなたがすでに登録しています` });
   }
 
   await saveRecord({

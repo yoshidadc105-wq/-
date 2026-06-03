@@ -266,25 +266,23 @@
     document.getElementById('otherWrap').style.display   = val === 'その他'    ? 'block' : 'none';
   }
 
-  // 患者番号重複チェック
+  // 患者番号入力時：この患者の登録件数を表示（参考情報）
   let checkTimer;
   document.getElementById('patientNo').addEventListener('input', function() {
     clearTimeout(checkTimer);
     const val = this.value.trim();
     const el = document.getElementById('patientCheck');
     if (!val) { el.textContent = ''; return; }
-    el.textContent = '確認中...';
     el.className = 'patient-check';
+    el.textContent = '';
     checkTimer = setTimeout(async () => {
       try {
         const res = await fetch('/api/check-patient/' + encodeURIComponent(val));
         const data = await res.json();
-        if (data.exists) {
-          el.textContent = '⚠ この患者番号はすでに登録されています';
-          el.className = 'patient-check check-ng';
-        } else {
-          el.textContent = '✓ 未登録です（入力可）';
-          el.className = 'patient-check check-ok';
+        if (data.count > 0) {
+          el.textContent = `ℹ この患者番号はすでに ${data.count} 件登録あり（項目・スタッフが異なれば追加可）`;
+          el.className = 'patient-check';
+          el.style.color = '#6b7280';
         }
       } catch { el.textContent = ''; }
     }, 500);
