@@ -45,8 +45,9 @@
 
     .recent-title { font-size: 14px; font-weight: bold; color: #065f46; margin-bottom: 10px; border-left: 4px solid #2aab96; padding-left: 8px; }
     .record-item { background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
+    .record-item .record-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px; }
     .record-item .staff-name { font-weight: bold; color: #2aab96; }
-    .record-item .record-date { font-size: 11px; color: #9ca3af; float: right; }
+    .record-item .record-date { font-size: 11px; color: #9ca3af; }
     .record-item .record-body { margin-top: 4px; color: #555; }
     .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; }
     .badge-item      { background: #fef3c7; color: #92400e; }
@@ -384,8 +385,10 @@
           body = body.trim();
         }
         return `<div class="record-item">
-          <span class="record-date">${r.date}</span>
-          <span class="staff-name">${r.staffName}</span>${r.patientNo ? `<span style="color:#9ca3af;font-size:12px"> 患者:${r.patientNo}</span>` : ''}
+          <div class="record-header">
+            <span class="staff-name">${r.staffName}</span>${r.patientNo ? `<span style="color:#9ca3af;font-size:12px">患者:${r.patientNo}</span>` : ''}
+            <span class="record-date">${r.date}</span>
+          </div>
           <div class="record-body">${badgeHtml}${body ? ` <span style="font-size:12px">${body}</span>` : ''}</div>
         </div>`;
       }).join('');
