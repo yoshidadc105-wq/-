@@ -24,10 +24,26 @@
     textarea { resize: vertical; min-height: 80px; }
     .row2 { display: flex; gap: 10px; }
     .row2 > * { flex: 1; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .patient-check { font-size: 12px; margin-top: 4px; min-height: 18px; }
     .check-ok { color: #059669; }
     .check-ng { color: #dc2626; font-weight: bold; }
+
+    /* 実施内容セレクター */
+    .item-add-row { display: flex; gap: 8px; align-items: flex-start; }
+    .item-add-row select { flex: 1; }
+    .add-btn { background: #2aab96; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: bold; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .add-btn:hover { background: #228f7c; }
+    .other-input-wrap { margin-top: 8px; display: none; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 24px; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; background: #e8f7f5; border: 1px solid #2aab96; color: #065f46; border-radius: 20px; padding: 4px 12px; font-size: 13px; }
+    .tag-counseling { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+    .tag-review    { background: #fce7f3; border-color: #ec4899; color: #9d174d; }
+    .tag-item      { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+    .tag-other     { background: #f3e8ff; border-color: #a855f7; color: #6b21a8; }
+    .tag-remove { cursor: pointer; font-size: 14px; line-height: 1; opacity: .6; }
+    .tag-remove:hover { opacity: 1; }
+    .empty-tags { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+
     .submit-btn { display: block; width: 100%; background: #2aab96; color: #fff; border: none; border-radius: 30px; padding: 14px; font-size: 17px; font-weight: bold; cursor: pointer; transition: background .2s; }
     .submit-btn:hover { background: #228f7c; }
     .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
@@ -40,14 +56,10 @@
     .recent-title { font-size: 14px; font-weight: bold; color: #065f46; margin-bottom: 10px; border-left: 4px solid #2aab96; padding-left: 8px; }
     .record-item { background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
     .record-item .staff-name { font-weight: bold; color: #2aab96; }
-    .record-item .record-detail { color: #555; margin-top: 4px; }
+    .record-item .record-detail { color: #555; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
     .record-item .record-date { font-size: 11px; color: #9ca3af; float: right; }
-    .badge { display: inline-block; background: #e8f7f5; color: #065f46; border-radius: 4px; padding: 1px 6px; font-size: 11px; margin: 1px; }
-    .badge-orange { background: #fef3c7; color: #92400e; }
-    .badge-blue { background: #dbeafe; color: #1e40af; }
-    .badge-pink { background: #fce7f3; color: #9d174d; }
+    .badge { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 11px; }
     .loading { text-align: center; color: #9ca3af; padding: 20px; font-size: 13px; }
-    @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -65,6 +77,7 @@
   </div>
 
   <form id="staff-form">
+    <!-- 基本情報 -->
     <div class="card">
       <div class="card-title">基本情報</div>
       <div class="row2">
@@ -84,84 +97,51 @@
       </div>
     </div>
 
+    <!-- 実施内容（統合プルダウン） -->
     <div class="card">
-      <div class="card-title">実績項目</div>
+      <div class="card-title">実施内容</div>
       <div class="form-group">
-        <label>物品販売</label>
-        <select name="items">
-          <option value="なし">なし</option>
-          <option value="1">1件</option>
-          <option value="2">2件</option>
-          <option value="3">3件</option>
-          <option value="4">4件</option>
-          <option value="5以上">5件以上</option>
-        </select>
+        <label>項目を選んで追加してください</label>
+        <div class="item-add-row">
+          <select id="itemSelect">
+            <optgroup label="── 実績 ──">
+              <option value="">選択してください</option>
+              <option value="物品販売" data-type="item">物品販売</option>
+              <option value="口コミ獲得" data-type="review">口コミ獲得</option>
+            </optgroup>
+            <optgroup label="── カウンセリング成約 ──">
+              <option value="インプラント" data-type="counseling">インプラント</option>
+              <option value="ワイヤー矯正" data-type="counseling">ワイヤー矯正</option>
+              <option value="マウスピース矯正" data-type="counseling">マウスピース矯正</option>
+              <option value="ホワイトニング" data-type="counseling">ホワイトニング</option>
+              <option value="セラミック・審美" data-type="counseling">セラミック・審美</option>
+              <option value="入れ歯・義歯" data-type="counseling">入れ歯・義歯</option>
+              <option value="歯周病治療" data-type="counseling">歯周病治療</option>
+              <option value="予防・定期検診" data-type="counseling">予防・定期検診</option>
+            </optgroup>
+            <optgroup label="── 処置 ──">
+              <option value="シーラント" data-type="treatment">シーラント</option>
+              <option value="レントゲン" data-type="treatment">レントゲン</option>
+              <option value="フッ素塗布" data-type="treatment">フッ素塗布</option>
+              <option value="クリーニング" data-type="treatment">クリーニング</option>
+              <option value="歯磨き指導(TBI)" data-type="treatment">歯磨き指導（TBI）</option>
+            </optgroup>
+            <optgroup label="── その他 ──">
+              <option value="__other__" data-type="other">その他（自由記述）</option>
+            </optgroup>
+          </select>
+          <button type="button" class="add-btn" onclick="addItem()">追加</button>
+        </div>
+        <div class="other-input-wrap" id="otherInputWrap">
+          <input type="text" id="otherText" placeholder="内容を入力してください" />
+        </div>
       </div>
-      <div class="form-group">
-        <label>カウンセリング成約</label>
-        <select name="counseling">
-          <option value="なし">なし</option>
-          <option value="インプラント">インプラント</option>
-          <option value="ワイヤー矯正">ワイヤー矯正</option>
-          <option value="マウスピース矯正">マウスピース矯正</option>
-          <option value="ホワイトニング">ホワイトニング</option>
-          <option value="セラミック・審美">セラミック・審美</option>
-          <option value="入れ歯・義歯">入れ歯・義歯</option>
-          <option value="歯周病治療">歯周病治療</option>
-          <option value="予防・定期検診">予防・定期検診</option>
-          <option value="その他">その他</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>口コミ獲得</label>
-        <select name="reviews">
-          <option value="なし">なし</option>
-          <option value="獲得">獲得</option>
-        </select>
-      </div>
+      <div class="tags" id="tags"></div>
+      <div class="empty-tags" id="emptyTags">まだ項目が追加されていません</div>
+      <input type="hidden" name="selectedItems" id="selectedItemsInput" value="[]" />
     </div>
 
-    <div class="card">
-      <div class="card-title">処置項目</div>
-      <div class="grid2">
-        <div class="form-group">
-          <label>シーラント</label>
-          <select name="sealant">
-            <option value="なし">なし</option>
-            <option value="あり">あり</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>レントゲン</label>
-          <select name="xray">
-            <option value="なし">なし</option>
-            <option value="あり">あり</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>フッ素塗布</label>
-          <select name="fluoride">
-            <option value="なし">なし</option>
-            <option value="あり">あり</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>クリーニング</label>
-          <select name="cleaning">
-            <option value="なし">なし</option>
-            <option value="あり">あり</option>
-          </select>
-        </div>
-        <div class="form-group" style="grid-column:1/-1">
-          <label>歯磨き指導（TBI）</label>
-          <select name="tbi">
-            <option value="なし">なし</option>
-            <option value="あり">あり</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
+    <!-- 行動・取り組み -->
     <div class="card">
       <div class="card-title">行動・取り組み（自由記入）</div>
       <div class="form-group">
@@ -174,6 +154,7 @@
     <button type="submit" class="submit-btn" id="submitBtn">実績を登録する</button>
   </form>
 
+  <!-- 最近の入力一覧 -->
   <div class="recent-section" style="margin-top:24px">
     <div class="recent-title">みんなの最近の入力（直近50件）</div>
     <div id="recentList"><div class="loading">読み込み中...</div></div>
@@ -182,6 +163,7 @@
 </div>
 
 <script>
+  // 例文ボタン
   const PHRASES = [
     'だれよりもトイレ掃除を丁寧に行った',
     '患者さんに笑顔で対応できた',
@@ -197,19 +179,84 @@
     'クレームゼロで患者満足度を高めた',
     'チームの雰囲気づくりに貢献した',
   ];
-
   const phraseButtons = document.getElementById('phraseButtons');
   PHRASES.forEach(p => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = p;
-    btn.style.cssText = 'background:#e8f7f5;border:1px solid #2aab96;color:#065f46;border-radius:20px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;';
+    btn.style.cssText = 'background:#e8f7f5;border:1px solid #2aab96;color:#065f46;border-radius:20px;padding:3px 10px;font-size:12px;cursor:pointer;';
     btn.onclick = () => { document.getElementById('freeText').value = p; };
     phraseButtons.appendChild(btn);
   });
 
   document.getElementById('dateInput').value = new Date().toLocaleDateString('sv-SE');
 
+  // その他選択時に入力欄を表示
+  document.getElementById('itemSelect').addEventListener('change', function() {
+    document.getElementById('otherInputWrap').style.display = this.value === '__other__' ? 'block' : 'none';
+  });
+
+  // タグ管理
+  let selectedItems = [];
+
+  const TYPE_CLASS = {
+    item: 'tag-item',
+    counseling: 'tag-counseling',
+    review: 'tag-review',
+    other: 'tag-other',
+    treatment: '',
+  };
+
+  function renderTags() {
+    const container = document.getElementById('tags');
+    const empty = document.getElementById('emptyTags');
+    container.innerHTML = '';
+    empty.style.display = selectedItems.length ? 'none' : 'block';
+    selectedItems.forEach((item, i) => {
+      const tag = document.createElement('span');
+      tag.className = 'tag ' + (TYPE_CLASS[item.type] || '');
+      tag.innerHTML = `${item.label} <span class="tag-remove" onclick="removeItem(${i})">✕</span>`;
+      container.appendChild(tag);
+    });
+    document.getElementById('selectedItemsInput').value = JSON.stringify(selectedItems);
+  }
+
+  function addItem() {
+    const sel = document.getElementById('itemSelect');
+    const opt = sel.options[sel.selectedIndex];
+    if (!sel.value) return;
+
+    let label = sel.value;
+    let type = opt.dataset.type || 'treatment';
+
+    if (sel.value === '__other__') {
+      const text = document.getElementById('otherText').value.trim();
+      if (!text) { document.getElementById('otherText').focus(); return; }
+      label = text;
+      type = 'other';
+      document.getElementById('otherText').value = '';
+      document.getElementById('otherInputWrap').style.display = 'none';
+    }
+
+    // 重複チェック（その他は重複OK）
+    if (type !== 'other' && selectedItems.some(i => i.label === label)) {
+      sel.value = '';
+      return;
+    }
+
+    selectedItems.push({ label, type });
+    sel.value = '';
+    renderTags();
+  }
+
+  function removeItem(index) {
+    selectedItems.splice(index, 1);
+    renderTags();
+  }
+
+  renderTags();
+
+  // 患者番号重複チェック
   let checkTimer;
   document.getElementById('patientNo').addEventListener('input', function() {
     clearTimeout(checkTimer);
@@ -271,6 +318,9 @@
     document.getElementById('staff-form').reset();
     document.getElementById('dateInput').value = new Date().toLocaleDateString('sv-SE');
     document.getElementById('patientCheck').textContent = '';
+    selectedItems = [];
+    renderTags();
+    document.getElementById('otherInputWrap').style.display = 'none';
     document.getElementById('staff-form').style.display = '';
     document.getElementById('success').style.display = 'none';
     document.getElementById('submitBtn').disabled = false;
@@ -287,16 +337,23 @@
         list.innerHTML = '<div class="loading">まだ入力がありません</div>';
         return;
       }
+      const TYPE_COLOR = {
+        item:       'background:#fef3c7;color:#92400e',
+        counseling: 'background:#dbeafe;color:#1e40af',
+        review:     'background:#fce7f3;color:#9d174d',
+        other:      'background:#f3e8ff;color:#6b21a8',
+        treatment:  'background:#e8f7f5;color:#065f46',
+      };
       list.innerHTML = records.map(r => {
-        const badges = [];
-        if (r.items && r.items !== 'なし') badges.push(`<span class="badge badge-orange">物品${r.items}件</span>`);
-        if (r.counseling && r.counseling !== 'なし') badges.push(`<span class="badge badge-blue">${r.counseling}</span>`);
-        if (r.reviews === '獲得') badges.push(`<span class="badge badge-pink">口コミ獲得</span>`);
+        const items = JSON.parse(r.selectedItems || '[]');
+        const badges = items.map(i =>
+          `<span class="badge" style="${TYPE_COLOR[i.type] || TYPE_COLOR.treatment}">${i.label}</span>`
+        ).join('');
         return `<div class="record-item">
           <span class="record-date">${r.date}</span>
           <span class="staff-name">${r.staffName}</span>
           <span style="color:#9ca3af;font-size:12px"> 患者:${r.patientNo}</span>
-          <div class="record-detail">${badges.join('') || '<span style="color:#ccc;font-size:12px">処置のみ</span>'}${r.freeText ? `<br><span style="font-size:12px;color:#555">「${r.freeText}」</span>` : ''}</div>
+          <div class="record-detail">${badges || '<span style="color:#ccc;font-size:12px">記録なし</span>'}${r.freeText ? `<div style="font-size:12px;color:#555;width:100%;margin-top:2px">「${r.freeText}」</div>` : ''}</div>
         </div>`;
       }).join('');
     } catch {

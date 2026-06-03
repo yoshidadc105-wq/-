@@ -50,9 +50,7 @@ app.get('/api/records', (req, res) => {
     date: r.date,
     staffName: r.staffName,
     patientNo: r.patientNo,
-    items: r.items,
-    counseling: r.counseling,
-    reviews: r.reviews,
+    selectedItems: JSON.stringify(r.selectedItems || []),
     freeText: r.freeText,
   })));
 });
@@ -77,20 +75,16 @@ app.post('/submit', (req, res) => {
     return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} はすでに登録されています` });
   }
 
+  let selectedItems = [];
+  try { selectedItems = JSON.parse(d.selectedItems || '[]'); } catch {}
+
   records.unshift({
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     date: d.date,
     staffName: d.staffName.trim(),
     patientNo: d.patientNo.trim(),
-    items: d.items || 'なし',
-    counseling: d.counseling || 'なし',
-    reviews: d.reviews || 'なし',
-    sealant: d.sealant || 'なし',
-    xray: d.xray || 'なし',
-    fluoride: d.fluoride || 'なし',
-    cleaning: d.cleaning || 'なし',
-    tbi: d.tbi || 'なし',
+    selectedItems,
     freeText: d.freeText || '',
   });
   saveDB(records);
@@ -105,47 +99,39 @@ app.get('/dashboard', (req, res) => {
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
-      byStaff[r.staffName] = {
-        items: 0, counselingMap: {}, reviews: 0,
-        sealant: 0, xray: 0, fluoride: 0, cleaning: 0, tbi: 0,
-        patients: new Set(), freePhrases: []
-      };
+      byStaff[r.staffName] = { itemsMap: {}, counselingMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
     }
     const s = byStaff[r.staffName];
-    if (r.items && r.items !== 'なし') s.items += parseInt(r.items) || 1;
-    if (r.counseling && r.counseling !== 'なし') s.counselingMap[r.counseling] = (s.counselingMap[r.counseling] || 0) + 1;
-    if (r.reviews === '獲得') s.reviews++;
-    if (r.sealant === 'あり') s.sealant++;
-    if (r.xray === 'あり') s.xray++;
-    if (r.fluoride === 'あり') s.fluoride++;
-    if (r.cleaning === 'あり') s.cleaning++;
-    if (r.tbi === 'あり') s.tbi++;
+    const items = Array.isArray(r.selectedItems) ? r.selectedItems : [];
+    for (const it of items) {
+      if (it.type === 'item')       s.itemsMap[it.label] = (s.itemsMap[it.label] || 0) + 1;
+      if (it.type === 'counseling') s.counselingMap[it.label] = (s.counselingMap[it.label] || 0) + 1;
+      if (it.type === 'review')     s.reviews++;
+      if (it.type === 'treatment')  s.treatmentMap[it.label] = (s.treatmentMap[it.label] || 0) + 1;
+    }
     s.patients.add(r.patientNo);
     if (r.freeText) s.freePhrases.push(r.freeText);
   }
 
   const staffList = Object.entries(byStaff).sort((a, b) => {
-    const scoreA = a[1].items + Object.values(a[1].counselingMap).reduce((x,y)=>x+y,0) + a[1].reviews;
-    const scoreB = b[1].items + Object.values(b[1].counselingMap).reduce((x,y)=>x+y,0) + b[1].reviews;
-    return scoreB - scoreA;
+    const score = s => Object.values(s.itemsMap).reduce((x,y)=>x+y,0) + Object.values(s.counselingMap).reduce((x,y)=>x+y,0) + s.reviews;
+    return score(b[1]) - score(a[1]);
   });
 
   const summaryRows = staffList.map(([name, s], i) => {
+    const itemsTotal = Object.values(s.itemsMap).reduce((x,y)=>x+y,0);
     const counselingTotal = Object.values(s.counselingMap).reduce((x,y)=>x+y,0);
     const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
+    const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
     return `
       <tr>
         <td>${medal} <strong>${esc(name)}</strong></td>
         <td class="num">${s.patients.size}</td>
-        <td class="num">${s.items}</td>
-        <td class="num" title="${esc(counselingDetail)}">${counselingTotal}<br><small style="color:#666">${esc(counselingDetail)}</small></td>
+        <td class="num">${itemsTotal}</td>
+        <td class="num">${counselingTotal}<br><small style="color:#666;font-size:11px">${esc(counselingDetail)}</small></td>
         <td class="num">${s.reviews}</td>
-        <td class="num">${s.sealant}</td>
-        <td class="num">${s.xray}</td>
-        <td class="num">${s.fluoride}</td>
-        <td class="num">${s.cleaning}</td>
-        <td class="num">${s.tbi}</td>
+        <td style="font-size:12px;color:#555">${esc(treatmentDetail)}</td>
         <td>
           <a href="/certificate?name=${encodeURIComponent(name)}" target="_blank" class="btn-cert">賞状</a>
           <a href="/evaluation?name=${encodeURIComponent(name)}" target="_blank" class="btn-eval">評価表</a>
@@ -153,16 +139,18 @@ app.get('/dashboard', (req, res) => {
       </tr>`;
   }).join('');
 
-  const detailRows = records.map(r => `
+  const detailRows = records.map(r => {
+    const its = Array.isArray(r.selectedItems) ? r.selectedItems : [];
+    const itemStr = its.map(i => i.label).join('、') || '-';
+    return `
       <tr>
         <td>${esc(r.date)}</td>
         <td><strong>${esc(r.staffName)}</strong></td>
         <td>${esc(r.patientNo)}</td>
-        <td class="num">${esc(r.items)}</td>
-        <td>${esc(r.counseling)}</td>
-        <td>${esc(r.reviews)}</td>
-        <td>${esc(r.freeText)}</td>
-      </tr>`).join('');
+        <td style="font-size:12px">${esc(itemStr)}</td>
+        <td style="font-size:12px">${esc(r.freeText)}</td>
+      </tr>`;
+  }).join('');
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -194,9 +182,7 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
     <thead><tr>
       <th>スタッフ名</th><th class="num">担当患者数</th><th class="num">物品販売</th>
       <th class="num">カウンセリング成約</th><th class="num">口コミ獲得</th>
-      <th class="num">シーラント</th><th class="num">レントゲン</th>
-      <th class="num">フッ素</th><th class="num">クリーニング</th><th class="num">TBI</th>
-      <th>出力</th>
+      <th>処置内訳</th><th>出力</th>
     </tr></thead>
     <tbody>${summaryRows || '<tr><td colspan="11" class="empty">まだデータがありません</td></tr>'}</tbody>
   </table>
@@ -205,8 +191,7 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
   <div style="overflow-x:auto">
   <table>
     <thead><tr>
-      <th>日付</th><th>スタッフ</th><th>患者番号</th>
-      <th class="num">物品</th><th>カウンセリング</th><th>口コミ</th><th>自由記入</th>
+      <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th>
     </tr></thead>
     <tbody>${detailRows || '<tr><td colspan="7" class="empty">まだデータがありません</td></tr>'}</tbody>
   </table>
@@ -222,9 +207,15 @@ app.get('/certificate', (req, res) => {
   const name = req.query.name || '';
   const records = loadDB();
   const staffRecords = records.filter(r => r.staffName === name);
-  const counselingTotal = staffRecords.filter(r => r.counseling && r.counseling !== 'なし').length;
-  const itemsTotal = staffRecords.reduce((s, r) => s + (parseInt(r.items) || (r.items !== 'なし' ? 1 : 0)), 0);
-  const reviewsTotal = staffRecords.filter(r => r.reviews === '獲得').length;
+  let itemsTotal = 0, counselingTotal = 0, reviewsTotal = 0;
+  for (const r of staffRecords) {
+    const its = Array.isArray(r.selectedItems) ? r.selectedItems : [];
+    for (const it of its) {
+      if (it.type === 'item') itemsTotal++;
+      if (it.type === 'counseling') counselingTotal++;
+      if (it.type === 'review') reviewsTotal++;
+    }
+  }
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
   const freePhrases = [...new Set(staffRecords.filter(r => r.freeText).map(r => r.freeText))].slice(0, 3);
 
@@ -277,37 +268,34 @@ app.get('/evaluation', (req, res) => {
   const staffRecords = records.filter(r => r.staffName === name);
   if (!staffRecords.length) return res.status(404).send('データがありません');
 
-  const counselingMap = {};
-  let items = 0, reviews = 0, sealant = 0, xray = 0, fluoride = 0, cleaning = 0, tbi = 0;
-  const freePhrases = [];
+  const itemsMap2 = {}, counselingMap2 = {}, treatmentMap2 = {};
+  let reviews2 = 0;
+  const freePhrases2 = [];
 
   for (const r of staffRecords) {
-    if (r.items && r.items !== 'なし') items += parseInt(r.items) || 1;
-    if (r.counseling && r.counseling !== 'なし') counselingMap[r.counseling] = (counselingMap[r.counseling] || 0) + 1;
-    if (r.reviews === '獲得') reviews++;
-    if (r.sealant === 'あり') sealant++;
-    if (r.xray === 'あり') xray++;
-    if (r.fluoride === 'あり') fluoride++;
-    if (r.cleaning === 'あり') cleaning++;
-    if (r.tbi === 'あり') tbi++;
-    if (r.freeText) freePhrases.push({ date: r.date, text: r.freeText });
+    const its = Array.isArray(r.selectedItems) ? r.selectedItems : [];
+    for (const it of its) {
+      if (it.type === 'item')       itemsMap2[it.label] = (itemsMap2[it.label] || 0) + 1;
+      if (it.type === 'counseling') counselingMap2[it.label] = (counselingMap2[it.label] || 0) + 1;
+      if (it.type === 'review')     reviews2++;
+      if (it.type === 'treatment' || it.type === 'other')
+        treatmentMap2[it.label] = (treatmentMap2[it.label] || 0) + 1;
+    }
+    if (r.freeText) freePhrases2.push({ date: r.date, text: r.freeText });
   }
-  const counselingTotal = Object.values(counselingMap).reduce((a,b)=>a+b,0);
+  const itemsTotal2 = Object.values(itemsMap2).reduce((a,b)=>a+b,0);
+  const counselingTotal2 = Object.values(counselingMap2).reduce((a,b)=>a+b,0);
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const rows = [
-    ['物品販売数', items + '件'],
-    ['カウンセリング成約数', counselingTotal + '件（' + Object.entries(counselingMap).map(([k,v])=>`${k}:${v}`).join('、') + '）'],
-    ['口コミ獲得数', reviews + '件'],
-    ['シーラント', sealant + '件'],
-    ['レントゲン', xray + '件'],
-    ['フッ素塗布', fluoride + '件'],
-    ['クリーニング', cleaning + '件'],
-    ['歯磨き指導(TBI)', tbi + '件'],
     ['担当患者数', staffRecords.length + '名'],
+    ['物品販売数', itemsTotal2 + '件'],
+    ['カウンセリング成約数', counselingTotal2 + '件' + (counselingTotal2 ? '（' + Object.entries(counselingMap2).map(([k,v])=>`${k}:${v}`).join('、') + '）' : '')],
+    ['口コミ獲得数', reviews2 + '件'],
+    ['処置内訳', Object.entries(treatmentMap2).map(([k,v])=>`${k}:${v}件`).join('、') || 'なし'],
   ].map(([label, val]) => `<tr><td class="label">${esc(label)}</td><td>${esc(val)}</td></tr>`).join('');
 
-  const freeRows = [...new Map(freePhrases.map(p => [p.text, p])).values()].slice(0, 10)
+  const freeRows = [...new Map(freePhrases2.map(p => [p.text, p])).values()].slice(0, 10)
     .map(p => `<tr><td class="label">${esc(p.date)}</td><td>${esc(p.text)}</td></tr>`).join('');
 
   res.send(`<!DOCTYPE html>
