@@ -2,21 +2,44 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const MONGODB_URI = process.env.MONGODB_URI;
 const DB_FILE = path.join(__dirname, 'data', 'records.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-function loadDB() {
+// MongoDB接続
+let mongoCol = null;
+if (MONGODB_URI) {
+  const client = new MongoClient(MONGODB_URI);
+  client.connect()
+    .then(() => {
+      mongoCol = client.db('nobinobi').collection('staff_records');
+      console.log('MongoDB接続成功');
+    })
+    .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
+}
+
+async function loadDB() {
+  if (mongoCol) {
+    return await mongoCol.find({}).sort({ createdAt: -1 }).toArray();
+  }
   try { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch { return []; }
 }
 
-function saveDB(records) {
+async function saveRecord(record) {
+  if (mongoCol) {
+    await mongoCol.insertOne(record);
+    return;
+  }
   try {
     fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+    const records = (() => { try { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch { return []; } })();
+    records.unshift(record);
     fs.writeFileSync(DB_FILE, JSON.stringify(records, null, 2), 'utf8');
   } catch (err) { console.error('DB保存エラー:', err.message); }
 }
@@ -44,8 +67,8 @@ function esc(str) {
 }
 
 // 最近の入力を全員分返す（フォーム画面用）
-app.get('/api/records', (req, res) => {
-  const records = loadDB();
+app.get('/api/records', async (req, res) => {
+  const records = await loadDB();
   res.json(records.slice(0, 50).map(r => ({
     date: r.date,
     staffName: r.staffName,
@@ -60,8 +83,8 @@ app.get('/api/records', (req, res) => {
 });
 
 // 患者番号の重複チェック（患者実績のみ対象）
-app.get('/api/check-patient/:patientNo', (req, res) => {
-  const records = loadDB();
+app.get('/api/check-patient/:patientNo', async (req, res) => {
+  const records = await loadDB();
   const exists = records.some(r => r.entryType !== 'behavior' && r.patientNo === req.params.patientNo);
   res.json({ exists });
 });
@@ -78,16 +101,13 @@ const ACTION_CATEGORY = {
   'その他': 'treatment',
 };
 
-app.post('/submit', (req, res) => {
+app.post('/submit', async (req, res) => {
   const d = req.body;
   if (!d || !d.staffName || !d.date) return res.status(400).json({ error: 'invalid data' });
 
-  const records = loadDB();
-
   if (d.entryType === 'behavior') {
-    // 行動・取り組み記録（患者番号不要）
     if (!d.freeText) return res.status(400).json({ error: 'invalid data' });
-    records.unshift({
+    await saveRecord({
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       entryType: 'behavior',
@@ -95,18 +115,18 @@ app.post('/submit', (req, res) => {
       staffName: d.staffName.trim(),
       freeText: d.freeText.trim(),
     });
-    saveDB(records);
     console.log(`行動記録: ${d.staffName} (${d.date})`);
     return res.status(200).json({ ok: true });
   }
 
   // 患者実績記録
   if (!d.patientNo || !d.action) return res.status(400).json({ error: 'invalid data' });
+  const records = await loadDB();
   if (records.some(r => r.entryType !== 'behavior' && r.patientNo === d.patientNo.trim())) {
     return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} はすでに登録されています` });
   }
 
-  records.unshift({
+  await saveRecord({
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     entryType: 'patient',
@@ -118,15 +138,14 @@ app.post('/submit', (req, res) => {
     itemName: d.itemName ? d.itemName.trim() : '',
     otherText: d.otherText ? d.otherText.trim() : '',
   });
-  saveDB(records);
   console.log(`患者実績登録: ${d.staffName} 患者${d.patientNo} ${d.action} (${d.date})`);
   res.status(200).json({ ok: true });
 });
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', async (req, res) => {
   if (!checkAuth(req, res)) return;
 
-  const records = loadDB();
+  const records = await loadDB();
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
@@ -235,10 +254,10 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
 });
 
 // 賞状ページ
-app.get('/certificate', (req, res) => {
+app.get('/certificate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const name = req.query.name || '';
-  const records = loadDB();
+  const records = await loadDB();
   const staffRecords = records.filter(r => r.staffName === name);
   let itemsTotal = 0, counselingTotal = 0, reviewsTotal = 0;
   for (const r of staffRecords) {
@@ -293,10 +312,10 @@ h1 { font-size: 42px; letter-spacing: 0.3em; color: #8b6914; margin-bottom: 40px
 });
 
 // 個人評価表ページ
-app.get('/evaluation', (req, res) => {
+app.get('/evaluation', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const name = req.query.name || '';
-  const records = loadDB();
+  const records = await loadDB();
   const staffRecords = records.filter(r => r.staffName === name);
   if (!staffRecords.length) return res.status(404).send('データがありません');
 
