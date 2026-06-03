@@ -552,7 +552,7 @@ async function generateQuestions() {
     const r = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-      body: JSON.stringify({ manualText: text, count })
+      body: JSON.stringify({ manualText: text, manualName: name, count })
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'エラー'); }
     const data = await r.json();
@@ -609,6 +609,8 @@ function appendQuestionEditor(container, q, idx) {
   div.dataset.idx = idx;
   div.innerHTML = buildQuestionEditorHTML(q, idx);
   container.appendChild(div);
+  const contextInput = div.querySelector('.q-context-input');
+  if (contextInput) contextInput.value = q.context || '';
   div.querySelector('.q-question-input').value = q.question || '';
   div.querySelector('.q-explanation-input').value = q.explanation || '';
   updateTypeFields(div, q);
@@ -633,6 +635,10 @@ function buildQuestionEditorHTML(q, idx) {
           <option value="fill" ${q.type==='fill'?'selected':''}>穴埋め</option>
           <option value="sort" ${q.type==='sort'?'selected':''}>並び替え</option>
         </select>
+      </div>
+      <div>
+        <label>出題場面（何の問題か）</label>
+        <input type="text" class="q-context-input" placeholder="例：医療証変更時の受付対応">
       </div>
       <div>
         <label>問題文</label>
@@ -749,6 +755,7 @@ function collectEditQuestions(containerId) {
   const questions = [];
   container.querySelectorAll('.question-editor').forEach(div => {
     const type = div.querySelector('.q-type-select').value;
+    const context = div.querySelector('.q-context-input') ? div.querySelector('.q-context-input').value.trim() : '';
     const question = div.querySelector('.q-question-input').value.trim();
     const explanation = div.querySelector('.q-explanation-input').value.trim();
     let options = [], answer;
@@ -767,7 +774,7 @@ function collectEditQuestions(containerId) {
       options = Array.from(div.querySelectorAll('.q-sort-item')).map(i => i.value.trim());
       answer = [...options];
     }
-    questions.push({ type, question, options, answer, explanation });
+    questions.push({ type, context, question, options, answer, explanation });
   });
   return questions;
 }
