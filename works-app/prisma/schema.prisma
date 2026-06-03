@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  avatar    String?
+  role      String   @default("member") // admin, member
+  createdAt DateTime @default(now())
+
+  sentMessages     Message[]       @relation("SentMessages")
+  conversations    ConversationMember[]
+  posts            Post[]
+  comments         Comment[]
+  questions        Question[]      @relation("QuestionAuthor")
+  answers          Answer[]
+  assignedQuestions Question[]     @relation("AssignedTo")
+  manualLinks      ManualLink[]
+  files            File[]
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  ConversationMember[]
+  messages Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(cuid())
+  userId         String
+  conversationId String
+  joinedAt       DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([userId, conversationId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  content        String
+  senderId       String
+  conversationId String
+  createdAt      DateTime @default(now())
+
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  files        File[]
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  authorId  String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author   User      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+  files    File[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  authorId  String
+  postId    String
+  createdAt DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id])
+  post   Post @relation(fields: [postId], references: [id])
+}
+
+model Question {
+  id           String   @id @default(cuid())
+  content      String
+  authorId     String
+  assignedToId String?
+  isAnonymous  Boolean  @default(false)
+  status       String   @default("open") // open, answered, closed
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  author     User    @relation("QuestionAuthor", fields: [authorId], references: [id])
+  assignedTo User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+  answers    Answer[]
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  content    String
+  authorId   String
+  questionId String
+  createdAt  DateTime @default(now())
+
+  author   User     @relation(fields: [authorId], references: [id])
+  question Question @relation(fields: [questionId], references: [id])
+}
+
+model ManualLink {
+  id          String   @id @default(cuid())
+  title       String
+  url         String
+  description String?
+  category    String   @default("general")
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy User @relation(fields: [createdById], references: [id])
+}
+
+model File {
+  id         String   @id @default(cuid())
+  name       String
+  url        String
+  size       Int
+  mimeType   String
+  uploaderId String
+  messageId  String?
+  postId     String?
+  createdAt  DateTime @default(now())
+
+  uploader User     @relation(fields: [uploaderId], references: [id])
+  message  Message? @relation(fields: [messageId], references: [id])
+  post     Post?    @relation(fields: [postId], references: [id])
+}

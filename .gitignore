@@ -1,3 +1,6 @@
 node_modules/
 .env
 data/
+works-app/prisma/dev.db
+works-app/.next/
+works-app/node_modules/
