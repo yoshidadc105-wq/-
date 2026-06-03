@@ -66,6 +66,13 @@ function esc(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// スタッフ名一覧（プルダウン用）
+app.get('/api/staff-names', async (req, res) => {
+  const records = await loadDB();
+  const names = [...new Set(records.map(r => r.staffName).filter(Boolean))].sort();
+  res.json(names);
+});
+
 // 最近の入力を全員分返す（フォーム画面用）
 app.get('/api/records', async (req, res) => {
   const records = await loadDB();
@@ -145,7 +152,13 @@ app.post('/submit', async (req, res) => {
 app.get('/dashboard', async (req, res) => {
   if (!checkAuth(req, res)) return;
 
-  const records = await loadDB();
+  const allRecords = await loadDB();
+  const { from, to } = req.query;
+  const records = allRecords.filter(r => {
+    if (from && r.date < from) return false;
+    if (to && r.date > to) return false;
+    return true;
+  });
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
@@ -223,12 +236,26 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
 .empty { text-align: center; padding: 40px; color: #9ca3af; }
 .btn-cert { background: #f59e0b; color: #fff; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; margin-right: 4px; display: inline-block; }
 .btn-eval { background: #3b82f6; color: #fff; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; }
+.filter-bar { background:#fff; border-radius:8px; padding:14px 16px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,.08); display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:13px; }
+.filter-bar label { color:#065f46; font-weight:bold; }
+.filter-bar input { border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:13px; }
+.filter-bar button { background:#2aab96; color:#fff; border:none; border-radius:6px; padding:6px 16px; font-size:13px; cursor:pointer; }
+.filter-bar a { color:#9ca3af; font-size:12px; text-decoration:underline; }
 </style>
 </head>
 <body>
 <header><h1>スタッフ実績ダッシュボード｜のびのび歯科</h1></header>
 <div class="container">
-  <h2>スタッフ別 累計実績</h2>
+  <form class="filter-bar" method="get" action="/dashboard">
+    <label>期間絞り込み</label>
+    <input type="date" name="from" value="${esc(from || '')}" />
+    <span style="color:#9ca3af">〜</span>
+    <input type="date" name="to" value="${esc(to || '')}" />
+    <button type="submit">絞り込む</button>
+    ${from || to ? '<a href="/dashboard">リセット</a>' : ''}
+    ${from || to ? `<span style="color:#f59e0b;font-size:12px">★ 期間指定中</span>` : ''}
+  </form>
+  <h2>スタッフ別 累計実績${from || to ? `（${from||''}〜${to||-''}）` : ''}</h2>
   <div style="overflow-x:auto">
   <table>
     <thead><tr>
@@ -257,18 +284,37 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
 app.get('/certificate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const name = req.query.name || '';
-  const records = await loadDB();
-  const staffRecords = records.filter(r => r.staffName === name);
-  let itemsTotal = 0, counselingTotal = 0, reviewsTotal = 0;
+  if (!name) return res.status(400).send('スタッフ名が必要です');
+  const allRecords = await loadDB();
+  const staffRecords = allRecords.filter(r => r.staffName === name);
+  let itemsTotal = 0, counselingTotal = 0, reviewsTotal = 0, treatmentTotal = 0, patientCount = 0;
+  const counselingTypes = new Set();
+  const itemNames = new Set();
+  const behaviors = [];
+  const patients = new Set();
   for (const r of staffRecords) {
-    if (r.entryType === 'behavior') continue;
+    if (r.entryType === 'behavior') { if (r.freeText) behaviors.push(r.freeText); continue; }
     const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
-    if (cat === 'item') itemsTotal++;
-    if (cat === 'counseling') counselingTotal++;
+    if (cat === 'item') { itemsTotal++; if (r.itemName) itemNames.add(r.itemName); }
+    if (cat === 'counseling') { counselingTotal++; counselingTypes.add(r.action); }
     if (cat === 'review') reviewsTotal++;
+    if (cat === 'treatment') treatmentTotal++;
+    if (r.patientNo) patients.add(r.patientNo);
   }
+  patientCount = patients.size;
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
-  const freePhrases = [...new Set(staffRecords.filter(r => r.freeText).map(r => r.freeText))].slice(0, 3);
+  const uniqueBehaviors = [...new Set(behaviors)].slice(0, 4);
+
+  // 実績に応じた文章を生成
+  const highlights = [];
+  if (patientCount > 0) highlights.push(`${patientCount}名の患者様を丁寧に担当`);
+  if (counselingTotal > 0) highlights.push(`${[...counselingTypes].join('・')}など${counselingTotal}件のカウンセリングを成約に導く`);
+  if (itemsTotal > 0) highlights.push(`${itemsTotal}件の物品販売を通じて患者様の口腔ケアをサポート`);
+  if (reviewsTotal > 0) highlights.push(`${reviewsTotal}件の口コミ獲得により医院の信頼向上に貢献`);
+  if (treatmentTotal > 0) highlights.push(`${treatmentTotal}件の処置において正確・迅速な補助を実践`);
+  if (uniqueBehaviors.length > 0) highlights.push(...uniqueBehaviors.slice(0,2));
+
+  const highlightHtml = highlights.map(h => `<div class="hl">・${esc(h)}</div>`).join('');
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -276,36 +322,49 @@ app.get('/certificate', async (req, res) => {
 <meta charset="UTF-8">
 <title>賞状 - ${esc(name)}</title>
 <style>
-@media print { .no-print { display: none; } }
-body { font-family: "游明朝", "Yu Mincho", serif; background: #fffdf5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-.cert { border: 8px double #b8860b; padding: 60px 70px; max-width: 700px; width: 100%; text-align: center; background: #fffdf5; position: relative; }
-.cert::before { content: ''; position: absolute; inset: 10px; border: 2px solid #d4a017; pointer-events: none; }
-h1 { font-size: 42px; letter-spacing: 0.3em; color: #8b6914; margin-bottom: 40px; }
-.name { font-size: 36px; font-weight: bold; border-bottom: 2px solid #333; display: inline-block; padding-bottom: 4px; margin: 20px 0; }
-.body { font-size: 17px; line-height: 2.2; color: #333; margin: 30px 0; }
-.achievements { font-size: 14px; color: #555; margin: 20px 0; line-height: 2; }
-.date { font-size: 14px; color: #666; margin-top: 40px; }
-.clinic { font-size: 18px; font-weight: bold; margin-top: 10px; }
-.print-btn { display: block; margin: 30px auto 0; padding: 10px 30px; background: #2aab96; color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+@media print { .no-print { display: none; } @page { margin: 15mm; } }
+body { font-family: "游明朝", "Yu Mincho", "Hiragino Mincho Pro", serif; background: #fffdf5; display: flex; flex-direction:column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+.no-print { display:flex; gap:12px; margin-bottom:20px; }
+.no-print button { padding:8px 24px; border:none; border-radius:6px; font-size:14px; cursor:pointer; }
+.back-btn { background:#e5e7eb; color:#333; }
+.print-btn { background:#2aab96; color:#fff; }
+.cert { border: 8px double #b8860b; padding: 56px 64px; max-width: 720px; width: 100%; text-align: center; background: #fffdf5; position: relative; }
+.cert::before { content:''; position:absolute; inset:10px; border:2px solid #d4a017; pointer-events:none; }
+.cert::after { content:'✦'; position:absolute; top:20px; left:50%; transform:translateX(-50%); font-size:20px; color:#d4a017; }
+h1 { font-size: 44px; letter-spacing: 0.4em; color: #8b6914; margin: 20px 0 36px; }
+.name { font-size: 38px; font-weight: bold; border-bottom: 2px solid #333; display: inline-block; padding-bottom: 6px; margin: 16px 0 28px; letter-spacing:0.15em; }
+.body { font-size: 16px; line-height: 2.4; color: #333; margin: 20px 0; text-align:left; padding: 0 10px; }
+.highlights { background: #fefce8; border: 1px solid #d4a017; border-radius: 6px; padding: 16px 20px; margin: 20px 0; text-align:left; }
+.hl { font-size: 14px; color: #555; line-height: 2; }
+.footer { margin-top: 36px; }
+.date { font-size: 14px; color: #666; }
+.clinic { font-size: 20px; font-weight: bold; margin-top: 8px; letter-spacing:0.1em; }
+.seal { font-size: 36px; margin-top: 4px; }
 </style>
 </head>
 <body>
+<div class="no-print">
+  <button class="back-btn" onclick="history.back()">← 戻る</button>
+  <button class="print-btn" onclick="window.print()">印刷する</button>
+</div>
 <div class="cert">
-  <h1>賞　状</h1>
+  <h1>表　彰　状</h1>
   <div class="name">${esc(name)}　殿</div>
   <div class="body">
-    あなたは日々の診療において<br>
-    患者様への真摯な対応と<br>
-    卓越した実績を積み重ねてきました。<br>
-    ここにその功績を称え、表彰いたします。
+    あなたは日々の診療業務において、患者様お一人おひとりに対して<br>
+    真心のこもった対応を実践し、チームの一員として<br>
+    常に高い意識と誠実な姿勢で職務に励んでまいりました。<br>
+    <br>
+    その献身的な取り組みと積み重ねた実績は<br>
+    医院の発展と患者様の信頼向上に大きく貢献するものであり<br>
+    ここにその功績を讃え、表彰いたします。
   </div>
-  <div class="achievements">
-    【実績】物品販売 ${itemsTotal}件　／　カウンセリング成約 ${counselingTotal}件　／　口コミ獲得 ${reviewsTotal}件
-    ${freePhrases.length ? '<br>【特記】' + freePhrases.map(p => esc(p)).join('　／　') : ''}
+  ${highlights.length ? `<div class="highlights">${highlightHtml}</div>` : ''}
+  <div class="footer">
+    <div class="date">${today}</div>
+    <div class="clinic">のびのび歯科・矯正歯科</div>
+    <div class="seal">院長　印</div>
   </div>
-  <div class="date">${today}</div>
-  <div class="clinic">のびのび歯科・矯正歯科</div>
-  <button class="print-btn no-print" onclick="window.print()">印刷する</button>
 </div>
 </body>
 </html>`);
@@ -315,13 +374,14 @@ h1 { font-size: 42px; letter-spacing: 0.3em; color: #8b6914; margin-bottom: 40px
 app.get('/evaluation', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const name = req.query.name || '';
-  const records = await loadDB();
-  const staffRecords = records.filter(r => r.staffName === name);
-  if (!staffRecords.length) return res.status(404).send('データがありません');
+  if (!name) return res.status(400).send('スタッフ名が必要です');
+  const allRecords = await loadDB();
+  const staffRecords = allRecords.filter(r => r.staffName === name);
 
   const itemsMap2 = {}, counselingMap2 = {}, treatmentMap2 = {};
   let reviews2 = 0;
   const freePhrases2 = [];
+  const patients = new Set();
 
   for (const r of staffRecords) {
     if (r.entryType === 'behavior') {
@@ -334,20 +394,33 @@ app.get('/evaluation', async (req, res) => {
     if (cat === 'counseling') counselingMap2[r.action] = (counselingMap2[r.action] || 0) + 1;
     if (cat === 'review')     reviews2++;
     if (cat === 'treatment')  treatmentMap2[r.action] = (treatmentMap2[r.action] || 0) + 1;
+    if (r.patientNo) patients.add(r.patientNo);
   }
   const itemsTotal2 = Object.values(itemsMap2).reduce((a,b)=>a+b,0);
   const counselingTotal2 = Object.values(counselingMap2).reduce((a,b)=>a+b,0);
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  // 評価コメント自動生成
+  const comments = [];
+  if (patients.size >= 10) comments.push('多くの患者様を担当し、豊富な臨床経験を積んでいます。');
+  else if (patients.size > 0) comments.push('患者様一人ひとりに丁寧に向き合う姿勢が見られます。');
+  if (counselingTotal2 >= 5) comments.push('カウンセリング成約数が高く、患者様への説明力・提案力が優れています。');
+  else if (counselingTotal2 > 0) comments.push('カウンセリングへの積極的な関与が実績に表れています。');
+  if (itemsTotal2 > 0) comments.push('物品提案を通じて患者様のセルフケアをサポートできています。');
+  if (reviews2 > 0) comments.push('口コミ獲得により医院の認知向上に貢献しています。');
+  if (freePhrases2.length >= 3) comments.push('日常業務での積極的な取り組みが多く記録されており、チームへの貢献度が高いです。');
+  if (comments.length === 0) comments.push('引き続き日々の業務に取り組み、実績を積み上げていきましょう。');
+
   const rows = [
-    ['担当患者数', staffRecords.length + '名'],
-    ['物品販売数', itemsTotal2 + '件'],
+    ['担当患者数', patients.size + '名'],
+    ['物品販売数', itemsTotal2 + '件' + (itemsTotal2 ? '（' + Object.entries(itemsMap2).map(([k,v])=>`${k}:${v}`).join('、') + '）' : '')],
     ['カウンセリング成約数', counselingTotal2 + '件' + (counselingTotal2 ? '（' + Object.entries(counselingMap2).map(([k,v])=>`${k}:${v}`).join('、') + '）' : '')],
     ['口コミ獲得数', reviews2 + '件'],
     ['処置内訳', Object.entries(treatmentMap2).map(([k,v])=>`${k}:${v}件`).join('、') || 'なし'],
+    ['行動・取り組み記録数', freePhrases2.length + '件'],
   ].map(([label, val]) => `<tr><td class="label">${esc(label)}</td><td>${esc(val)}</td></tr>`).join('');
 
-  const freeRows = [...new Map(freePhrases2.map(p => [p.text, p])).values()].slice(0, 10)
+  const freeRows = [...new Map(freePhrases2.map(p => [p.text, p])).values()].slice(0, 15)
     .map(p => `<tr><td class="label">${esc(p.date)}</td><td>${esc(p.text)}</td></tr>`).join('');
 
   res.send(`<!DOCTYPE html>
@@ -356,31 +429,53 @@ app.get('/evaluation', async (req, res) => {
 <meta charset="UTF-8">
 <title>個人評価表 - ${esc(name)}</title>
 <style>
-@media print { .no-print { display: none; } }
-body { font-family: sans-serif; background: #fff; margin: 0; padding: 30px; color: #333; }
-h1 { font-size: 20px; border-bottom: 3px solid #2aab96; padding-bottom: 8px; margin-bottom: 20px; }
-.meta { font-size: 13px; color: #666; margin-bottom: 20px; }
-.name-big { font-size: 28px; font-weight: bold; color: #065f46; }
-h2 { font-size: 14px; background: #e8f7f5; padding: 6px 12px; border-left: 4px solid #2aab96; margin: 20px 0 10px; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
-td { padding: 8px 12px; border: 1px solid #e5e7eb; }
-td.label { background: #f9fafb; font-weight: bold; width: 40%; color: #374151; }
-.print-btn { margin: 20px 0; padding: 10px 30px; background: #2aab96; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
-.date { font-size: 13px; color: #888; margin-top: 30px; text-align: right; }
+@media print { .no-print { display: none; } @page { margin: 15mm; } }
+body { font-family: sans-serif; background: #fff; margin: 0; padding: 30px; color: #333; max-width: 800px; }
+.no-print { display:flex; gap:12px; margin-bottom:20px; }
+.no-print button { padding:8px 24px; border:none; border-radius:6px; font-size:14px; cursor:pointer; }
+.back-btn { background:#e5e7eb; color:#333; }
+.print-btn { background:#2aab96; color:#fff; }
+.header-bar { border-bottom: 3px solid #2aab96; padding-bottom: 10px; margin-bottom: 6px; display:flex; justify-content:space-between; align-items:flex-end; }
+.title { font-size: 20px; font-weight:bold; }
+.meta { font-size: 13px; color: #666; }
+.name-big { font-size: 30px; font-weight: bold; color: #065f46; margin: 12px 0 20px; }
+h2 { font-size: 14px; background: #e8f7f5; padding: 6px 12px; border-left: 4px solid #2aab96; margin: 24px 0 10px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+td { padding: 9px 12px; border: 1px solid #e5e7eb; }
+td.label { background: #f9fafb; font-weight: bold; width: 38%; color: #374151; }
+.comment-box { background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:14px 18px; margin:16px 0; }
+.comment-box p { font-size:14px; line-height:2; color:#166534; margin:0; }
+.sign-area { margin-top: 40px; display:flex; justify-content:flex-end; gap:60px; font-size:13px; color:#555; }
+.sign-line { border-top:1px solid #333; width:120px; text-align:center; padding-top:4px; margin-top:30px; }
 </style>
 </head>
 <body>
-<h1>個人実績評価表</h1>
-<div class="meta">出力日：${today}</div>
+<div class="no-print">
+  <button class="back-btn" onclick="history.back()">← 戻る</button>
+  <button class="print-btn" onclick="window.print()">印刷する</button>
+</div>
+<div class="header-bar">
+  <div class="title">個人実績評価表</div>
+  <div class="meta">出力日：${today}</div>
+</div>
 <div class="name-big">${esc(name)}</div>
+
 <h2>実績サマリー</h2>
 <table>${rows}</table>
-<h2>特記事項・行動評価</h2>
+
+<h2>総合コメント</h2>
+<div class="comment-box"><p>${comments.map(c => esc(c)).join('<br>')}</p></div>
+
+<h2>行動・取り組み記録</h2>
 <table>
-  <tr><td class="label">日付</td><td>内容</td></tr>
-  ${freeRows || '<tr><td colspan="2" style="color:#9ca3af;text-align:center">記録なし</td></tr>'}
+  <tr><td class="label" style="width:22%">日付</td><td>内容</td></tr>
+  ${freeRows || '<tr><td colspan="2" style="color:#9ca3af;text-align:center;padding:20px">記録なし</td></tr>'}
 </table>
-<button class="print-btn no-print" onclick="window.print()">印刷する</button>
+
+<div class="sign-area">
+  <div><div class="sign-line">確認者</div></div>
+  <div><div class="sign-line">院長</div></div>
+</div>
 </body>
 </html>`);
 });

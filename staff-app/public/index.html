@@ -91,7 +91,13 @@
           </div>
           <div class="form-group">
             <label class="required">スタッフ名</label>
-            <input type="text" name="staffName" placeholder="例：田中" required />
+            <select name="staffName" id="pStaffSelect" required>
+              <option value="">選択してください</option>
+            </select>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input type="text" id="pNewStaff" placeholder="新しい名前を追加" style="font-size:13px;padding:6px 10px;" />
+              <button type="button" onclick="addStaff('p')" style="background:#e8f7f5;border:1px solid #2aab96;color:#065f46;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">追加</button>
+            </div>
           </div>
         </div>
         <div class="form-group">
@@ -159,7 +165,13 @@
           </div>
           <div class="form-group">
             <label class="required">スタッフ名</label>
-            <input type="text" name="staffName" placeholder="例：田中" required />
+            <select name="staffName" id="bStaffSelect" required>
+              <option value="">選択してください</option>
+            </select>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input type="text" id="bNewStaff" placeholder="新しい名前を追加" style="font-size:13px;padding:6px 10px;" />
+              <button type="button" onclick="addStaff('b')" style="background:#e8f7f5;border:1px solid #2aab96;color:#065f46;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">追加</button>
+            </div>
           </div>
         </div>
       </div>
@@ -184,6 +196,46 @@
 </div>
 
 <script>
+  // スタッフ名プルダウン管理
+  let staffNames = [];
+
+  async function loadStaffNames() {
+    try {
+      const res = await fetch('/api/staff-names');
+      staffNames = await res.json();
+    } catch { staffNames = []; }
+    renderStaffSelects();
+  }
+
+  function renderStaffSelects() {
+    ['pStaffSelect', 'bStaffSelect'].forEach(id => {
+      const sel = document.getElementById(id);
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">選択してください</option>';
+      staffNames.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = n;
+        sel.appendChild(opt);
+      });
+      if (cur) sel.value = cur;
+    });
+  }
+
+  function addStaff(prefix) {
+    const input = document.getElementById(prefix + 'NewStaff');
+    const name = input.value.trim();
+    if (!name) return;
+    if (!staffNames.includes(name)) {
+      staffNames.push(name);
+      staffNames.sort();
+      renderStaffSelects();
+    }
+    document.getElementById(prefix + 'StaffSelect').value = name;
+    input.value = '';
+  }
+
+  loadStaffNames();
+
   // タブ切替
   function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach((b, i) => {
@@ -296,6 +348,7 @@
     document.getElementById('patientCheck').textContent = '';
     document.getElementById('itemNameWrap').style.display = 'none';
     document.getElementById('otherWrap').style.display = 'none';
+    renderStaffSelects();
     f.style.display = '';
     document.getElementById('success-patient').style.display = 'none';
     document.getElementById('pSubmitBtn').disabled = false;
