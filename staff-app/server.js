@@ -451,7 +451,7 @@ h1 { font-size: 44px; letter-spacing: 0.4em; color: #8b6914; margin: 20px 0 36px
 </head>
 <body>
 <div class="no-print">
-  <button class="back-btn" onclick="history.back()">← 戻る</button>
+  <button class="back-btn" onclick="window.close(); location.href='/dashboard'">← 戻る</button>
   <button class="print-btn" onclick="window.print()">印刷する</button>
 </div>
 <div class="cert">
@@ -558,7 +558,7 @@ td.label { background: #f9fafb; font-weight: bold; width: 38%; color: #374151; }
 </head>
 <body>
 <div class="no-print">
-  <button class="back-btn" onclick="history.back()">← 戻る</button>
+  <button class="back-btn" onclick="window.close(); location.href='/dashboard'">← 戻る</button>
   <button class="print-btn" onclick="window.print()">印刷する</button>
 </div>
 <div class="header-bar">
