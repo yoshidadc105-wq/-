@@ -134,7 +134,7 @@ app.get('/api/sets/public', async (req, res) => {
       manualName: s.manualName,
       questionCount: s.questions.length,
       createdAt: s.createdAt,
-      questions: s.questions.map(({ id, type, question, options }) => ({ id, type, question, options })),
+      questions: s.questions.map(({ id, type, question, options, context }) => ({ id, type, question, options, context: context || s.manualName || '' })),
     }));
   res.json(sets);
 });
@@ -200,8 +200,12 @@ function cleanManualText(manualText) {
   return [...new Set(sentences)].slice(0, 80).join('\n');
 }
 
-function buildQuizPrompt(manualText, count) {
+function buildQuizPrompt(manualText, count, manualName = '') {
+  const contextTitle = String(manualName || '').trim() || '歯科クリニック業務マニュアル';
   return `以下の【整理済みマニュアル本文】だけを根拠に、歯科クリニックのスタッフ研修に使える理解度確認クイズを${count}問作成してください。
+
+【出題テーマ】
+${contextTitle}
 
 【最重要ルール】
 - 出題対象は、患者対応、検査、診療補助、受付、説明、記録、感染対策、器具管理など、スタッフが実務で判断・行動する内容だけです。
@@ -210,6 +214,8 @@ function buildQuizPrompt(manualText, count) {
 - 「このマニュアルに記載」「マニュアル本文」「次の内容は正しいですか」のような丸写し確認は禁止です。現場で迷う判断・行動・確認事項を問う自然な問題文にしてください。
 - 本文に書かれた手順・注意点・確認事項・禁止事項・説明事項を、現場で使える問いに言い換えてください。
 - マニュアル本文に書かれていない内容、一般論、IT、Python、システム管理などの架空問題は作らないでください。
+- 問題文だけを見ても何について問われているか分かるように、患者対応・受付・保険証/医療証確認・診療補助などの場面を自然に含めてください。
+- 各問題には必ず"context"を付け、20字以内で出題場面を示してください。例：「医療証変更時の受付対応」「患者情報確認」「感染対策」
 - 問題・選択肢・解説はすべて自然な日本語にしてください。
 - 出力はJSONオブジェクトのみです。前置き、説明文、Markdownコードブロックは禁止です。
 - ${count}問ちょうど作成してください。
@@ -226,10 +232,10 @@ ${manualText}
 【出力形式】JSONオブジェクトのみ：
 {
   "questions": [
-    {"type":"truefalse","question":"実務判断を問う問題文","options":[],"answer":"true","explanation":"マニュアル本文に基づく解説"},
-    {"type":"choice","question":"実務上の適切な対応を問う問題文","options":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":"選択肢1","explanation":"マニュアル本文に基づく解説"},
-    {"type":"fill","question":"重要な確認事項は___です。","options":[],"answer":"答え","explanation":"マニュアル本文に基づく解説"},
-    {"type":"sort","question":"次の手順を正しい順番に並べてください。","options":["手順1","手順2","手順3"],"answer":["手順1","手順2","手順3"],"explanation":"マニュアル本文に基づく解説"}
+    {"type":"truefalse","context":"出題場面","question":"何についての判断か分かる実務問題文","options":[],"answer":"true","explanation":"マニュアル本文に基づく解説"},
+    {"type":"choice","context":"出題場面","question":"何についての対応か分かる選択問題文","options":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":"選択肢1","explanation":"マニュアル本文に基づく解説"},
+    {"type":"fill","context":"出題場面","question":"具体的な場面で必要な確認事項は___です。","options":[],"answer":"答え","explanation":"マニュアル本文に基づく解説"},
+    {"type":"sort","context":"出題場面","question":"具体的な業務場面で、次の手順を正しい順番に並べてください。","options":["手順1","手順2","手順3"],"answer":["手順1","手順2","手順3"],"explanation":"マニュアル本文に基づく解説"}
   ]
 }`;
 }
@@ -296,10 +302,22 @@ function isGenericManualQuestion(text) {
   return /このマニュアル|マニュアル本文|マニュアルに記載|記載されている内容|次の内容は.*正しいですか|該当箇所/.test(s);
 }
 
-function normalizeGeneratedQuestions(raw, count) {
+function inferQuestionContext(text, manualName = '') {
+  const source = `${manualName} ${text || ''}`;
+  if (/医療証|保険証|資格確認|受給者証|公費/.test(source)) return '医療証変更時の受付対応';
+  if (/受付|会計|予約|電話/.test(source)) return '受付対応';
+  if (/感染|手指|消毒|滅菌|洗浄|清掃/.test(source)) return '感染対策・器具管理';
+  if (/問診|同意|説明|患者/.test(source)) return '患者説明・確認';
+  if (/記録|入力|共有|カルテ/.test(source)) return '記録・情報共有';
+  if (/検査|撮影|スキャン|印象/.test(source)) return '検査・診療補助';
+  return String(manualName || '').trim().slice(0, 20) || '実務対応';
+}
+
+function normalizeGeneratedQuestions(raw, count, manualName = '') {
   return raw.map(q => {
     const questionText = String(q.question || q.text || q['問題'] || q['問題文'] || '').trim();
     const explanation = String(q.explanation || q['解説'] || q['説明'] || '').trim();
+    const context = String(q.context || q['出題場面'] || q['場面'] || '').trim() || inferQuestionContext(`${questionText} ${explanation}`, manualName);
     let options = q.options || q.choices || q['選択肢'] || [];
     if (!Array.isArray(options)) {
       options = (options && typeof options === 'object') ? Object.values(options) : [];
@@ -327,7 +345,7 @@ function normalizeGeneratedQuestions(raw, count) {
 
     const answer = q.answer != null ? q.answer : q.correct_answer != null ? q.correct_answer : q['答え'] != null ? q['答え'] : q['正解'] != null ? q['正解'] : '';
     const finalAnswer = (type === 'sort' && !Array.isArray(answer)) ? [...options] : answer;
-    return { type, question: questionText, options, answer: finalAnswer, explanation };
+    return { type, context, question: questionText, options, answer: finalAnswer, explanation };
   }).filter(q => {
     const answerText = Array.isArray(q.answer) ? q.answer.join(' ') : String(q.answer || '');
     const combined = [q.question, q.explanation, answerText].join(' ');
@@ -357,19 +375,21 @@ function pickBlankTarget(sentence) {
   return candidates.find(w => !stopwords.has(w) && !/^[0-9０-９]+$/.test(w)) || candidates[0] || '';
 }
 
-function makeLocalQuizQuestions(manualText, count) {
+function makeLocalQuizQuestions(manualText, count, manualName = '') {
   const sentences = splitManualSentences(manualText);
   const source = sentences.length ? sentences : [String(manualText || '').trim()].filter(Boolean);
   const questions = [];
 
   for (let i = 0; questions.length < count && i < Math.max(source.length, count * 2); i++) {
     const sentence = source[i % source.length];
+    const context = inferQuestionContext(sentence, manualName);
     const mode = questions.length % 3;
 
     if (mode === 0) {
       questions.push({
         type: 'truefalse',
-        question: `スタッフが現場で行う対応として、次の行動は適切ですか。「${sentence}」`,
+        context,
+        question: `${context}について、スタッフが現場で行う対応として次の行動は適切ですか。「${sentence}」`,
         options: [],
         answer: 'true',
         explanation: `この対応は、研修本文で求められている手順・確認事項に沿っています。`,
@@ -382,7 +402,8 @@ function makeLocalQuizQuestions(manualText, count) {
       if (target && sentence.includes(target)) {
         questions.push({
           type: 'fill',
-          question: sentence.replace(target, '___'),
+          context,
+          question: `${context}で、` + sentence.replace(target, '___'),
           options: [],
           answer: target,
           explanation: `研修本文では、この確認・対応が必要であることが示されています。`,
@@ -399,7 +420,8 @@ function makeLocalQuizQuestions(manualText, count) {
     ];
     questions.push({
       type: 'choice',
-      question: '現場対応として最も適切なものはどれですか。',
+      context,
+      question: `${context}について、現場対応として最も適切なものはどれですか。`,
       options,
       answer: sentence,
       explanation: `正解は、研修本文で求められている具体的な対応に沿った選択肢です。`,
@@ -411,13 +433,13 @@ function makeLocalQuizQuestions(manualText, count) {
 
 app.post('/api/generate', async (req, res) => {
   if (!checkAuth(req, res)) return;
-  const { manualText, count = 5 } = req.body;
+  const { manualText, manualName = '', count = 5 } = req.body;
   const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 1), 20);
   if (!manualText) return res.status(400).json({ error: 'manualTextが必要です' });
   const cleanedManualText = cleanManualText(manualText);
   if (!cleanedManualText) return res.status(400).json({ error: '出題できる実務本文が見つかりませんでした。名前・日時・履歴ではなく、手順や注意点を含む本文を入力してください。' });
 
-  const prompt = buildQuizPrompt(cleanedManualText, safeCount);
+  const prompt = buildQuizPrompt(cleanedManualText, safeCount, manualName);
   const attempts = [];
 
   if (GEMINI_API_KEY) attempts.push(['Gemini 2.0 Flash', () => generateWithGemini(prompt)]);
@@ -427,9 +449,9 @@ app.post('/api/generate', async (req, res) => {
   for (const [providerName, fn] of attempts) {
     try {
       const raw = await fn();
-      let questions = normalizeGeneratedQuestions(raw, safeCount);
+      let questions = normalizeGeneratedQuestions(raw, safeCount, manualName);
       if (questions.length < safeCount) {
-        const local = makeLocalQuizQuestions(cleanedManualText, safeCount - questions.length);
+        const local = makeLocalQuizQuestions(cleanedManualText, safeCount - questions.length, manualName);
         questions = questions.concat(local).slice(0, safeCount);
       }
       console.log(`AI provider success: ${providerName}, questions: ${questions.length}`);
@@ -442,7 +464,7 @@ app.post('/api/generate', async (req, res) => {
     }
   }
 
-  const questions = makeLocalQuizQuestions(cleanedManualText, safeCount);
+  const questions = makeLocalQuizQuestions(cleanedManualText, safeCount, manualName);
   if (!questions.length) return res.status(500).json({ error: '有効な問題が生成されませんでした。マニュアル本文を長めに入力してください。' });
   console.log('AI provider fallback: Local rule-based generator', errors.join(' / '));
   return res.json({ questions, provider: 'Local rule-based generator', warning: errors.length ? errors.join(' / ') : undefined });
