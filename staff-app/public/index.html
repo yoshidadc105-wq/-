@@ -193,30 +193,34 @@
     document.getElementById('panel-behavior').classList.toggle('active', tab === 'behavior');
   }
 
-  // 例文ボタン
+  // 例文（表示のみ・クリック不可）
   const PHRASES = [
-    'だれよりもトイレ掃除を丁寧に行った',
-    '患者さんに笑顔で対応できた',
-    '毎日マニュアルを確認している',
-    '院内の整理整頓を率先して行った',
-    '患者さんのお名前を覚えて声かけした',
-    'チームへの報連相を徹底した',
-    '新人スタッフのサポートをした',
-    '器具の準備・片付けを迅速に行った',
-    '患者さんへの治療説明をわかりやすく行った',
-    '時間に正確で遅刻ゼロだった',
-    '自主的に勉強・スキルアップに取り組んだ',
-    'クレームゼロで患者満足度を高めた',
-    'チームの雰囲気づくりに貢献した',
+    '受付で患者さんを名前で呼んで笑顔でお迎えした',
+    '会計のたびに次回予約の声かけを必ず行った',
+    '治療前に緊張している患者さんへ一声かけ緊張をほぐした',
+    'お子さんが怖がらないようやさしく声かけしながら誘導した',
+    'ユニットの片付けと次の準備をスムーズに行いお待たせしなかった',
+    '器具の滅菌・準備を正確にミスゼロで行った',
+    '問診票の内容を確認しドクターに的確に申し送りした',
+    '在庫が少ない材料にいち早く気づき補充・報告した',
+    '急な予約変更や問い合わせに冷静・丁寧に対応した',
+    '患者さんからの質問に自信を持って分かりやすく答えた',
+    '院内清掃をだれよりも丁寧に毎日欠かさず行った',
+    '予防の重要性を患者さんにわかりやすく説明し定期検診につなげた',
+    '新人スタッフに自ら声をかけサポートした',
+    '診療後に気になったことをドクターにすぐ報告・相談した',
+    '勉強会や研修の内容を自分なりにまとめチームに共有した',
   ];
-  const phraseButtons = document.getElementById('phraseButtons');
+  const phraseContainer = document.getElementById('phraseButtons');
+  const exLabel = document.createElement('div');
+  exLabel.style.cssText = 'font-size:12px;color:#9ca3af;margin-bottom:6px;width:100%;';
+  exLabel.textContent = '▼ 記入例（参考）';
+  phraseContainer.appendChild(exLabel);
   PHRASES.forEach(p => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = p;
-    btn.style.cssText = 'background:#f3e8ff;border:1px solid #a855f7;color:#6b21a8;border-radius:20px;padding:3px 10px;font-size:12px;cursor:pointer;';
-    btn.onclick = () => { document.getElementById('freeText').value = p; };
-    phraseButtons.appendChild(btn);
+    const chip = document.createElement('span');
+    chip.textContent = p;
+    chip.style.cssText = 'background:#f3e8ff;border:1px solid #d8b4fe;color:#6b21a8;border-radius:20px;padding:3px 10px;font-size:12px;display:inline-block;';
+    phraseContainer.appendChild(chip);
   });
 
   // 日付初期値
