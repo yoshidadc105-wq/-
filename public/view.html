@@ -6,35 +6,31 @@
   <title>マニュアル閲覧 - 社内マニュアルシステム</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    .manual-content { line-height: 1.8; font-size: 15px; }
-    .manual-content h1, .manual-content h2, .manual-content h3 { margin: 20px 0 10px; font-weight: 700; }
-    .manual-content h1 { font-size: 22px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-    .manual-content h2 { font-size: 18px; }
-    .manual-content h3 { font-size: 16px; }
-    .manual-content p { margin-bottom: 12px; }
-    .manual-content ul, .manual-content ol { padding-left: 24px; margin-bottom: 12px; }
-    .manual-content li { margin-bottom: 4px; }
-    .manual-content strong { font-weight: 700; }
-    .manual-content em { font-style: italic; }
-    .manual-content blockquote { border-left: 4px solid var(--primary); padding-left: 16px; color: var(--text-muted); margin: 12px 0; }
-    .manual-content table { border-collapse: collapse; margin-bottom: 12px; }
-    .manual-content th, .manual-content td { border: 1px solid var(--border); padding: 8px 12px; }
-    .manual-content th { background: var(--bg); }
-    .cat-option { padding: 8px 12px; cursor: pointer; border-radius: 6px; }
-    .cat-option:hover { background: var(--bg); }
-    .cat-option.selected { background: var(--primary); color: white; }
-    .step-desc { font-size: 15px; line-height: 1.8; word-break: break-word; }
-    .step-desc b, .step-desc strong { font-weight: 700; }
-    .step-desc i, .step-desc em { font-style: italic; }
-    .step-desc u { text-decoration: underline; }
-    .step-desc s { text-decoration: line-through; }
-    .step-desc ul { padding-left: 20px; margin: 6px 0; }
-    .step-desc ol { padding-left: 20px; margin: 6px 0; }
-    .step-desc li { margin-bottom: 4px; }
+    .manual-content{line-height:1.8;font-size:15px}
+    .manual-content h1,.manual-content h2,.manual-content h3{margin:20px 0 10px;font-weight:700}
+    .manual-content h1{font-size:22px;border-bottom:2px solid var(--border);padding-bottom:8px}
+    .manual-content h2{font-size:18px}.manual-content h3{font-size:16px}
+    .manual-content p{margin-bottom:12px}
+    .manual-content ul,.manual-content ol{padding-left:24px;margin-bottom:12px}
+    .manual-content li{margin-bottom:4px}
+    .manual-content strong{font-weight:700}.manual-content em{font-style:italic}
+    .manual-content blockquote{border-left:4px solid var(--primary);padding-left:16px;color:var(--text-muted);margin:12px 0}
+    .manual-content table{border-collapse:collapse;margin-bottom:12px}
+    .manual-content th,.manual-content td{border:1px solid var(--border);padding:8px 12px}
+    .manual-content th{background:var(--bg)}
+    .cat-option{padding:8px 12px;cursor:pointer;border-radius:6px}
+    .cat-option:hover{background:var(--bg)}.cat-option.selected{background:var(--primary);color:white}
+    .step-desc{font-size:15px;line-height:1.8;word-break:break-word}
+    .step-desc b,.step-desc strong{font-weight:700}.step-desc i,.step-desc em{font-style:italic}
+    .step-desc u{text-decoration:underline}.step-desc s{text-decoration:line-through}
+    .step-desc ul,.step-desc ol{padding-left:20px;margin:6px 0}.step-desc li{margin-bottom:4px}
+    .video-wrap{position:relative;display:inline-block;max-width:100%;text-align:left}
+    .video-wrap video{display:block;max-width:100%;max-height:500px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .van-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;border-radius:6px;overflow:hidden}
+    .van-overlay img{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
   </style>
 </head>
 <body>
-
 <nav class="navbar">
   <a href="/" class="navbar-brand">マニュアルシステム</a>
   <div class="navbar-right">
@@ -45,20 +41,14 @@
     <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
   </div>
 </nav>
-
 <div class="container">
-  <div id="breadcrumb" class="text-sm text-muted mb-2">
-    <a href="/" style="color: var(--primary);">← マニュアル一覧</a>
-  </div>
+  <div id="breadcrumb" class="text-sm text-muted mb-2"><a href="/" style="color:var(--primary)">← マニュアル一覧</a></div>
   <div id="content"><div class="loading">読み込み中</div></div>
 </div>
 
 <div class="modal-overlay hidden" id="deleteModal">
   <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">マニュアルの削除</span>
-      <button class="modal-close" onclick="closeModal('deleteModal')">×</button>
-    </div>
+    <div class="modal-header"><span class="modal-title">マニュアルの削除</span><button class="modal-close" onclick="closeModal('deleteModal')">×</button></div>
     <div class="modal-body"><p>このマニュアルを削除しますか？この操作は取り消せません。</p></div>
     <div class="modal-footer">
       <button onclick="closeModal('deleteModal')" class="btn btn-secondary">キャンセル</button>
@@ -69,13 +59,10 @@
 
 <div class="modal-overlay hidden" id="moveModal">
   <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">📁 カテゴリを移動</span>
-      <button class="modal-close" onclick="closeModal('moveModal')">×</button>
-    </div>
+    <div class="modal-header"><span class="modal-title">📁 カテゴリを移動</span><button class="modal-close" onclick="closeModal('moveModal')">×</button></div>
     <div class="modal-body">
       <p class="text-sm text-muted mb-2">移動先のカテゴリを選んでください</p>
-      <div id="moveCatList" style="max-height:360px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px;"></div>
+      <div id="moveCatList" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
     </div>
     <div class="modal-footer">
       <button onclick="closeModal('moveModal')" class="btn btn-secondary">キャンセル</button>
@@ -86,226 +73,174 @@
 
 <script src="/js/common.js"></script>
 <script>
-let manualId = null;
-let currentUser = null;
-let manualData = null;
-let selectedCategoryId = undefined;
-let allCategories = [];
+let manualId=null,currentUser=null,manualData=null,selectedCategoryId=undefined,allCategories=[];
+const isMobile=window.innerWidth<=768||/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-const isMobile = window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  manualId = params.get('id');
-  if (!manualId) { window.location.href = '/'; return; }
-  currentUser = await loadCurrentUser();
-  if (!currentUser) return;
+async function init(){
+  const p=new URLSearchParams(window.location.search);
+  manualId=p.get('id');if(!manualId){window.location.href='/';return;}
+  currentUser=await loadCurrentUser();if(!currentUser)return;
   initNavbar(currentUser);
   await loadManual();
   await loadCheckStatus();
 }
 
-function renderStepDesc(desc) {
-  if (!desc) return '';
-  // HTMLタグが含まれていればそのままinnerHTMLとして使用、なければ改行→<br>に変換
-  if (/<[a-zA-Z]/.test(desc)) {
-    return `<div class="step-desc">${desc}</div>`;
-  }
-  const escaped = desc.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  return `<div class="step-desc">${escaped}</div>`;
+function renderStepDesc(desc){
+  if(!desc)return'';
+  if(/<[a-zA-Z]/.test(desc))return`<div class="step-desc">${desc}</div>`;
+  const e=desc.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  return`<div class="step-desc">${e}</div>`;
 }
 
-function renderStepMedia(image, imageType) {
-  if (!image) return '';
-  const isVideo = imageType === 'video' || /\.(mp4|webm|mov|avi|m4v)$/i.test(image);
-  if (isVideo) {
-    return `<div style="text-align:center; margin-bottom:16px;">
-      <video src="/uploads/${image}" controls playsinline
-        style="max-width:100%; max-height:500px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);"></video>
+function renderStepMedia(image,imageType,videoAnnotations){
+  if(!image)return'';
+  const isVideo=imageType==='video'||/\.(mp4|webm|mov|avi|m4v)$/i.test(image);
+  if(isVideo){
+    const hasVA=videoAnnotations&&videoAnnotations.length>0;
+    const vaAttr=hasVA?` data-va="${encodeURIComponent(JSON.stringify(videoAnnotations))}"`  :'';
+    return`<div style="text-align:center;margin-bottom:16px">
+      <div class="video-wrap">
+        <video src="/uploads/${image}" controls playsinline${vaAttr}
+          style="display:block;max-width:100%;max-height:500px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)"
+          onloadedmetadata="initVAnnotPlay(this)"></video>
+      </div>
     </div>`;
   }
-  return `<div style="text-align:center; margin-bottom:16px;">
-    <img src="/uploads/${image}" style="max-width:100%; max-height:500px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-  </div>`;
+  return`<div style="text-align:center;margin-bottom:16px"><img src="/uploads/${image}" style="max-width:100%;max-height:500px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)"></div>`;
 }
 
-async function loadManual() {
-  const res = await fetch(`/api/manuals/${manualId}`);
-  if (!res.ok) {
-    document.getElementById('content').innerHTML = `
-      <div class="empty"><div class="empty-icon">❌</div>マニュアルが見つかりません<br>
-      <a href="/" class="btn btn-primary mt-2">一覧に戻る</a></div>`;
+function initVAnnotPlay(videoEl){
+  const raw=videoEl.getAttribute('data-va');if(!raw)return;
+  let annotations;try{annotations=JSON.parse(decodeURIComponent(raw));}catch(e){return;}
+  if(!annotations||!annotations.length)return;
+  const wrap=videoEl.parentElement;
+  const overlay=document.createElement('div');
+  overlay.className='van-overlay';
+  wrap.appendChild(overlay);
+  // Preload annotation images
+  const imgs={};
+  annotations.forEach(a=>{
+    if(a.overlayImage){const img=new Image();img.src=`/uploads/${a.overlayImage}`;imgs[a.id]=img;}
+  });
+  videoEl.addEventListener('timeupdate',()=>{
+    const t=videoEl.currentTime;
+    const active=annotations.filter(a=>t>=a.time&&t<a.time+a.duration);
+    overlay.innerHTML='';
+    active.forEach(a=>{
+      if(!imgs[a.id])return;
+      const el=document.createElement('img');
+      el.src=imgs[a.id].src;
+      overlay.appendChild(el);
+    });
+  });
+}
+
+async function loadManual(){
+  const res=await fetch(`/api/manuals/${manualId}`);
+  if(!res.ok){
+    document.getElementById('content').innerHTML=`<div class="empty"><div class="empty-icon">❌</div>マニュアルが見つかりません<br><a href="/" class="btn btn-primary mt-2">一覧に戻る</a></div>`;
     return;
   }
-
-  manualData = await res.json();
-  document.title = `${manualData.title} - マニュアルシステム`;
-
-  const isAdmin = currentUser.role === 'admin';
-  const viewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(manualData.file_path || '')}&title=${encodeURIComponent(manualData.title)}&id=${manualId}`;
-  const pdfUrl = `/uploads/${manualData.file_path}`;
-
-  let bodyHtml = '';
-
-  if (manualData.type === 'pdf') {
-    const adminBtns = isAdmin ? `
+  manualData=await res.json();
+  document.title=`${manualData.title} - マニュアルシステム`;
+  const isAdmin=currentUser.role==='admin';
+  const viewerUrl=`/pdf-viewer.html?file=${encodeURIComponent(manualData.file_path||'')}&title=${encodeURIComponent(manualData.title)}&id=${manualId}`;
+  const pdfUrl=`/uploads/${manualData.file_path}`;
+  let bodyHtml='';
+  if(manualData.type==='pdf'){
+    const adminBtns=isAdmin?`
       <a href="${pdfUrl}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
       <a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>
       <button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>
-      <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>` : '';
-
-    if (isMobile) {
-      bodyHtml = (adminBtns ? `<div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">${adminBtns}</div>` : '') + `
-        <div style="text-align:center; padding:40px 20px; background:white; border-radius:8px; border:1px solid #e2e8f0;">
-          <div style="font-size:64px; margin-bottom:12px;">📄</div>
-          <p style="color:#64748b; font-size:14px; margin-bottom:20px;">${manualData.file_name || 'PDF'}</p>
+      <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>`:'';
+    if(isMobile){
+      bodyHtml=(adminBtns?`<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">${adminBtns}</div>`:'')+
+        `<div style="text-align:center;padding:40px 20px;background:white;border-radius:8px;border:1px solid #e2e8f0">
+          <div style="font-size:64px;margin-bottom:12px">📄</div>
+          <p style="color:#64748b;font-size:14px;margin-bottom:20px">${manualData.file_name||'PDF'}</p>
           <a href="${viewerUrl}" class="btn btn-primary btn-lg">PDFを見る</a>
         </div>`;
-    } else {
-      const embeddedViewerUrl = viewerUrl + '&embedded=1';
-      bodyHtml = `
-        <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-          <a href="${viewerUrl}" target="_blank" class="btn btn-secondary btn-sm">🔍 別タブで開く</a>
-          ${adminBtns}
-        </div>
-        <iframe src="${embeddedViewerUrl}" class="pdf-viewer" style="min-height:82vh; width:100%; border:none; border-radius:8px;"></iframe>`;
+    }else{
+      const ev=viewerUrl+'&embedded=1';
+      bodyHtml=`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+        <a href="${viewerUrl}" target="_blank" class="btn btn-secondary btn-sm">🔍 別タブで開く</a>${adminBtns}</div>
+        <iframe src="${ev}" class="pdf-viewer" style="min-height:82vh;width:100%;border:none;border-radius:8px"></iframe>`;
     }
-  } else if (manualData.type === 'steps') {
-    let stepsData = {};
-    try { stepsData = JSON.parse(manualData.content || '{}'); } catch(e) {}
-    const stepsList = stepsData.steps || [];
-    const coverHtml = stepsData.cover_image ? `
+  }else if(manualData.type==='steps'){
+    let sd={};try{sd=JSON.parse(manualData.content||'{}');}catch(e){}
+    const sl=sd.steps||[];
+    const coverHtml=sd.cover_image?`<div class="card mb-2"><div class="card-body" style="text-align:center;padding:16px"><img src="/uploads/${sd.cover_image}" style="max-width:100%;max-height:400px;border-radius:8px"></div></div>`:'';
+    const stepsHtml=sl.map((step,i)=>`
       <div class="card mb-2">
-        <div class="card-body" style="text-align:center; padding:16px;">
-          <img src="/uploads/${stepsData.cover_image}" style="max-width:100%; max-height:400px; border-radius:8px;">
-        </div>
-      </div>` : '';
-    const stepsHtml = stepsList.map((step, i) => `
-      <div class="card mb-2">
-        <div class="card-header" style="background:var(--primary); color:white; border-bottom:none;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-size:13px; font-weight:700; background:rgba(255,255,255,0.2); border-radius:4px; padding:2px 10px; white-space:nowrap;">STEP ${step.order || i + 1}</span>
-            ${step.title ? `<span style="font-size:16px; font-weight:600;">${escHtml(step.title)}</span>` : ''}
+        <div class="card-header" style="background:var(--primary);color:white;border-bottom:none">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:13px;font-weight:700;background:rgba(255,255,255,.2);border-radius:4px;padding:2px 10px;white-space:nowrap">STEP ${step.order||i+1}</span>
+            ${step.title?`<span style="font-size:16px;font-weight:600">${escHtml(step.title)}</span>`:''}
           </div>
         </div>
         <div class="card-body">
-          ${renderStepMedia(step.image, step.image_type)}
+          ${renderStepMedia(step.image,step.image_type,step.video_annotations)}
           ${renderStepDesc(step.description)}
         </div>
       </div>`).join('');
-    bodyHtml = coverHtml + (stepsList.length > 0 ? stepsHtml : '<div class="empty"><div class="empty-icon">📋</div>ステップがまだありません</div>');
-  } else {
-    bodyHtml = `<div class="card"><div class="card-body"><div class="manual-content">${manualData.content || ''}</div></div></div>`;
+    bodyHtml=coverHtml+(sl.length?stepsHtml:'<div class="empty"><div class="empty-icon">📋</div>ステップがまだありません</div>');
+  }else{
+    bodyHtml=`<div class="card"><div class="card-body"><div class="manual-content">${manualData.content||''}</div></div></div>`;
   }
-
-  const editBtns = manualData.type !== 'pdf' && isAdmin ? `
-    <div class="flex gap-2">
-      <a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>
-      <button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>
-      <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>
-    </div>` : '';
-
-  const checkAreaHtml = manualData.type !== 'pdf' ? `
-    <div class="card mt-2">
-      <div class="card-body" style="text-align:center; padding:24px;" id="checkArea">
-        <div class="loading" style="padding:16px;"></div>
-      </div>
-    </div>` : '';
-
-  document.getElementById('content').innerHTML = `
-    <div class="card mb-2">
-      <div class="card-header">
-        <div>
-          <div class="flex items-center gap-2 mb-1">
-            <span class="badge ${manualData.type === 'pdf' ? 'badge-pdf' : manualData.type === 'steps' ? 'badge-steps' : 'badge-text'}">${manualData.type === 'pdf' ? 'PDF' : manualData.type === 'steps' ? 'ステップ' : 'テキスト'}</span>
-            ${manualData.category_name ? `<span class="badge" style="background:#f1f5f9;color:var(--text-muted);" id="currentCatBadge">${manualData.category_name}</span>` : '<span id="currentCatBadge"></span>'}
-          </div>
-          <h1 style="font-size:22px; font-weight:700;">${manualData.title}</h1>
-          ${manualData.description ? `<p class="text-muted text-sm mt-1">${manualData.description}</p>` : ''}
-          <div class="text-sm text-muted mt-1">作成者: ${manualData.created_by_name} · 作成日: ${formatDate(manualData.created_at)} · 更新日: ${formatDate(manualData.updated_at)}</div>
+  const editBtns=manualData.type!=='pdf'&&isAdmin?`<div class="flex gap-2"><a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a><button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button><button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button></div>`:'';
+  const checkAreaHtml=manualData.type!=='pdf'?`<div class="card mt-2"><div class="card-body" style="text-align:center;padding:24px" id="checkArea"><div class="loading" style="padding:16px"></div></div></div>`:'';
+  document.getElementById('content').innerHTML=`
+    <div class="card mb-2"><div class="card-header">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="badge ${manualData.type==='pdf'?'badge-pdf':manualData.type==='steps'?'badge-steps':'badge-text'}">${manualData.type==='pdf'?'PDF':manualData.type==='steps'?'ステップ':'テキスト'}</span>
+          ${manualData.category_name?`<span class="badge" style="background:#f1f5f9;color:var(--text-muted)" id="currentCatBadge">${manualData.category_name}</span>`:'<span id="currentCatBadge"></span>'}
         </div>
-        ${editBtns}
+        <h1 style="font-size:22px;font-weight:700">${manualData.title}</h1>
+        ${manualData.description?`<p class="text-muted text-sm mt-1">${manualData.description}</p>`:''}
+        <div class="text-sm text-muted mt-1">作成者: ${manualData.created_by_name} · 作成日: ${formatDate(manualData.created_at)} · 更新日: ${formatDate(manualData.updated_at)}</div>
       </div>
-    </div>
+      ${editBtns}
+    </div></div>
     ${bodyHtml}
     ${checkAreaHtml}`;
 }
 
-function escHtml(str) {
-  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-async function loadCheckStatus() {
-  const area = document.getElementById('checkArea');
-  if (!area) return;
-  const res = await fetch(`/api/progress/check/${manualId}`);
-  const data = await res.json();
-  renderCheckButton(data.checked, data.checked_at);
+async function loadCheckStatus(){
+  const area=document.getElementById('checkArea');if(!area)return;
+  const res=await fetch(`/api/progress/check/${manualId}`);
+  const data=await res.json();
+  renderCheckButton(data.checked,data.checked_at);
 }
+function renderCheckButton(checked,checkedAt){
+  const area=document.getElementById('checkArea');if(!area)return;
+  if(checked){area.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="color:var(--success);font-weight:700;font-size:15px">✅ 確認済み（${formatDate(checkedAt)}）</span><button onclick="uncheckManual()" class="btn btn-secondary btn-sm">取り消す</button></div>`;}
+  else{area.innerHTML=`<button onclick="checkManual()" class="btn btn-success" style="font-size:15px;padding:12px 32px">✅ 確認しました</button>`;}
+}
+async function checkManual(){const res=await fetch(`/api/progress/check/${manualId}`,{method:'POST'});if(res.ok){const d=await fetch(`/api/progress/check/${manualId}`).then(r=>r.json());renderCheckButton(d.checked,d.checked_at);}}
+async function uncheckManual(){const res=await fetch(`/api/progress/check/${manualId}`,{method:'DELETE'});if(res.ok)renderCheckButton(false,null);}
+async function deleteManual(){const res=await fetch(`/api/manuals/${manualId}`,{method:'DELETE'});if(res.ok)window.location.href='/';else{const d=await res.json();alert(d.error||'削除に失敗しました');closeModal('deleteModal');}}
 
-function renderCheckButton(checked, checkedAt) {
-  const area = document.getElementById('checkArea');
-  if (!area) return;
-  if (checked) {
-    area.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span style="color:var(--success);font-weight:700;font-size:15px;">✅ 確認済み（${formatDate(checkedAt)}）</span>
-      <button onclick="uncheckManual()" class="btn btn-secondary btn-sm">取り消す</button></div>`;
-  } else {
-    area.innerHTML = `<button onclick="checkManual()" class="btn btn-success" style="font-size:15px;padding:12px 32px;">✅ 確認しました</button>`;
-  }
+async function openMoveModal(){
+  selectedCategoryId=manualData.category_id||null;
+  if(!allCategories.length){const r=await fetch('/api/categories');allCategories=await r.json();}
+  renderMoveCatList();document.getElementById('doMoveBtn').disabled=false;openModal('moveModal');
 }
-
-async function checkManual() {
-  const res = await fetch(`/api/progress/check/${manualId}`, { method: 'POST' });
-  if (res.ok) { const d = await fetch(`/api/progress/check/${manualId}`).then(r=>r.json()); renderCheckButton(d.checked, d.checked_at); }
+function renderMoveCatList(){
+  const c=document.getElementById('moveCatList');
+  let h=`<div class="cat-option ${selectedCategoryId===null?'selected':''}" onclick="selectCat(null,this)">（カテゴリなし）</div>`;
+  function rn(pid,d){allCategories.filter(c=>pid===null?!c.parent_id:c.parent_id==pid).forEach(cat=>{const iS=selectedCategoryId==cat.id;h+=`<div class="cat-option ${iS?'selected':''}" onclick="selectCat(${cat.id},this)" style="padding-left:${12+d*16}px">${d>0?'└ ':''}${cat.name}</div>`;rn(cat.id,d+1);});}
+  rn(null,0);c.innerHTML=h;
 }
-async function uncheckManual() {
-  const res = await fetch(`/api/progress/check/${manualId}`, { method: 'DELETE' });
-  if (res.ok) renderCheckButton(false, null);
-}
-async function deleteManual() {
-  const res = await fetch(`/api/manuals/${manualId}`, { method: 'DELETE' });
-  if (res.ok) { window.location.href = '/'; }
-  else { const d = await res.json(); alert(d.error||'削除に失敗しました'); closeModal('deleteModal'); }
-}
-
-async function openMoveModal() {
-  selectedCategoryId = manualData.category_id || null;
-  if (allCategories.length === 0) { const r = await fetch('/api/categories'); allCategories = await r.json(); }
-  renderMoveCatList();
-  document.getElementById('doMoveBtn').disabled = false;
-  openModal('moveModal');
-}
-function renderMoveCatList() {
-  const container = document.getElementById('moveCatList');
-  let html = `<div class="cat-option ${selectedCategoryId===null?'selected':''}" onclick="selectCat(null,this)">（カテゴリなし）</div>`;
-  function renderNodes(parentId, depth) {
-    allCategories.filter(c=>parentId===null?!c.parent_id:c.parent_id==parentId).forEach(c=>{
-      const indent=depth*16, isSel=selectedCategoryId==c.id;
-      html+=`<div class="cat-option ${isSel?'selected':''}" onclick="selectCat(${c.id},this)" style="padding-left:${12+indent}px;">${depth>0?'└ ':''}${c.name}</div>`;
-      renderNodes(c.id,depth+1);
-    });
-  }
-  renderNodes(null,0);
-  container.innerHTML=html;
-}
-function selectCat(id,el){
-  selectedCategoryId=id;
-  document.querySelectorAll('#moveCatList .cat-option').forEach(e=>e.classList.remove('selected'));
-  el.classList.add('selected');
-}
+function selectCat(id,el){selectedCategoryId=id;document.querySelectorAll('#moveCatList .cat-option').forEach(e=>e.classList.remove('selected'));el.classList.add('selected');}
 async function doMove(){
-  const btn=document.getElementById('doMoveBtn'); btn.disabled=true;
+  const btn=document.getElementById('doMoveBtn');btn.disabled=true;
   const res=await fetch(`/api/manuals/${manualId}/category`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({category_id:selectedCategoryId})});
   const data=await res.json();
-  if(res.ok){
-    closeModal('moveModal');
-    manualData.category_id=selectedCategoryId;
-    const moved=allCategories.find(c=>c.id==selectedCategoryId);
-    const badge=document.getElementById('currentCatBadge');
-    if(badge){badge.textContent=moved?moved.name:''; badge.style.display=moved?'':'none';}
-    alert('カテゴリを移動しました');
-  } else { alert(data.error||'移動に失敗しました'); btn.disabled=false; }
+  if(res.ok){closeModal('moveModal');manualData.category_id=selectedCategoryId;const m=allCategories.find(c=>c.id==selectedCategoryId);const b=document.getElementById('currentCatBadge');if(b){b.textContent=m?m.name:'';b.style.display=m?'':'none';}alert('カテゴリを移動しました');}
+  else{alert(data.error||'移動に失敗しました');btn.disabled=false;}
 }
 
 init();
