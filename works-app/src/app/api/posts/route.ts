@@ -3,11 +3,14 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const category = req.nextUrl.searchParams.get("category");
+
   const posts = await prisma.post.findMany({
+    where: category ? { category } : undefined,
     include: {
       author: { select: { id: true, name: true, avatar: true } },
       comments: {
@@ -26,9 +29,15 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { title, content } = await req.json();
+  const { title, content, category, imageData } = await req.json();
   const post = await prisma.post.create({
-    data: { title, content, authorId: session.user.id },
+    data: {
+      title,
+      content,
+      category: category || "連絡ノート",
+      imageData: imageData || null,
+      authorId: session.user.id,
+    },
     include: {
       author: { select: { id: true, name: true, avatar: true } },
       comments: { include: { author: { select: { id: true, name: true } } } },

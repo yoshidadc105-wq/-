@@ -63,6 +63,8 @@ model Post {
   id        String   @id @default(cuid())
   title     String
   content   String
+  imageData String?
+  category  String   @default("連絡ノート")
   authorId  String
   pinned    Boolean  @default(false)
   createdAt DateTime @default(now())

@@ -1,0 +1,2 @@
+ALTER TABLE "Post" ADD COLUMN "category" TEXT NOT NULL DEFAULT '連絡ノート';
+ALTER TABLE "Post" ADD COLUMN "imageData" TEXT;
