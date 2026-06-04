@@ -8,17 +8,29 @@ const path = require('path');
 const { MongoClient } = require('mongodb');
 const Groq = require('groq-sdk');
 
+let _mongoClient = null;
 let _mongoDb = null;
 async function getDb() {
-  if (_mongoDb) return _mongoDb;
+  if (_mongoDb) {
+    try {
+      await _mongoDb.command({ ping: 1 });
+      return _mongoDb;
+    } catch {
+      console.log('MongoDB接続切れ、再接続します');
+      _mongoClient = null;
+      _mongoDb = null;
+    }
+  }
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error('MONGODB_URI is not set');
   const client = new MongoClient(uri, {
-    serverSelectionTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
     tls: true,
     tlsAllowInvalidCertificates: false,
   });
   await client.connect();
+  _mongoClient = client;
   _mongoDb = client.db('nobinobi');
   console.log('MongoDB接続成功');
   return _mongoDb;
@@ -26,8 +38,8 @@ async function getDb() {
 
 // async routeエラーでサーバーがクラッシュしないようにする
 const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(err => {
-  console.error('Route error:', err.message);
-  if (!res.headersSent) res.status(500).send('サーバーエラーが発生しました。管理者に連絡してください。');
+  console.error('Route error:', err.message, err.stack);
+  if (!res.headersSent) res.status(500).json({ error: err.message });
 });
 
 process.on('unhandledRejection', reason => {
