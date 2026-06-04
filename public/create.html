@@ -8,154 +8,31 @@
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <style>
-    .ql-container { font-size: 15px; min-height: 400px; }
-    .ql-editor { min-height: 400px; }
-    .step-media-drop {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      min-height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 4px;
-    }
-    .step-media-drop:hover { border-color: var(--primary); background: var(--primary-light); }
-    .step-media-drop img { max-width: 100%; max-height: 300px; border-radius: 4px; }
-    .step-media-drop video { max-width: 100%; max-height: 300px; border-radius: 4px; }
-    .fmt-toolbar {
-      display: flex;
-      gap: 3px;
-      flex-wrap: wrap;
-      padding: 5px 8px;
-      background: #f8f9fa;
-      border: 1px solid var(--border);
-      border-bottom: none;
-      border-radius: var(--radius) var(--radius) 0 0;
-    }
-    .fmt-toolbar button {
-      padding: 3px 8px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      background: white;
-      cursor: pointer;
-      font-size: 13px;
-      line-height: 1.4;
-      min-width: 28px;
-    }
-    .fmt-toolbar button:hover { background: var(--primary-light); border-color: var(--primary); }
-    .fmt-toolbar .sep { width: 1px; background: var(--border); margin: 2px 3px; }
-    .step-desc-editor {
-      min-height: 80px;
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 0 0 var(--radius) var(--radius);
-      outline: none;
-      line-height: 1.8;
-      font-size: 14px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .step-desc-editor:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-light);
-    }
-    .step-desc-editor:empty:before {
-      content: attr(data-placeholder);
-      color: var(--text-muted);
-      pointer-events: none;
-    }
-    /* Annotation Modal */
-    #annotationModal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 9000;
-      background: rgba(0,0,0,0.85);
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-    .annot-panel {
-      background: white;
-      border-radius: 8px;
-      width: 95vw;
-      max-width: 900px;
-      max-height: 95vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .annot-toolbar {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      background: #f8f9fa;
-    }
-    .annot-toolbar button {
-      padding: 4px 10px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      background: white;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .annot-toolbar button:hover, .annot-toolbar button.active { background: var(--primary); color: white; border-color: var(--primary); }
-    .annot-canvas-wrap {
-      flex: 1;
-      overflow: auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #e5e7eb;
-      padding: 16px;
-      min-height: 200px;
-    }
-    .annot-footer {
-      padding: 10px 14px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-    .color-dot {
-      width: 22px; height: 22px;
-      border-radius: 50%;
-      border: 2px solid #ccc;
-      cursor: pointer;
-      display: inline-block;
-    }
-    .color-dot.selected { border: 3px solid #333; }
-    /* Video Trim Modal */
-    #videoTrimModal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 9000;
-      background: rgba(0,0,0,0.85);
-      align-items: center;
-      justify-content: center;
-    }
-    .trim-panel {
-      background: white;
-      border-radius: 8px;
-      width: 95vw;
-      max-width: 700px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
+    .ql-container{font-size:15px;min-height:400px}.ql-editor{min-height:400px}
+    .step-media-drop{border:2px dashed var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;transition:all .15s;min-height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+    .step-media-drop:hover{border-color:var(--primary);background:var(--primary-light)}
+    .step-media-drop img,.step-media-drop video{max-width:100%;max-height:300px;border-radius:4px}
+    .fmt-toolbar{display:flex;gap:3px;flex-wrap:wrap;padding:5px 8px;background:#f8f9fa;border:1px solid var(--border);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0}
+    .fmt-toolbar button{padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:white;cursor:pointer;font-size:13px;line-height:1.4;min-width:28px}
+    .fmt-toolbar button:hover{background:var(--primary-light);border-color:var(--primary)}
+    .fmt-toolbar .sep{width:1px;background:var(--border);margin:2px 3px}
+    .step-desc-editor{min-height:80px;padding:8px 12px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);outline:none;line-height:1.8;font-size:14px;white-space:pre-wrap;word-break:break-word}
+    .step-desc-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+    .step-desc-editor:empty:before{content:attr(data-placeholder);color:var(--text-muted);pointer-events:none}
+    #annotationModal,#videoAnnotModal,#videoTrimModal{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);flex-direction:column;align-items:center;justify-content:center}
+    #videoAnnotModal{z-index:9100}
+    .annot-panel{background:white;border-radius:8px;width:95vw;max-width:900px;max-height:95vh;display:flex;flex-direction:column;overflow:hidden}
+    .annot-toolbar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f8f9fa}
+    .annot-toolbar button{padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:white;cursor:pointer;font-size:13px}
+    .annot-toolbar button:hover,.annot-toolbar button.active{background:var(--primary);color:white;border-color:var(--primary)}
+    .annot-canvas-wrap{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#e5e7eb;padding:16px;min-height:150px}
+    .annot-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+    .color-dot{width:22px;height:22px;border-radius:50%;border:2px solid #ccc;cursor:pointer;display:inline-block}
+    .color-dot.selected{border:3px solid #333}
+    .trim-panel{background:white;border-radius:8px;width:95vw;max-width:700px;padding:20px;display:flex;flex-direction:column;gap:14px}
   </style>
 </head>
 <body>
-
 <nav class="navbar">
   <a href="/" class="navbar-brand">マニュアルシステム</a>
   <div class="navbar-right">
@@ -166,87 +43,43 @@
     <button onclick="logout()" class="btn btn-secondary btn-sm">ログアウト</button>
   </div>
 </nav>
-
-<div class="container" style="max-width: 900px;">
+<div class="container" style="max-width:900px">
   <div class="flex items-center justify-between mb-3">
     <div>
-      <a href="/" class="text-sm" style="color: var(--primary);">← 一覧に戻る</a>
-      <h1 style="font-size: 22px; font-weight: 700; margin-top: 4px;" id="pageTitle">新規マニュアル作成</h1>
+      <a href="/" class="text-sm" style="color:var(--primary)">← 一覧に戻る</a>
+      <h1 style="font-size:22px;font-weight:700;margin-top:4px" id="pageTitle">新規マニュアル作成</h1>
     </div>
   </div>
-
   <div id="alert" class="hidden"></div>
-
   <div id="typeTabs" class="tabs">
-    <div class="tab active" id="tabPdf" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
-    <div class="tab" id="tabSteps" onclick="switchType('steps', this)">📋 ステップで作成</div>
+    <div class="tab active" id="tabPdf" onclick="switchType('pdf',this)">📄 PDFをアップロード</div>
+    <div class="tab" id="tabSteps" onclick="switchType('steps',this)">📋 ステップで作成</div>
   </div>
-
   <form id="manualForm">
-    <div class="card mb-2">
-      <div class="card-body">
-        <div class="form-group">
-          <label class="form-label">タイトル <span class="required">*</span></label>
-          <input type="text" id="title" class="form-control" placeholder="マニュアルのタイトルを入力" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">説明（任意）</label>
-          <input type="text" id="description" class="form-control" placeholder="このマニュアルの概要を入力">
-        </div>
-        <div class="form-group">
-          <label class="form-label">カテゴリ</label>
-          <select id="categorySelect" class="form-control">
-            <option value="">カテゴリなし</option>
-          </select>
-        </div>
+    <div class="card mb-2"><div class="card-body">
+      <div class="form-group"><label class="form-label">タイトル <span class="required">*</span></label><input type="text" id="title" class="form-control" placeholder="マニュアルのタイトルを入力" required></div>
+      <div class="form-group"><label class="form-label">説明（任意）</label><input type="text" id="description" class="form-control" placeholder="このマニュアルの概要を入力"></div>
+      <div class="form-group"><label class="form-label">カテゴリ</label><select id="categorySelect" class="form-control"><option value="">カテゴリなし</option></select></div>
+    </div></div>
+    <div id="textSection" class="card mb-2"><div class="card-header"><span class="card-title">本文</span></div><div class="card-body" style="padding:0"><div id="editor"></div></div></div>
+    <div id="pdfSection" class="card mb-2 hidden"><div class="card-header"><span class="card-title">PDFファイル</span></div><div class="card-body">
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdfFile').click()">
+        <div class="upload-area-icon">📄</div><div class="upload-area-text">クリックしてPDFを選択</div>
+        <div class="upload-area-hint">またはここにファイルをドラッグ＆ドロップ</div>
+        <div id="fileNameDisplay" class="mt-1" style="font-weight:500;color:var(--success)"></div>
       </div>
-    </div>
-
-    <div id="textSection" class="card mb-2">
-      <div class="card-header"><span class="card-title">本文</span></div>
-      <div class="card-body" style="padding: 0;">
-        <div id="editor"></div>
-      </div>
-    </div>
-
-    <div id="pdfSection" class="card mb-2 hidden">
-      <div class="card-header"><span class="card-title">PDFファイル</span></div>
-      <div class="card-body">
-        <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdfFile').click()">
-          <div class="upload-area-icon">📄</div>
-          <div class="upload-area-text">クリックしてPDFを選択</div>
-          <div class="upload-area-hint">またはここにファイルをドラッグ＆ドロップ</div>
-          <div id="fileNameDisplay" class="mt-1" style="font-weight: 500; color: var(--success);"></div>
-        </div>
-        <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
-        <p class="text-sm text-muted mt-1">最大100MBのPDFファイル</p>
-        <div id="replacePdfOption" class="hidden mt-2">
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="replacePdfCheck" onchange="toggleReplaceMode(this.checked)">
-            <span>PDFファイルを差し替える</span>
-          </label>
-        </div>
-      </div>
-    </div>
-
+      <input type="file" id="pdfFile" accept=".pdf" style="display:none">
+      <p class="text-sm text-muted mt-1">最大100MBのPDFファイル</p>
+      <div id="replacePdfOption" class="hidden mt-2"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="replacePdfCheck" onchange="toggleReplaceMode(this.checked)"><span>PDFファイルを差し替える</span></label></div>
+    </div></div>
     <div id="stepsSection" class="hidden">
-      <div class="card mb-2">
-        <div class="card-header"><span class="card-title">カバー画像（任意）</span></div>
-        <div class="card-body">
-          <div class="step-media-drop" id="coverImageDrop" onclick="document.getElementById('coverImageInput').click()">
-            <div style="color:var(--text-muted); font-size:14px;">🖼 クリックして画像を選択（任意）</div>
-          </div>
-          <input type="file" id="coverImageInput" accept="image/*" style="display:none;" onchange="uploadCoverImage(this)">
-        </div>
-      </div>
-
+      <div class="card mb-2"><div class="card-header"><span class="card-title">カバー画像（任意）</span></div><div class="card-body">
+        <div class="step-media-drop" id="coverImageDrop" onclick="document.getElementById('coverImageInput').click()"><div style="color:var(--text-muted);font-size:14px">🖼 クリックして画像を選択（任意）</div></div>
+        <input type="file" id="coverImageInput" accept="image/*" style="display:none" onchange="uploadCoverImage(this)">
+      </div></div>
       <div id="stepsList"></div>
-
-      <div class="mb-2">
-        <button type="button" onclick="addStep()" class="btn btn-secondary w-full" style="font-size:15px; padding:12px;">＋ ステップを追加</button>
-      </div>
+      <div class="mb-2"><button type="button" onclick="addStep()" class="btn btn-secondary w-full" style="font-size:15px;padding:12px">＋ ステップを追加</button></div>
     </div>
-
     <div class="flex gap-2">
       <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">保存する</button>
       <a href="/" class="btn btn-secondary btn-lg">キャンセル</a>
@@ -254,34 +87,32 @@
   </form>
 </div>
 
-<!-- ===== Image Annotation Modal ===== -->
+<!-- Image Annotation Modal -->
 <div id="annotationModal">
   <div class="annot-panel">
     <div class="annot-toolbar">
-      <strong style="margin-right:4px;">✏️ 画像に書き込む</strong>
+      <strong style="margin-right:4px">✏️ 画像に書き込む</strong>
       <button id="annotToolDraw" onclick="setAnnotTool('draw')" class="active">✏️ ペン</button>
       <button id="annotToolText" onclick="setAnnotTool('text')">T テキスト</button>
       <button id="annotToolRect" onclick="setAnnotTool('rect')">□ 四角</button>
       <button id="annotToolArrow" onclick="setAnnotTool('arrow')">→ 矢印</button>
-      <button id="annotToolSelect" onclick="setAnnotTool('select')">▶ 選択/移動</button>
-      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch;"></span>
-      <span style="font-size:12px;">色：</span>
-      <span class="color-dot selected" style="background:#ef4444;" onclick="setAnnotColor('#ef4444', this)"></span>
-      <span class="color-dot" style="background:#f97316;" onclick="setAnnotColor('#f97316', this)"></span>
-      <span class="color-dot" style="background:#eab308;" onclick="setAnnotColor('#eab308', this)"></span>
-      <span class="color-dot" style="background:#22c55e;" onclick="setAnnotColor('#22c55e', this)"></span>
-      <span class="color-dot" style="background:#3b82f6;" onclick="setAnnotColor('#3b82f6', this)"></span>
-      <span class="color-dot" style="background:#000000;" onclick="setAnnotColor('#000000', this)"></span>
-      <span class="color-dot" style="background:#ffffff;border-color:#999;" onclick="setAnnotColor('#ffffff', this)"></span>
-      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch;"></span>
-      <span style="font-size:12px;">太さ：</span>
-      <input type="range" id="brushSize" min="1" max="24" value="4" style="width:70px;" oninput="setAnnotBrushSize(this.value)">
-      <button onclick="undoAnnot()" style="margin-left:4px;">↩ 元に戻す</button>
-      <button onclick="clearAnnot()" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5;">🗑 全消去</button>
+      <button id="annotToolSelect" onclick="setAnnotTool('select')">▶ 選択</button>
+      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch"></span>
+      <span style="font-size:12px">色:</span>
+      <span class="color-dot selected" style="background:#ef4444" onclick="setAnnotColor('#ef4444',this)"></span>
+      <span class="color-dot" style="background:#f97316" onclick="setAnnotColor('#f97316',this)"></span>
+      <span class="color-dot" style="background:#eab308" onclick="setAnnotColor('#eab308',this)"></span>
+      <span class="color-dot" style="background:#22c55e" onclick="setAnnotColor('#22c55e',this)"></span>
+      <span class="color-dot" style="background:#3b82f6" onclick="setAnnotColor('#3b82f6',this)"></span>
+      <span class="color-dot" style="background:#000" onclick="setAnnotColor('#000000',this)"></span>
+      <span class="color-dot" style="background:#fff;border-color:#999" onclick="setAnnotColor('#ffffff',this)"></span>
+      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch"></span>
+      <span style="font-size:12px">太さ:</span>
+      <input type="range" id="brushSize" min="1" max="24" value="4" style="width:70px" oninput="setAnnotBrushSize(this.value)">
+      <button onclick="undoAnnot()">↩ 元に戻す</button>
+      <button onclick="clearAnnot()" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5">🗑 全消去</button>
     </div>
-    <div class="annot-canvas-wrap">
-      <canvas id="annotCanvas"></canvas>
-    </div>
+    <div class="annot-canvas-wrap"><canvas id="annotCanvas"></canvas></div>
     <div class="annot-footer">
       <button onclick="closeAnnotation()" class="btn btn-secondary">キャンセル</button>
       <button onclick="confirmAnnotation()" class="btn btn-primary" id="annotConfirmBtn">✓ 確定して保存</button>
@@ -289,24 +120,81 @@
   </div>
 </div>
 
-<!-- ===== Video Trim Modal ===== -->
+<!-- Video Annotation Modal -->
+<div id="videoAnnotModal">
+  <div class="annot-panel">
+    <!-- Drawing toolbar (shown in draw mode) -->
+    <div id="vanToolbar" class="annot-toolbar" style="display:none">
+      <button onclick="backToVideoPlayer()" style="margin-right:4px">← 戻る</button>
+      <strong style="margin-right:4px">✏️ 書き込み</strong>
+      <button id="vanToolDraw" onclick="setVAnnotTool('draw')" class="active">✏️ ペン</button>
+      <button id="vanToolText" onclick="setVAnnotTool('text')">T テキスト</button>
+      <button id="vanToolRect" onclick="setVAnnotTool('rect')">□ 四角</button>
+      <button id="vanToolArrow" onclick="setVAnnotTool('arrow')">→ 矢印</button>
+      <button id="vanToolSelect" onclick="setVAnnotTool('select')">▶ 選択</button>
+      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch"></span>
+      <span style="font-size:12px">色:</span>
+      <span class="color-dot van-cdot selected" style="background:#ef4444" onclick="setVAnnotColor('#ef4444',this)"></span>
+      <span class="color-dot van-cdot" style="background:#f97316" onclick="setVAnnotColor('#f97316',this)"></span>
+      <span class="color-dot van-cdot" style="background:#eab308" onclick="setVAnnotColor('#eab308',this)"></span>
+      <span class="color-dot van-cdot" style="background:#22c55e" onclick="setVAnnotColor('#22c55e',this)"></span>
+      <span class="color-dot van-cdot" style="background:#3b82f6" onclick="setVAnnotColor('#3b82f6',this)"></span>
+      <span class="color-dot van-cdot" style="background:#000" onclick="setVAnnotColor('#000000',this)"></span>
+      <span style="font-size:12px;margin-left:4px">太さ:</span>
+      <input type="range" id="vanBrushSize" min="1" max="20" value="4" style="width:60px" oninput="setVAnnotBrush(this.value)">
+      <button onclick="undoVAnnot()">↩</button>
+      <button onclick="clearVAnnot()" style="background:#fee2e2;color:#dc2626">🗑 消去</button>
+    </div>
+    <!-- Header for video mode -->
+    <div id="vanHeader" class="annot-toolbar">
+      <strong>🎬 動画にメモを追加</strong>
+      <span style="font-size:12px;color:var(--text-muted)">— 動画を一時停止して写き込みたいフレームで「このフレームに書き込む」を押してください</span>
+    </div>
+    <!-- Video player -->
+    <div id="vanVideoPanel" class="annot-canvas-wrap" style="flex-direction:column;gap:12px">
+      <div style="position:relative;display:inline-block;max-width:100%">
+        <video id="vanVideo" controls playsinline style="display:block;max-width:100%;max-height:40vh;border-radius:6px"></video>
+      </div>
+      <button onclick="captureVideoFrame()" class="btn btn-primary">✏️ このフレームに書き込む</button>
+    </div>
+    <!-- Canvas draw panel -->
+    <div id="vanCanvasPanel" class="annot-canvas-wrap" style="display:none">
+      <div style="text-align:center">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">⏱ <strong id="vanFrameTimeLabel">0.0</strong> 秒のフレーム</div>
+        <canvas id="vanCanvas"></canvas>
+      </div>
+    </div>
+    <!-- Canvas save bar -->
+    <div id="vanSaveBar" style="display:none;padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8f9fa">
+      <span style="font-size:13px">表示時間:</span>
+      <input type="number" id="vanDuration" min="1" max="60" value="3" style="width:55px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:13px"> 秒
+      <button onclick="saveVAnnotFrame()" class="btn btn-primary btn-sm" id="vanSaveBtn">💾 このメモを保存</button>
+    </div>
+    <!-- Saved list -->
+    <div style="padding:10px 14px;border-top:1px solid var(--border);max-height:150px;overflow-y:auto;background:#f8f9fa">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">保存済みメモ</div>
+      <div id="vanAnnotItems"></div>
+    </div>
+    <div class="annot-footer">
+      <button onclick="closeVideoAnnot()" class="btn btn-secondary">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video Trim Modal -->
 <div id="videoTrimModal">
   <div class="trim-panel">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;justify-content:space-between">
       <strong>✂️ 動画をトリミング</strong>
-      <button onclick="closeVideoTrim()" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+      <button onclick="closeVideoTrim()" style="background:none;border:none;font-size:20px;cursor:pointer">×</button>
     </div>
-    <video id="trimVideoEl" controls playsinline style="width:100%;border-radius:6px;max-height:300px;background:#000;"></video>
-    <div>
-      <label style="font-size:13px;font-weight:600;">開始時刻 (秒): <span id="trimStartLabel">0.0</span></label>
-      <input type="range" id="trimStart" min="0" max="100" step="0.1" value="0" style="width:100%;" oninput="onTrimStartChange(this.value)">
-    </div>
-    <div>
-      <label style="font-size:13px;font-weight:600;">終了時刻 (秒): <span id="trimEndLabel">10.0</span></label>
-      <input type="range" id="trimEnd" min="0" max="100" step="0.1" value="100" style="width:100%;" oninput="onTrimEndChange(this.value)">
-    </div>
-    <div id="trimProgress" style="display:none;font-size:13px;color:var(--primary);text-align:center;">録画中... 動画が終了するまでお待ちください</div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <video id="trimVideoEl" controls playsinline style="width:100%;border-radius:6px;max-height:300px;background:#000"></video>
+    <div><label style="font-size:13px;font-weight:600">開始時刻(秒): <span id="trimStartLabel">0.0</span></label>
+    <input type="range" id="trimStart" min="0" max="100" step="0.1" value="0" style="width:100%" oninput="onTrimStartChange(this.value)"></div>
+    <div><label style="font-size:13px;font-weight:600">終了時刻(秒): <span id="trimEndLabel">10.0</span></label>
+    <input type="range" id="trimEnd" min="0" max="100" step="0.1" value="100" style="width:100%" oninput="onTrimEndChange(this.value)"></div>
+    <div id="trimProgress" style="display:none;font-size:13px;color:var(--primary);text-align:center">録画中... 動画が終了するまでお待ちください</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="closeVideoTrim()" class="btn btn-secondary">キャンセル</button>
       <button onclick="startVideoTrim()" class="btn btn-primary" id="trimConfirmBtn">✂️ トリミングして保存</button>
     </div>
@@ -316,756 +204,477 @@
 <script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
 <script src="/js/common.js"></script>
 <script>
-let currentUser = null;
-let editId = null;
-let currentType = 'pdf';
-let editManual = null;
-let quill = null;
-let coverImageName = null;
-let steps = [];
-let stepCounter = 0;
+let currentUser=null,editId=null,currentType='pdf',editManual=null,quill=null;
+let coverImageName=null,steps=[],stepCounter=0;
 
-async function init() {
-  currentUser = await loadCurrentUser();
-  if (!currentUser) return;
+async function init(){
+  currentUser=await loadCurrentUser();
+  if(!currentUser)return;
   initNavbar(currentUser);
-
-  quill = new Quill('#editor', {
-    theme: 'snow',
-    modules: {
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ color: [] }, { background: [] }],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        [{ indent: '-1' }, { indent: '+1' }],
-        ['blockquote', 'code-block'],
-        ['link', 'image'],
-        ['clean']
-      ]
-    },
-    placeholder: 'マニュアルの本文を入力してください...'
-  });
-
+  quill=new Quill('#editor',{theme:'snow',modules:{toolbar:[[{header:[1,2,3,false]}],['bold','italic','underline','strike'],[{color:[]},{background:[]}],[{list:'ordered'},{list:'bullet'}],[{indent:'-1'},{indent:'+1'}],['blockquote','code-block'],['link','image'],['clean']]},placeholder:'マニュアルの本文を入力してください...'});
   await loadCategories();
-
-  const params = new URLSearchParams(window.location.search);
-  editId = params.get('id');
-  if (editId) await loadEditData();
-
-  document.getElementById('pdfFile').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) document.getElementById('fileNameDisplay').textContent = `選択: ${file.name}`;
-  });
-
-  const area = document.getElementById('uploadArea');
-  area.addEventListener('dragover', (e) => { e.preventDefault(); area.classList.add('dragover'); });
-  area.addEventListener('dragleave', () => area.classList.remove('dragover'));
-  area.addEventListener('drop', (e) => {
-    e.preventDefault();
-    area.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') {
-      document.getElementById('pdfFile').files = e.dataTransfer.files;
-      document.getElementById('fileNameDisplay').textContent = `選択: ${file.name}`;
-    } else {
-      showAlert('alert', 'PDFファイルのみ対応しています', 'error');
-    }
-  });
-
-  document.getElementById('manualForm').addEventListener('submit', handleSubmit);
+  const p=new URLSearchParams(window.location.search);
+  editId=p.get('id');
+  if(editId)await loadEditData();
+  document.getElementById('pdfFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)document.getElementById('fileNameDisplay').textContent=`選択: ${f.name}`;});
+  const area=document.getElementById('uploadArea');
+  area.addEventListener('dragover',e=>{e.preventDefault();area.classList.add('dragover');});
+  area.addEventListener('dragleave',()=>area.classList.remove('dragover'));
+  area.addEventListener('drop',e=>{e.preventDefault();area.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf'){document.getElementById('pdfFile').files=e.dataTransfer.files;document.getElementById('fileNameDisplay').textContent=`選択: ${f.name}`;}else showAlert('alert','PDFファイルのみ対応しています','error');});
+  document.getElementById('manualForm').addEventListener('submit',handleSubmit);
 }
 
-async function loadCategories() {
-  const res = await fetch('/api/categories');
-  const cats = await res.json();
-  const select = document.getElementById('categorySelect');
-  select.innerHTML = '<option value="">カテゴリなし</option>';
-  function addOpts(parentId, depth) {
-    cats.filter(c => parentId === null ? !c.parent_id : c.parent_id == parentId).forEach(c => {
-      const prefix = '　'.repeat(depth);
-      const label = depth > 0 ? prefix + '└ ' + c.name : c.name;
-      select.innerHTML += `<option value="${c.id}">${label}</option>`;
-      addOpts(c.id, depth + 1);
-    });
-  }
-  addOpts(null, 0);
+async function loadCategories(){
+  const res=await fetch('/api/categories');const cats=await res.json();
+  const sel=document.getElementById('categorySelect');
+  sel.innerHTML='<option value="">カテゴリなし</option>';
+  function addOpts(pid,d){cats.filter(c=>pid===null?!c.parent_id:c.parent_id==pid).forEach(c=>{const pre='　'.repeat(d);sel.innerHTML+=`<option value="${c.id}">${d>0?pre+'└ '+c.name:c.name}</option>`;addOpts(c.id,d+1);});}
+  addOpts(null,0);
 }
 
-async function loadEditData() {
-  const res = await fetch(`/api/manuals/${editId}`);
-  if (!res.ok) { window.location.href = '/'; return; }
-
-  editManual = await res.json();
-  document.getElementById('pageTitle').textContent = 'マニュアルを編集';
-  document.getElementById('submitBtn').textContent = '更新する';
-  document.getElementById('title').value = editManual.title;
-  document.getElementById('description').value = editManual.description || '';
-  document.getElementById('categorySelect').value = editManual.category_id || '';
-
-  if (editManual.type === 'pdf') {
-    document.getElementById('tabPdf').textContent = '📄 PDFのまま編集';
-    document.getElementById('tabSteps').textContent = '📋 ステップに変換';
+async function loadEditData(){
+  const res=await fetch(`/api/manuals/${editId}`);
+  if(!res.ok){window.location.href='/';return;}
+  editManual=await res.json();
+  document.getElementById('pageTitle').textContent='マニュアルを編集';
+  document.getElementById('submitBtn').textContent='更新する';
+  document.getElementById('title').value=editManual.title;
+  document.getElementById('description').value=editManual.description||'';
+  document.getElementById('categorySelect').value=editManual.category_id||'';
+  if(editManual.type==='pdf'){
+    document.getElementById('tabPdf').textContent='📄 PDFのまま編集';
+    document.getElementById('tabSteps').textContent='📋 ステップに変換';
     switchType('pdf');
-    document.getElementById('uploadArea').innerHTML = `
-      <div class="upload-area-icon">📄</div>
-      <div class="upload-area-text" style="color: var(--text);">${editManual.file_name}</div>
-      <div class="upload-area-hint">${formatFileSize(editManual.file_size)}</div>
-    `;
+    document.getElementById('uploadArea').innerHTML=`<div class="upload-area-icon">📄</div><div class="upload-area-text" style="color:var(--text)">${editManual.file_name}</div><div class="upload-area-hint">${formatFileSize(editManual.file_size)}</div>`;
     document.getElementById('replacePdfOption').classList.remove('hidden');
-  } else if (editManual.type === 'steps') {
+  }else if(editManual.type==='steps'){
     document.getElementById('typeTabs').classList.add('hidden');
     switchType('steps');
-    let stepsData = {};
-    try { stepsData = JSON.parse(editManual.content || '{}'); } catch(e) {}
-    coverImageName = stepsData.cover_image || null;
-    if (coverImageName) {
-      const drop = document.getElementById('coverImageDrop');
-      drop.innerHTML = `<img src="/uploads/${coverImageName}" style="max-width:100%; max-height:200px; border-radius:4px;">`;
+    let sd={};try{sd=JSON.parse(editManual.content||'{}');}catch(e){}
+    coverImageName=sd.cover_image||null;
+    if(coverImageName){document.getElementById('coverImageDrop').innerHTML=`<img src="/uploads/${coverImageName}" style="max-width:100%;max-height:200px;border-radius:4px">`;
     }
-    steps = (stepsData.steps || []).map(s => ({
-      id: ++stepCounter,
-      title: s.title || '',
-      imageName: s.image || null,
-      imageType: s.image_type || 'image',
-      description: s.description || ''
-    }));
+    steps=(sd.steps||[]).map(s=>({id:++stepCounter,title:s.title||'',imageName:s.image||null,imageType:s.image_type||'image',description:s.description||'',videoAnnotations:s.video_annotations||[]}));
     renderSteps();
-  } else {
+  }else{
     document.getElementById('typeTabs').classList.add('hidden');
     switchType('rich_text');
-    quill.root.innerHTML = editManual.content || '';
+    quill.root.innerHTML=editManual.content||'';
   }
 }
 
-function switchType(type, tabEl) {
-  currentType = type;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  if (tabEl) tabEl.classList.add('active');
-  if (!tabEl) {
-    if (type === 'pdf') document.getElementById('tabPdf').classList.add('active');
-    if (type === 'steps') document.getElementById('tabSteps').classList.add('active');
-  }
-  document.getElementById('textSection').classList.toggle('hidden', type !== 'rich_text');
-  document.getElementById('pdfSection').classList.toggle('hidden', type !== 'pdf');
-  document.getElementById('stepsSection').classList.toggle('hidden', type !== 'steps');
+function switchType(type,tabEl){
+  currentType=type;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  if(tabEl)tabEl.classList.add('active');
+  if(!tabEl){if(type==='pdf')document.getElementById('tabPdf').classList.add('active');if(type==='steps')document.getElementById('tabSteps').classList.add('active');}
+  document.getElementById('textSection').classList.toggle('hidden',type!=='rich_text');
+  document.getElementById('pdfSection').classList.toggle('hidden',type!=='pdf');
+  document.getElementById('stepsSection').classList.toggle('hidden',type!=='steps');
 }
-
-function toggleReplaceMode(checked) {
-  const area = document.getElementById('uploadArea');
-  if (checked) {
-    area.onclick = () => document.getElementById('pdfFile').click();
-    area.style.cursor = 'pointer';
-  } else {
-    area.onclick = null;
-    area.style.cursor = 'default';
-  }
+function toggleReplaceMode(checked){
+  const area=document.getElementById('uploadArea');
+  area.onclick=checked?()=>document.getElementById('pdfFile').click():null;
+  area.style.cursor=checked?'pointer':'default';
 }
+function formatCmd(cmd){document.execCommand(cmd,false,null);}
+function setForeColor(color){document.execCommand('foreColor',false,color);}
+function clearFmt(){document.execCommand('removeFormat',false,null);document.execCommand('unlink',false,null);}
 
-// ---- 書式設定 ----
-function formatCmd(cmd) { document.execCommand(cmd, false, null); }
-function setForeColor(color) { document.execCommand('foreColor', false, color); }
-function clearFmt() {
-  document.execCommand('removeFormat', false, null);
-  document.execCommand('unlink', false, null);
-}
-
-// ---- ステップ管理 ----
-
-function addStep() {
-  steps.push({ id: ++stepCounter, title: '', imageName: null, imageType: 'image', description: '' });
+// ---- Steps ----
+function addStep(){
+  steps.push({id:++stepCounter,title:'',imageName:null,imageType:'image',description:'',videoAnnotations:[]});
   renderSteps();
-  setTimeout(() => {
-    const cards = document.querySelectorAll('.step-card');
-    if (cards.length > 0) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 50);
+  setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);
+}
+function removeStep(id){steps=steps.filter(s=>s.id!==id);renderSteps();}
+function updateStepField(id,field,value){const s=steps.find(s=>s.id===id);if(s)s[field]=value;}
+
+async function uploadCoverImage(input){
+  const file=input.files[0];if(!file)return;
+  const form=new FormData();form.append('image',file);
+  const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
+  if(!res.ok){alert('画像のアップロードに失敗しました');return;}
+  const data=await res.json();coverImageName=data.filename;
+  document.getElementById('coverImageDrop').innerHTML=`<img src="/uploads/${data.filename}" style="max-width:100%;max-height:200px;border-radius:4px">`;
 }
 
-function removeStep(id) {
-  steps = steps.filter(s => s.id !== id);
-  renderSteps();
+async function uploadStepMedia(id,input){
+  const file=input.files[0];if(!file)return;
+  const drop=document.getElementById(`stepMediaDrop_${id}`);
+  drop.innerHTML=`<div style="color:var(--text-muted);font-size:13px">アップロード中...</div>`;
+  const form=new FormData();form.append('image',file);
+  const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
+  if(!res.ok){alert('アップロードに失敗しました');return;}
+  const data=await res.json();
+  const step=steps.find(s=>s.id===id);
+  if(step){step.imageName=data.filename;step.imageType=data.type;}
+  refreshStepMediaDrop(id,step);
 }
 
-function updateStepField(id, field, value) {
-  const step = steps.find(s => s.id === id);
-  if (step) step[field] = value;
-}
-
-async function uploadCoverImage(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const form = new FormData();
-  form.append('image', file);
-  const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
-  if (!res.ok) { alert('画像のアップロードに失敗しました'); return; }
-  const data = await res.json();
-  coverImageName = data.filename;
-  const drop = document.getElementById('coverImageDrop');
-  drop.innerHTML = `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:200px; border-radius:4px;">`;
-}
-
-async function uploadStepMedia(id, input) {
-  const file = input.files[0];
-  if (!file) return;
-  const drop = document.getElementById(`stepMediaDrop_${id}`);
-  drop.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">アップロード中...</div>`;
-  const form = new FormData();
-  form.append('image', file);
-  const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
-  if (!res.ok) { alert('アップロードに失敗しました'); return; }
-  const data = await res.json();
-  const step = steps.find(s => s.id === id);
-  if (step) { step.imageName = data.filename; step.imageType = data.type; }
-  refreshStepMediaDrop(id, step);
-}
-
-function refreshStepMediaDrop(id, step) {
-  const drop = document.getElementById(`stepMediaDrop_${id}`);
-  if (!drop || !step) return;
-  if (!step.imageName) {
-    drop.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">📷🎬 クリックして画像または動画を追加（任意）</div>`;
-  } else if (step.imageType === 'video') {
-    drop.innerHTML = `<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%; max-height:300px; border-radius:4px;"></video>`;
-  } else {
-    drop.innerHTML = `<img src="/uploads/${step.imageName}" style="max-width:100%; max-height:300px; border-radius:4px;">`;
+function refreshStepMediaDrop(id,step){
+  const drop=document.getElementById(`stepMediaDrop_${id}`);if(!drop||!step)return;
+  if(!step.imageName){drop.innerHTML=`<div style="color:var(--text-muted);font-size:13px">📷🎬 クリックして画像または動画を追加（任意）</div>`;}
+  else if(step.imageType==='video'){drop.innerHTML=`<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%;max-height:300px;border-radius:4px"></video>`;}
+  else{drop.innerHTML=`<img src="/uploads/${step.imageName}" style="max-width:100%;max-height:300px;border-radius:4px">`;
   }
-  // refresh action buttons
-  const btns = document.getElementById(`stepMediaBtns_${id}`);
-  if (btns) btns.innerHTML = buildMediaBtns(step);
+  const btns=document.getElementById(`stepMediaBtns_${id}`);
+  if(btns)btns.innerHTML=buildMediaBtns(step);
 }
 
-function buildMediaBtns(step) {
-  if (!step.imageName) return '';
-  let html = `<button type="button" onclick="clearStepMedia(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px;">✕ 削除</button>`;
-  if (step.imageType !== 'video') {
-    html += ` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px;">✏️ 画像に書き込む</button>`;
-  } else {
-    html += ` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px;">✂️ 動画をトリミング</button>`;
+function buildMediaBtns(step){
+  if(!step.imageName)return'';
+  let h=`<button type="button" onclick="clearStepMedia(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✕ 削除</button>`;
+  if(step.imageType!=='video'){
+    h+=` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 画像に書き込む</button>`;
+  }else{
+    h+=` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✂️ トリミング</button>`;
+    h+=` <button type="button" onclick="openVideoAnnot(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 動画にメモ</button>`;
   }
-  return html;
+  return h;
 }
 
-function clearStepMedia(id) {
-  const step = steps.find(s => s.id === id);
-  if (!step) return;
-  step.imageName = null;
-  step.imageType = 'image';
-  refreshStepMediaDrop(id, step);
+function clearStepMedia(id){
+  const step=steps.find(s=>s.id===id);if(!step)return;
+  step.imageName=null;step.imageType='image';step.videoAnnotations=[];
+  refreshStepMediaDrop(id,step);
 }
 
-function renderSteps() {
-  const container = document.getElementById('stepsList');
-  container.innerHTML = steps.map((step, i) => `
+function renderSteps(){
+  const c=document.getElementById('stepsList');
+  c.innerHTML=steps.map((step,i)=>`
     <div class="card mb-2 step-card" data-step-id="${step.id}">
-      <div class="card-header" style="background:#f8f9fa; flex-wrap:wrap; gap:8px;">
-        <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
-          <span style="background:var(--primary);color:white;border-radius:4px;padding:3px 10px;font-weight:700;white-space:nowrap;font-size:13px;">STEP ${i + 1}</span>
-          <input type="text" class="form-control" placeholder="ステップのタイトル（任意）"
-            value="${escAttr(step.title)}"
-            oninput="updateStepField(${step.id}, 'title', this.value)"
-            style="flex:1;">
+      <div class="card-header" style="background:#f8f9fa;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          <span style="background:var(--primary);color:white;border-radius:4px;padding:3px 10px;font-weight:700;white-space:nowrap;font-size:13px">STEP ${i+1}</span>
+          <input type="text" class="form-control" placeholder="ステップのタイトル（任意）" value="${escAttr(step.title)}" oninput="updateStepField(${step.id},'title',this.value)" style="flex:1">
         </div>
         <button type="button" onclick="removeStep(${step.id})" class="btn btn-danger btn-sm">削除</button>
       </div>
       <div class="card-body">
-        <div class="step-media-drop" id="stepMediaDrop_${step.id}"
-          onclick="document.getElementById('stepMediaInput_${step.id}').click()">
-          ${step.imageName
-            ? (step.imageType === 'video'
-                ? `<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%; max-height:300px; border-radius:4px;"></video>`
-                : `<img src="/uploads/${step.imageName}" style="max-width:100%; max-height:300px; border-radius:4px;">`)
-            : `<div style="color:var(--text-muted);font-size:13px;">📷🎬 クリックして画像または動画を追加（任意）</div>`}
+        <div class="step-media-drop" id="stepMediaDrop_${step.id}" onclick="document.getElementById('stepMediaInput_${step.id}').click()">
+          ${step.imageName?(step.imageType==='video'?`<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%;max-height:300px;border-radius:4px"></video>`:`<img src="/uploads/${step.imageName}" style="max-width:100%;max-height:300px;border-radius:4px">`):"<div style='color:var(--text-muted);font-size:13px'>📷🎬 クリックして画像または動画を追加（任意）</div>"}
         </div>
-        <input type="file" id="stepMediaInput_${step.id}" accept="image/*,video/*" style="display:none;"
-          onchange="uploadStepMedia(${step.id}, this)">
-        <div id="stepMediaBtns_${step.id}" style="text-align:right; margin-bottom:6px; min-height:28px;">${buildMediaBtns(step)}</div>
-        <div class="text-sm text-muted mb-1" style="font-size:12px;">画像: JPG/PNG など ／ 動画: MP4/MOV など（最大200MB）</div>
+        <input type="file" id="stepMediaInput_${step.id}" accept="image/*,video/*" style="display:none" onchange="uploadStepMedia(${step.id},this)">
+        <div id="stepMediaBtns_${step.id}" style="text-align:right;margin-bottom:6px;min-height:28px">${buildMediaBtns(step)}</div>
+        <div class="text-sm text-muted mb-1" style="font-size:12px">画像: JPG/PNG など / 動画: MP4/MOV など（最大200MB）</div>
         <div class="fmt-toolbar">
           <button type="button" onmousedown="event.preventDefault();formatCmd('bold')" title="太字"><b>B</b></button>
           <button type="button" onmousedown="event.preventDefault();formatCmd('italic')" title="斜体"><i>I</i></button>
           <button type="button" onmousedown="event.preventDefault();formatCmd('underline')" title="下線"><u>U</u></button>
           <button type="button" onmousedown="event.preventDefault();formatCmd('strikeThrough')" title="取り消し線"><s>S</s></button>
           <div class="sep"></div>
-          <button type="button" onmousedown="event.preventDefault();setForeColor('#ef4444')" style="color:#ef4444;font-weight:700;" title="赤">A</button>
-          <button type="button" onmousedown="event.preventDefault();setForeColor('#f97316')" style="color:#f97316;font-weight:700;" title="オレンジ">A</button>
-          <button type="button" onmousedown="event.preventDefault();setForeColor('#ca8a04')" style="color:#ca8a04;font-weight:700;" title="黄">A</button>
-          <button type="button" onmousedown="event.preventDefault();setForeColor('#16a34a')" style="color:#16a34a;font-weight:700;" title="緑">A</button>
-          <button type="button" onmousedown="event.preventDefault();setForeColor('#2563eb')" style="color:#2563eb;font-weight:700;" title="青">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#ef4444')" style="color:#ef4444;font-weight:700">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#f97316')" style="color:#f97316;font-weight:700">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#ca8a04')" style="color:#ca8a04;font-weight:700">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#16a34a')" style="color:#16a34a;font-weight:700">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#2563eb')" style="color:#2563eb;font-weight:700">A</button>
           <div class="sep"></div>
-          <button type="button" onmousedown="event.preventDefault();formatCmd('insertUnorderedList')" title="箇条書き">• リスト</button>
-          <button type="button" onmousedown="event.preventDefault();clearFmt()" title="書式クリア" style="color:var(--text-muted);">✕ 書式クリア</button>
+          <button type="button" onmousedown="event.preventDefault();formatCmd('insertUnorderedList')">• リスト</button>
+          <button type="button" onmousedown="event.preventDefault();clearFmt()" style="color:var(--text-muted)">✕ 書式クリア</button>
         </div>
-        <div class="step-desc-editor"
-          id="stepDesc_${step.id}"
-          contenteditable="true"
-          data-placeholder="このステップの説明（任意）"
-          oninput="updateStepField(${step.id}, 'description', this.innerHTML)"></div>
+        <div class="step-desc-editor" id="stepDesc_${step.id}" contenteditable="true" data-placeholder="このステップの説明（任意）" oninput="updateStepField(${step.id},'description',this.innerHTML)"></div>
       </div>
-    </div>
-  `).join('');
-
-  steps.forEach(step => {
-    const el = document.getElementById(`stepDesc_${step.id}`);
-    if (el && step.description) el.innerHTML = step.description;
-  });
+    </div>`).join('');
+  steps.forEach(step=>{const el=document.getElementById(`stepDesc_${step.id}`);if(el&&step.description)el.innerHTML=step.description;});
 }
 
-function escHtml(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-function escAttr(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 
 // ============================================================
-// Image Annotation
+// Image Annotation (Fabric.js)
 // ============================================================
-let annotFabric = null;
-let annotStepId = null;
-let annotTool = 'draw';
-let annotColor = '#ef4444';
+let annotFabric=null,annotStepId=null,annotTool='draw',annotColor='#ef4444';
 
-function openAnnotation(stepId) {
-  const step = steps.find(s => s.id === stepId);
-  if (!step || !step.imageName || step.imageType === 'video') {
-    alert('画像を先にアップロードしてください');
-    return;
-  }
-  annotStepId = stepId;
-  const modal = document.getElementById('annotationModal');
-  modal.style.display = 'flex';
-
-  const imgObj = new Image();
-  imgObj.crossOrigin = 'anonymous';
-  imgObj.onload = () => {
-    const maxW = Math.min(window.innerWidth * 0.85, 840);
-    const maxH = Math.floor(window.innerHeight * 0.55);
-    let w = imgObj.naturalWidth, h = imgObj.naturalHeight;
-    const scale = Math.min(maxW / w, maxH / h, 1);
-    w = Math.round(w * scale);
-    h = Math.round(h * scale);
-
-    const canvasEl = document.getElementById('annotCanvas');
-    // Fabric.js manages the canvas element itself
-    if (annotFabric) { annotFabric.dispose(); annotFabric = null; }
-    // Reset canvas size via parent element
-    canvasEl.style.width = w + 'px';
-    canvasEl.style.height = h + 'px';
-
-    annotFabric = new fabric.Canvas('annotCanvas', { width: w, height: h });
-    fabric.Image.fromURL(imgObj.src, (fImg) => {
-      fImg.scaleToWidth(w);
-      fImg.scaleToHeight(h);
-      fImg.set({ selectable: false, evented: false });
-      annotFabric.setBackgroundImage(fImg, annotFabric.renderAll.bind(annotFabric));
-    }, { crossOrigin: 'anonymous' });
-
+function openAnnotation(stepId){
+  const step=steps.find(s=>s.id===stepId);
+  if(!step||!step.imageName||step.imageType==='video'){alert('画像を先にアップロードしてください');return;}
+  annotStepId=stepId;
+  document.getElementById('annotationModal').style.display='flex';
+  const imgObj=new Image();imgObj.crossOrigin='anonymous';
+  imgObj.onload=()=>{
+    const maxW=Math.min(window.innerWidth*.85,840),maxH=Math.floor(window.innerHeight*.55);
+    let w=imgObj.naturalWidth,h=imgObj.naturalHeight;
+    const sc=Math.min(maxW/w,maxH/h,1);w=Math.round(w*sc);h=Math.round(h*sc);
+    if(annotFabric){annotFabric.dispose();annotFabric=null;}
+    annotFabric=new fabric.Canvas('annotCanvas',{width:w,height:h});
+    fabric.Image.fromURL(imgObj.src,(fImg)=>{fImg.scaleToWidth(w);fImg.scaleToHeight(h);fImg.set({selectable:false,evented:false});annotFabric.setBackgroundImage(fImg,annotFabric.renderAll.bind(annotFabric))},{crossOrigin:'anonymous'});
     setAnnotTool('draw');
   };
-  imgObj.src = `/uploads/${step.imageName}?t=${Date.now()}`;
+  imgObj.src=`/uploads/${step.imageName}?t=${Date.now()}`;
+}
+function closeAnnotation(){document.getElementById('annotationModal').style.display='none';if(annotFabric){annotFabric.dispose();annotFabric=null;}annotStepId=null;}
+async function confirmAnnotation(){
+  if(!annotFabric)return;
+  const btn=document.getElementById('annotConfirmBtn');btn.disabled=true;btn.textContent='保存中...';
+  try{
+    const dataURL=annotFabric.toDataURL({format:'png',quality:1,multiplier:1});
+    const blob=await(await fetch(dataURL)).blob();
+    const form=new FormData();form.append('image',blob,`annotated_${Date.now()}.png`);
+    const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
+    if(!res.ok){alert('保存に失敗しました');return;}
+    const data=await res.json();
+    const step=steps.find(s=>s.id===annotStepId);
+    if(step){step.imageName=data.filename;step.imageType='image';}
+    refreshStepMediaDrop(annotStepId,step);closeAnnotation();
+  }finally{btn.disabled=false;btn.textContent='✓ 確定して保存';}
+}
+function setAnnotTool(tool){
+  annotTool=tool;
+  document.querySelectorAll('#annotationModal button[id^="annotTool"]').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('annotTool'+tool.charAt(0).toUpperCase()+tool.slice(1));
+  if(btn)btn.classList.add('active');
+  if(!annotFabric)return;
+  annotFabric.isDrawingMode=false;annotFabric.selection=false;
+  annotFabric.off('mouse:down');annotFabric.off('mouse:move');annotFabric.off('mouse:up');
+  annotFabric.getObjects().forEach(o=>{if(o.selectable!==false)o.selectable=(tool==='select');});
+  if(tool==='select'){annotFabric.selection=true;annotFabric.getObjects().forEach(o=>o.selectable=true);}
+  else if(tool==='draw'){annotFabric.isDrawingMode=true;annotFabric.freeDrawingBrush.color=annotColor;annotFabric.freeDrawingBrush.width=parseInt(document.getElementById('brushSize').value);}
+  else if(tool==='text'){annotFabric.on('mouse:down',opt=>{if(opt.target)return;const p=annotFabric.getPointer(opt.e);const txt=new fabric.IText('テキスト',{left:p.x,top:p.y,fontSize:22,fill:annotColor,fontWeight:'bold',editable:true,selectable:true});annotFabric.add(txt);annotFabric.setActiveObject(txt);txt.enterEditing();txt.selectAll();});}
+  else if(tool==='rect'){let sx,sy,rect,dr=false;annotFabric.on('mouse:down',opt=>{if(opt.target)return;const p=annotFabric.getPointer(opt.e);sx=p.x;sy=p.y;dr=true;rect=new fabric.Rect({left:sx,top:sy,width:1,height:1,fill:'transparent',stroke:annotColor,strokeWidth:3,selectable:true});annotFabric.add(rect);});annotFabric.on('mouse:move',opt=>{if(!dr)return;const p=annotFabric.getPointer(opt.e);rect.set({width:Math.abs(p.x-sx),height:Math.abs(p.y-sy),left:Math.min(p.x,sx),top:Math.min(p.y,sy)});annotFabric.renderAll();});annotFabric.on('mouse:up',()=>dr=false);}
+  else if(tool==='arrow'){let sx,sy,ln,hd,dr=false;annotFabric.on('mouse:down',opt=>{if(opt.target)return;const p=annotFabric.getPointer(opt.e);sx=p.x;sy=p.y;dr=true;ln=new fabric.Line([sx,sy,sx,sy],{stroke:annotColor,strokeWidth:3,selectable:false,evented:false});hd=new fabric.Triangle({width:16,height:16,fill:annotColor,left:sx,top:sy,angle:90,selectable:false,evented:false});annotFabric.add(ln);annotFabric.add(hd);});annotFabric.on('mouse:move',opt=>{if(!dr)return;const p=annotFabric.getPointer(opt.e);ln.set({x2:p.x,y2:p.y});hd.set({left:p.x,top:p.y,angle:Math.atan2(p.y-sy,p.x-sx)*180/Math.PI+90});annotFabric.renderAll();});annotFabric.on('mouse:up',()=>dr=false);}
+}
+function setAnnotColor(color,dotEl){annotColor=color;document.querySelectorAll('#annotationModal .color-dot').forEach(d=>d.classList.remove('selected'));if(dotEl)dotEl.classList.add('selected');if(annotFabric){if(annotFabric.isDrawingMode)annotFabric.freeDrawingBrush.color=color;const a=annotFabric.getActiveObject();if(a){if(a.type==='i-text'||a.type==='text')a.set('fill',color);else{a.set('stroke',color);if(a.fill!=='transparent')a.set('fill',color);}annotFabric.renderAll();}}}
+function setAnnotBrushSize(s){if(annotFabric&&annotFabric.freeDrawingBrush)annotFabric.freeDrawingBrush.width=parseInt(s);}
+function undoAnnot(){if(!annotFabric)return;const o=annotFabric.getObjects();if(o.length)annotFabric.remove(o[o.length-1]);annotFabric.renderAll();}
+function clearAnnot(){if(!annotFabric)return;annotFabric.getObjects().slice().forEach(o=>annotFabric.remove(o));annotFabric.renderAll();}
+
+// ============================================================
+// Video Annotation
+// ============================================================
+let vanStepId=null,vanFabric=null,vanTool='draw',vanColor='#ef4444',vanVideoElRef=null;
+
+function openVideoAnnot(stepId){
+  const step=steps.find(s=>s.id===stepId);
+  if(!step||!step.imageName||step.imageType!=='video'){alert('動画を先にアップロードしてください');return;}
+  vanStepId=stepId;
+  vanVideoElRef=document.getElementById('vanVideo');
+  vanVideoElRef.src=`/uploads/${step.imageName}`;
+  vanVideoElRef.load();
+  // show video panel, hide canvas panel
+  document.getElementById('vanHeader').style.display='flex';
+  document.getElementById('vanToolbar').style.display='none';
+  document.getElementById('vanVideoPanel').style.display='flex';
+  document.getElementById('vanCanvasPanel').style.display='none';
+  document.getElementById('vanSaveBar').style.display='none';
+  document.getElementById('videoAnnotModal').style.display='flex';
+  renderVanList();
 }
 
-function closeAnnotation() {
-  document.getElementById('annotationModal').style.display = 'none';
-  if (annotFabric) { annotFabric.dispose(); annotFabric = null; }
-  annotStepId = null;
+function closeVideoAnnot(){
+  document.getElementById('videoAnnotModal').style.display='none';
+  if(vanFabric){vanFabric.dispose();vanFabric=null;}
+  if(vanVideoElRef){vanVideoElRef.pause();vanVideoElRef.src='';}
+  vanStepId=null;vanVideoElRef=null;
 }
 
-async function confirmAnnotation() {
-  if (!annotFabric) return;
-  const btn = document.getElementById('annotConfirmBtn');
-  btn.disabled = true;
-  btn.textContent = '保存中...';
-  try {
-    const dataURL = annotFabric.toDataURL({ format: 'png', quality: 1, multiplier: 1 });
-    const blob = await (await fetch(dataURL)).blob();
-    const form = new FormData();
-    form.append('image', blob, `annotated_${Date.now()}.png`);
-    const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
-    if (!res.ok) { alert('保存に失敗しました'); return; }
-    const data = await res.json();
-    const step = steps.find(s => s.id === annotStepId);
-    if (step) { step.imageName = data.filename; step.imageType = 'image'; }
-    refreshStepMediaDrop(annotStepId, step);
-    closeAnnotation();
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '✓ 確定して保存';
-  }
+function captureVideoFrame(){
+  const video=vanVideoElRef;if(!video)return;
+  video.pause();
+  const t=video.currentTime;
+  document.getElementById('vanFrameTimeLabel').textContent=t.toFixed(1);
+  // Capture frame
+  const vw=video.offsetWidth,vh=video.offsetHeight;
+  const tmp=document.createElement('canvas');tmp.width=vw;tmp.height=vh;
+  tmp.getContext('2d').drawImage(video,0,0,vw,vh);
+  const frameURL=tmp.toDataURL();
+  // Setup Fabric canvas
+  if(vanFabric){vanFabric.dispose();vanFabric=null;}
+  vanFabric=new fabric.Canvas('vanCanvas',{width:vw,height:vh});
+  fabric.Image.fromURL(frameURL,(img)=>{
+    img.scaleToWidth(vw);img.scaleToHeight(vh);
+    img.set({selectable:false,evented:false});
+    vanFabric.setBackgroundImage(img,vanFabric.renderAll.bind(vanFabric));
+  });
+  // Switch panels
+  document.getElementById('vanHeader').style.display='none';
+  document.getElementById('vanToolbar').style.display='flex';
+  document.getElementById('vanVideoPanel').style.display='none';
+  document.getElementById('vanCanvasPanel').style.display='flex';
+  document.getElementById('vanSaveBar').style.display='flex';
+  setVAnnotTool('draw');
 }
 
-function setAnnotTool(tool) {
-  annotTool = tool;
-  // Update active button
-  document.querySelectorAll('.annot-toolbar button[id^="annotTool"]').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById('annotTool' + tool.charAt(0).toUpperCase() + tool.slice(1));
-  if (btn) btn.classList.add('active');
-  if (!annotFabric) return;
-
-  // Clear event listeners
-  annotFabric.isDrawingMode = false;
-  annotFabric.selection = false;
-  annotFabric.off('mouse:down');
-  annotFabric.off('mouse:move');
-  annotFabric.off('mouse:up');
-  annotFabric.getObjects().forEach(o => { if (o.selectable !== false) o.selectable = (tool === 'select'); });
-
-  if (tool === 'select') {
-    annotFabric.selection = true;
-    annotFabric.getObjects().forEach(o => { o.selectable = true; });
-
-  } else if (tool === 'draw') {
-    annotFabric.isDrawingMode = true;
-    annotFabric.freeDrawingBrush.color = annotColor;
-    annotFabric.freeDrawingBrush.width = parseInt(document.getElementById('brushSize').value);
-
-  } else if (tool === 'text') {
-    annotFabric.on('mouse:down', (opt) => {
-      if (opt.target) return;
-      const p = annotFabric.getPointer(opt.e);
-      const txt = new fabric.IText('テキスト', {
-        left: p.x, top: p.y,
-        fontSize: 22, fill: annotColor, fontWeight: 'bold',
-        editable: true, selectable: true
-      });
-      annotFabric.add(txt);
-      annotFabric.setActiveObject(txt);
-      txt.enterEditing();
-      txt.selectAll();
-    });
-
-  } else if (tool === 'rect') {
-    let startX, startY, rect, drawing = false;
-    annotFabric.on('mouse:down', (opt) => {
-      if (opt.target) return;
-      const p = annotFabric.getPointer(opt.e);
-      startX = p.x; startY = p.y; drawing = true;
-      rect = new fabric.Rect({
-        left: startX, top: startY, width: 1, height: 1,
-        fill: 'transparent', stroke: annotColor, strokeWidth: 3, selectable: true
-      });
-      annotFabric.add(rect);
-    });
-    annotFabric.on('mouse:move', (opt) => {
-      if (!drawing) return;
-      const p = annotFabric.getPointer(opt.e);
-      rect.set({
-        width: Math.abs(p.x - startX), height: Math.abs(p.y - startY),
-        left: Math.min(p.x, startX), top: Math.min(p.y, startY)
-      });
-      annotFabric.renderAll();
-    });
-    annotFabric.on('mouse:up', () => { drawing = false; });
-
-  } else if (tool === 'arrow') {
-    let startX, startY, arrowLine, arrowHead, drawing = false;
-    annotFabric.on('mouse:down', (opt) => {
-      if (opt.target) return;
-      const p = annotFabric.getPointer(opt.e);
-      startX = p.x; startY = p.y; drawing = true;
-      arrowLine = new fabric.Line([startX, startY, startX, startY], {
-        stroke: annotColor, strokeWidth: 3, selectable: false, evented: false
-      });
-      arrowHead = new fabric.Triangle({
-        width: 16, height: 16, fill: annotColor,
-        left: startX, top: startY, angle: 90, selectable: false, evented: false
-      });
-      annotFabric.add(arrowLine);
-      annotFabric.add(arrowHead);
-    });
-    annotFabric.on('mouse:move', (opt) => {
-      if (!drawing) return;
-      const p = annotFabric.getPointer(opt.e);
-      arrowLine.set({ x2: p.x, y2: p.y });
-      const angle = Math.atan2(p.y - startY, p.x - startX) * 180 / Math.PI;
-      arrowHead.set({ left: p.x, top: p.y, angle: angle + 90 });
-      annotFabric.renderAll();
-    });
-    annotFabric.on('mouse:up', () => { drawing = false; });
-  }
+function backToVideoPlayer(){
+  if(vanFabric){vanFabric.dispose();vanFabric=null;}
+  document.getElementById('vanHeader').style.display='flex';
+  document.getElementById('vanToolbar').style.display='none';
+  document.getElementById('vanVideoPanel').style.display='flex';
+  document.getElementById('vanCanvasPanel').style.display='none';
+  document.getElementById('vanSaveBar').style.display='none';
 }
 
-function setAnnotColor(color, dotEl) {
-  annotColor = color;
-  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
-  if (dotEl) dotEl.classList.add('selected');
-  if (annotFabric) {
-    if (annotFabric.isDrawingMode) annotFabric.freeDrawingBrush.color = color;
-    const active = annotFabric.getActiveObject();
-    if (active) {
-      if (active.type === 'i-text' || active.type === 'text') active.set('fill', color);
-      else { active.set('stroke', color); if (active.fill !== 'transparent') active.set('fill', color); }
-      annotFabric.renderAll();
-    }
-  }
+function setVAnnotTool(tool){
+  vanTool=tool;
+  document.querySelectorAll('#vanToolbar button[id^="vanTool"]').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('vanTool'+tool.charAt(0).toUpperCase()+tool.slice(1));
+  if(btn)btn.classList.add('active');
+  if(!vanFabric)return;
+  vanFabric.isDrawingMode=false;vanFabric.selection=false;
+  vanFabric.off('mouse:down');vanFabric.off('mouse:move');vanFabric.off('mouse:up');
+  vanFabric.getObjects().forEach(o=>{if(o.selectable!==false)o.selectable=(tool==='select');});
+  if(tool==='select'){vanFabric.selection=true;vanFabric.getObjects().forEach(o=>o.selectable=true);}
+  else if(tool==='draw'){vanFabric.isDrawingMode=true;vanFabric.freeDrawingBrush.color=vanColor;vanFabric.freeDrawingBrush.width=parseInt(document.getElementById('vanBrushSize').value);}
+  else if(tool==='text'){vanFabric.on('mouse:down',opt=>{if(opt.target)return;const p=vanFabric.getPointer(opt.e);const txt=new fabric.IText('テキスト',{left:p.x,top:p.y,fontSize:22,fill:vanColor,fontWeight:'bold',editable:true,selectable:true});vanFabric.add(txt);vanFabric.setActiveObject(txt);txt.enterEditing();txt.selectAll();});}
+  else if(tool==='rect'){let sx,sy,rect,dr=false;vanFabric.on('mouse:down',opt=>{if(opt.target)return;const p=vanFabric.getPointer(opt.e);sx=p.x;sy=p.y;dr=true;rect=new fabric.Rect({left:sx,top:sy,width:1,height:1,fill:'transparent',stroke:vanColor,strokeWidth:3,selectable:true});vanFabric.add(rect);});vanFabric.on('mouse:move',opt=>{if(!dr)return;const p=vanFabric.getPointer(opt.e);rect.set({width:Math.abs(p.x-sx),height:Math.abs(p.y-sy),left:Math.min(p.x,sx),top:Math.min(p.y,sy)});vanFabric.renderAll();});vanFabric.on('mouse:up',()=>dr=false);}
+  else if(tool==='arrow'){let sx,sy,ln,hd,dr=false;vanFabric.on('mouse:down',opt=>{if(opt.target)return;const p=vanFabric.getPointer(opt.e);sx=p.x;sy=p.y;dr=true;ln=new fabric.Line([sx,sy,sx,sy],{stroke:vanColor,strokeWidth:3,selectable:false,evented:false});hd=new fabric.Triangle({width:16,height:16,fill:vanColor,left:sx,top:sy,angle:90,selectable:false,evented:false});vanFabric.add(ln);vanFabric.add(hd);});vanFabric.on('mouse:move',opt=>{if(!dr)return;const p=vanFabric.getPointer(opt.e);ln.set({x2:p.x,y2:p.y});hd.set({left:p.x,top:p.y,angle:Math.atan2(p.y-sy,p.x-sx)*180/Math.PI+90});vanFabric.renderAll();});vanFabric.on('mouse:up',()=>dr=false);}
+}
+function setVAnnotColor(color,dotEl){vanColor=color;document.querySelectorAll('.van-cdot').forEach(d=>d.classList.remove('selected'));if(dotEl)dotEl.classList.add('selected');if(vanFabric){if(vanFabric.isDrawingMode)vanFabric.freeDrawingBrush.color=color;const a=vanFabric.getActiveObject();if(a){if(a.type==='i-text'||a.type==='text')a.set('fill',color);else{a.set('stroke',color);if(a.fill!=='transparent')a.set('fill',color);}vanFabric.renderAll();}}}
+function setVAnnotBrush(s){if(vanFabric&&vanFabric.freeDrawingBrush)vanFabric.freeDrawingBrush.width=parseInt(s);}
+function undoVAnnot(){if(!vanFabric)return;const o=vanFabric.getObjects();if(o.length)vanFabric.remove(o[o.length-1]);vanFabric.renderAll();}
+function clearVAnnot(){if(!vanFabric)return;vanFabric.getObjects().slice().forEach(o=>vanFabric.remove(o));vanFabric.renderAll();}
+
+async function saveVAnnotFrame(){
+  if(!vanFabric)return;
+  if(vanFabric.getObjects().length===0){alert('何か書き込んでから保存してください');return;}
+  const btn=document.getElementById('vanSaveBtn');btn.disabled=true;btn.textContent='保存中...';
+  try{
+    // Export only drawings (no background)
+    const bg=vanFabric.backgroundImage;
+    vanFabric.setBackgroundImage(null,()=>{});
+    vanFabric.backgroundColor='transparent';
+    const dataURL=vanFabric.toDataURL({format:'png',quality:1,multiplier:1});
+    if(bg)vanFabric.setBackgroundImage(bg,vanFabric.renderAll.bind(vanFabric));
+    const blob=await(await fetch(dataURL)).blob();
+    const form=new FormData();form.append('image',blob,`vAnnot_${Date.now()}.png`);
+    const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
+    if(!res.ok){alert('保存に失敗しました');return;}
+    const data=await res.json();
+    const step=steps.find(s=>s.id===vanStepId);if(!step)return;
+    if(!step.videoAnnotations)step.videoAnnotations=[];
+    const time=parseFloat(document.getElementById('vanFrameTimeLabel').textContent)||0;
+    const dur=parseFloat(document.getElementById('vanDuration').value)||3;
+    step.videoAnnotations.push({id:'va_'+Date.now(),time,duration:dur,overlayImage:data.filename,origW:vanFabric.width,origH:vanFabric.height});
+    clearVAnnot();
+    renderVanList();
+    backToVideoPlayer();
+  }finally{btn.disabled=false;btn.textContent='💾 このメモを保存';}
 }
 
-function setAnnotBrushSize(size) {
-  if (annotFabric && annotFabric.freeDrawingBrush) {
-    annotFabric.freeDrawingBrush.width = parseInt(size);
-  }
+function renderVanList(){
+  const step=steps.find(s=>s.id===vanStepId);
+  const annots=step?.videoAnnotations||[];
+  const el=document.getElementById('vanAnnotItems');if(!el)return;
+  if(!annots.length){el.innerHTML='<div style="font-size:12px;color:var(--text-muted)">メモはまだありません</div>';return;}
+  el.innerHTML=annots.map(a=>`<div style="display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;margin-bottom:4px">
+    <img src="/uploads/${a.overlayImage}" style="height:32px;border:1px solid #ccc;border-radius:3px;background:#eee">
+    <span>⏱ ${a.time.toFixed(1)}秒 〜 ${(a.time+a.duration).toFixed(1)}秒</span>
+    <button onclick="seekVAnnot(${a.time})" class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 6px">▶ 確認</button>
+    <button onclick="deleteVAnnot('${a.id}')" class="btn btn-sm btn-danger" style="font-size:11px;padding:2px 6px">削除</button>
+  </div>`).join('');
 }
-
-function undoAnnot() {
-  if (!annotFabric) return;
-  const objs = annotFabric.getObjects();
-  if (objs.length > 0) annotFabric.remove(objs[objs.length - 1]);
-  annotFabric.renderAll();
-}
-
-function clearAnnot() {
-  if (!annotFabric) return;
-  annotFabric.getObjects().slice().forEach(o => annotFabric.remove(o));
-  annotFabric.renderAll();
-}
+function seekVAnnot(t){if(vanVideoElRef){vanVideoElRef.currentTime=t;vanVideoElRef.pause();}backToVideoPlayer();}
+function deleteVAnnot(id){const step=steps.find(s=>s.id===vanStepId);if(!step)return;step.videoAnnotations=(step.videoAnnotations||[]).filter(a=>a.id!==id);renderVanList();}
 
 // ============================================================
 // Video Trim
 // ============================================================
-let trimStepId = null;
-let trimRecorder = null;
-let trimChunks = [];
-
-function openVideoTrim(stepId) {
-  const step = steps.find(s => s.id === stepId);
-  if (!step || !step.imageName || step.imageType !== 'video') {
-    alert('動画を先にアップロードしてください');
-    return;
-  }
-  trimStepId = stepId;
-  const video = document.getElementById('trimVideoEl');
-  video.src = `/uploads/${step.imageName}`;
-  video.load();
-  video.onloadedmetadata = () => {
-    const dur = video.duration;
-    const si = document.getElementById('trimStart');
-    const ei = document.getElementById('trimEnd');
-    si.max = dur; si.value = 0;
-    ei.max = dur; ei.value = dur;
-    document.getElementById('trimStartLabel').textContent = '0.0';
-    document.getElementById('trimEndLabel').textContent = dur.toFixed(1);
+let trimStepId=null,trimRecorder=null,trimChunks=[];
+function openVideoTrim(stepId){
+  const step=steps.find(s=>s.id===stepId);
+  if(!step||!step.imageName||step.imageType!=='video'){alert('動画を先にアップロードしてください');return;}
+  trimStepId=stepId;
+  const video=document.getElementById('trimVideoEl');
+  video.src=`/uploads/${step.imageName}`;video.load();
+  video.onloadedmetadata=()=>{const d=video.duration;const si=document.getElementById('trimStart');const ei=document.getElementById('trimEnd');si.max=d;si.value=0;ei.max=d;ei.value=d;document.getElementById('trimStartLabel').textContent='0.0';document.getElementById('trimEndLabel').textContent=d.toFixed(1);};
+  document.getElementById('videoTrimModal').style.display='flex';
+  document.getElementById('trimProgress').style.display='none';
+  document.getElementById('trimConfirmBtn').disabled=false;
+  document.getElementById('trimConfirmBtn').textContent='✂️ トリミングして保存';
+}
+function closeVideoTrim(){document.getElementById('videoTrimModal').style.display='none';if(trimRecorder&&trimRecorder.state==='recording')trimRecorder.stop();trimRecorder=null;trimChunks=[];trimStepId=null;}
+function onTrimStartChange(v){const ev=parseFloat(document.getElementById('trimEnd').value);if(parseFloat(v)>=ev){document.getElementById('trimStart').value=ev-.1;return;}document.getElementById('trimStartLabel').textContent=parseFloat(v).toFixed(1);document.getElementById('trimVideoEl').currentTime=parseFloat(v);}
+function onTrimEndChange(v){const sv=parseFloat(document.getElementById('trimStart').value);if(parseFloat(v)<=sv){document.getElementById('trimEnd').value=sv+.1;return;}document.getElementById('trimEndLabel').textContent=parseFloat(v).toFixed(1);}
+async function startVideoTrim(){
+  const video=document.getElementById('trimVideoEl');
+  const st=parseFloat(document.getElementById('trimStart').value);
+  const et=parseFloat(document.getElementById('trimEnd').value);
+  if(et-st<=0){alert('終了時刻は開始時刻より後にしてください');return;}
+  if(!video.captureStream&&!video.mozCaptureStream){alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');return;}
+  document.getElementById('trimConfirmBtn').disabled=true;
+  document.getElementById('trimProgress').style.display='block';
+  trimChunks=[];
+  video.currentTime=st;
+  await new Promise(r=>video.onseeked=r);
+  const stream=video.captureStream?video.captureStream():video.mozCaptureStream();
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';
+  trimRecorder=new MediaRecorder(stream,{mimeType:mime});
+  trimRecorder.ondataavailable=e=>{if(e.data.size>0)trimChunks.push(e.data);};
+  trimRecorder.onstop=async()=>{
+    const blob=new Blob(trimChunks,{type:mime});
+    const ext=mime.includes('mp4')?'.mp4':'.webm';
+    const form=new FormData();form.append('image',blob,`trimmed_${Date.now()}${ext}`);
+    const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
+    if(!res.ok){alert('保存に失敗しました');return;}
+    const data=await res.json();
+    const step=steps.find(s=>s.id===trimStepId);
+    if(step){step.imageName=data.filename;step.imageType='video';}
+    refreshStepMediaDrop(trimStepId,step);closeVideoTrim();
   };
-  document.getElementById('videoTrimModal').style.display = 'flex';
-  document.getElementById('trimProgress').style.display = 'none';
-  document.getElementById('trimConfirmBtn').disabled = false;
-  document.getElementById('trimConfirmBtn').textContent = '✂️ トリミングして保存';
-}
-
-function closeVideoTrim() {
-  document.getElementById('videoTrimModal').style.display = 'none';
-  if (trimRecorder && trimRecorder.state === 'recording') trimRecorder.stop();
-  trimRecorder = null;
-  trimChunks = [];
-  trimStepId = null;
-}
-
-function onTrimStartChange(val) {
-  const v = parseFloat(val);
-  const endVal = parseFloat(document.getElementById('trimEnd').value);
-  if (v >= endVal) { document.getElementById('trimStart').value = endVal - 0.1; return; }
-  document.getElementById('trimStartLabel').textContent = v.toFixed(1);
-  const video = document.getElementById('trimVideoEl');
-  video.currentTime = v;
-}
-
-function onTrimEndChange(val) {
-  const v = parseFloat(val);
-  const startVal = parseFloat(document.getElementById('trimStart').value);
-  if (v <= startVal) { document.getElementById('trimEnd').value = startVal + 0.1; return; }
-  document.getElementById('trimEndLabel').textContent = v.toFixed(1);
-}
-
-async function startVideoTrim() {
-  const video = document.getElementById('trimVideoEl');
-  const startTime = parseFloat(document.getElementById('trimStart').value);
-  const endTime = parseFloat(document.getElementById('trimEnd').value);
-  const duration = endTime - startTime;
-  if (duration <= 0) { alert('終了時刻は開始時刻より後にしてください'); return; }
-
-  // Check MediaRecorder / captureStream support
-  if (!video.captureStream && !video.mozCaptureStream) {
-    alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');
-    return;
-  }
-
-  document.getElementById('trimConfirmBtn').disabled = true;
-  document.getElementById('trimProgress').style.display = 'block';
-  trimChunks = [];
-
-  video.currentTime = startTime;
-  await new Promise(r => video.onseeked = r);
-
-  const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
-  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
-    : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
-  trimRecorder = new MediaRecorder(stream, { mimeType });
-  trimRecorder.ondataavailable = e => { if (e.data.size > 0) trimChunks.push(e.data); };
-  trimRecorder.onstop = async () => {
-    const blob = new Blob(trimChunks, { type: mimeType });
-    const ext = mimeType.includes('mp4') ? '.mp4' : '.webm';
-    const form = new FormData();
-    form.append('image', blob, `trimmed_${Date.now()}${ext}`);
-    const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
-    if (!res.ok) { alert('保存に失敗しました'); return; }
-    const data = await res.json();
-    const step = steps.find(s => s.id === trimStepId);
-    if (step) { step.imageName = data.filename; step.imageType = 'video'; }
-    refreshStepMediaDrop(trimStepId, step);
-    closeVideoTrim();
-  };
-
-  trimRecorder.start();
-  video.play();
-
-  // Stop recording at endTime
-  const checkInterval = setInterval(() => {
-    if (video.currentTime >= endTime) {
-      clearInterval(checkInterval);
-      video.pause();
-      trimRecorder.stop();
-    }
-  }, 100);
+  trimRecorder.start();video.play();
+  const iv=setInterval(()=>{if(video.currentTime>=et){clearInterval(iv);video.pause();trimRecorder.stop();}},100);
 }
 
 // ============================================================
 // Save
 // ============================================================
-
-async function handleSubmit(e) {
+async function handleSubmit(e){
   e.preventDefault();
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = '保存中...';
-  const title = document.getElementById('title').value.trim();
-  const description = document.getElementById('description').value.trim();
-  const categoryId = document.getElementById('categorySelect').value;
-  if (!title) {
-    showAlert('alert', 'タイトルを入力してください', 'error');
-    btn.disabled = false; btn.textContent = editId ? '更新する' : '保存する';
-    return;
-  }
-  try {
-    if (editId) await updateManual(title, description, categoryId);
-    else await createManual(title, description, categoryId);
-  } catch (err) {
-    showAlert('alert', '予期せぬエラーが発生しました', 'error');
-    btn.disabled = false; btn.textContent = editId ? '更新する' : '保存する';
-  }
+  const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='保存中...';
+  const title=document.getElementById('title').value.trim();
+  const description=document.getElementById('description').value.trim();
+  const categoryId=document.getElementById('categorySelect').value;
+  if(!title){showAlert('alert','タイトルを入力してください','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';return;}
+  try{if(editId)await updateManual(title,description,categoryId);else await createManual(title,description,categoryId);}
+  catch(err){showAlert('alert','予期せぬエラーが発生しました','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';}
 }
 
-async function createManual(title, description, categoryId) {
+function buildStepsContent(){return JSON.stringify({cover_image:coverImageName,steps:steps.map((s,i)=>({order:i+1,title:s.title,image:s.imageName,image_type:s.imageType,description:s.description,video_annotations:s.videoAnnotations||[]}))});}
+
+async function createManual(title,description,categoryId){
   let res;
-  if (currentType === 'steps') {
-    if (steps.length === 0) {
-      showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
-      document.getElementById('submitBtn').disabled = false;
-      document.getElementById('submitBtn').textContent = '保存する';
-      return;
-    }
-    const content = JSON.stringify({
-      cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i+1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
-    });
-    res = await fetch('/api/manuals/steps', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
-    });
-  } else if (currentType === 'rich_text') {
-    const content = quill.root.innerHTML;
-    if (!content || content === '<p><br></p>') {
-      showAlert('alert', '本文を入力してください', 'error');
-      document.getElementById('submitBtn').disabled = false;
-      document.getElementById('submitBtn').textContent = '保存する';
-      return;
-    }
-    res = await fetch('/api/manuals/text', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
-    });
-  } else {
-    const file = document.getElementById('pdfFile').files[0];
-    if (!file) {
-      showAlert('alert', 'PDFファイルを選択してください', 'error');
-      document.getElementById('submitBtn').disabled = false;
-      document.getElementById('submitBtn').textContent = '保存する';
-      return;
-    }
-    const form = new FormData();
-    form.append('pdf', file); form.append('title', title); form.append('description', description);
-    if (categoryId) form.append('category_id', categoryId);
-    res = await fetch('/api/manuals/pdf', { method: 'POST', body: form });
+  if(currentType==='steps'){
+    if(!steps.length){showAlert('alert','少なくとも1つのステップを追加してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}
+    res=await fetch('/api/manuals/steps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null})});
+  }else if(currentType==='rich_text'){
+    const content=quill.root.innerHTML;
+    if(!content||content==='<p><br></p>'){showAlert('alert','本文を入力してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}
+    res=await fetch('/api/manuals/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content,category_id:categoryId||null})});
+  }else{
+    const file=document.getElementById('pdfFile').files[0];
+    if(!file){showAlert('alert','PDFファイルを選択してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}
+    const form=new FormData();form.append('pdf',file);form.append('title',title);form.append('description',description);if(categoryId)form.append('category_id',categoryId);
+    res=await fetch('/api/manuals/pdf',{method:'POST',body:form});
   }
-  const data = await res.json();
-  if (res.ok) {
-    window.location.href = `/view.html?id=${data.id}`;
-  } else {
-    showAlert('alert', data.error || '保存に失敗しました', 'error');
-    document.getElementById('submitBtn').disabled = false;
-    document.getElementById('submitBtn').textContent = '保存する';
-  }
+  const data=await res.json();
+  if(res.ok)window.location.href=`/view.html?id=${data.id}`;
+  else{showAlert('alert',data.error||'保存に失敗しました','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';}
 }
 
-async function updateManual(title, description, categoryId) {
+async function updateManual(title,description,categoryId){
   let res;
-  if (editManual.type === 'pdf' && currentType === 'steps') {
-    if (steps.length === 0) {
-      showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
-      document.getElementById('submitBtn').disabled = false;
-      document.getElementById('submitBtn').textContent = '更新する';
-      return;
+  if(editManual.type==='pdf'&&currentType==='steps'){
+    if(!steps.length){showAlert('alert','少なくとも1つのステップを追加してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';return;}
+    res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null,convert_to_type:'steps'})});
+  }else if(editManual.type==='steps'){
+    res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null})});
+  }else if(editManual.type==='pdf'){
+    const replaceCheck=document.getElementById('replacePdfCheck');
+    if(replaceCheck&&replaceCheck.checked){
+      const file=document.getElementById('pdfFile').files[0];
+      if(!file){showAlert('alert','新しいPDFファイルを選択してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';return;}
+      const form=new FormData();form.append('pdf',file);form.append('title',title);form.append('description',description);if(categoryId)form.append('category_id',categoryId);
+      res=await fetch(`/api/manuals/${editId}/pdf`,{method:'PUT',body:form});
+    }else{
+      res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,category_id:categoryId||null})});
     }
-    const content = JSON.stringify({
-      cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i+1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
-    });
-    res = await fetch(`/api/manuals/${editId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, content, category_id: categoryId || null, convert_to_type: 'steps' })
-    });
-  } else if (editManual.type === 'steps') {
-    const content = JSON.stringify({
-      cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i+1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
-    });
-    res = await fetch(`/api/manuals/${editId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
-    });
-  } else if (editManual.type === 'pdf') {
-    const replaceCheck = document.getElementById('replacePdfCheck');
-    if (replaceCheck && replaceCheck.checked) {
-      const file = document.getElementById('pdfFile').files[0];
-      if (!file) {
-        showAlert('alert', '新しいPDFファイルを選択してください', 'error');
-        document.getElementById('submitBtn').disabled = false;
-        document.getElementById('submitBtn').textContent = '更新する';
-        return;
-      }
-      const form = new FormData();
-      form.append('pdf', file); form.append('title', title); form.append('description', description);
-      if (categoryId) form.append('category_id', categoryId);
-      res = await fetch(`/api/manuals/${editId}/pdf`, { method: 'PUT', body: form });
-    } else {
-      res = await fetch(`/api/manuals/${editId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, category_id: categoryId || null })
-      });
-    }
-  } else {
-    const content = quill.root.innerHTML;
-    res = await fetch(`/api/manuals/${editId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, content, category_id: categoryId || null })
-    });
+  }else{
+    res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:quill.root.innerHTML,category_id:categoryId||null})});
   }
-  const data = await res.json();
-  if (res.ok) {
-    window.location.href = `/view.html?id=${editId}`;
-  } else {
-    showAlert('alert', data.error || '更新に失敗しました', 'error');
-    document.getElementById('submitBtn').disabled = false;
-    document.getElementById('submitBtn').textContent = '更新する';
-  }
+  const data=await res.json();
+  if(res.ok)window.location.href=`/view.html?id=${editId}`;
+  else{showAlert('alert',data.error||'更新に失敗しました','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';}
 }
 
 init();
