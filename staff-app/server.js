@@ -220,10 +220,11 @@ app.get('/dashboard', async (req, res) => {
   if (!checkAuth(req, res)) return;
 
   const allRecords = await loadDB();
-  const { from, to } = req.query;
+  const { from, to, staff: staffFilter } = req.query;
   const records = allRecords.filter(r => {
     if (from && r.date < from) return false;
     if (to && r.date > to) return false;
+    if (staffFilter && r.staffName !== staffFilter) return false;
     return true;
   });
   const byStaff = {};
@@ -248,6 +249,41 @@ app.get('/dashboard', async (req, res) => {
 
   const staffList = Object.entries(byStaff).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
 
+  // 月別集計（スタッフフィルター適用済みrecordsから）
+  const byMonth = {};
+  for (const r of records) {
+    if (r.entryType === 'behavior') continue;
+    const month = r.date ? r.date.slice(0, 7) : 'unknown';
+    if (!byMonth[month]) byMonth[month] = { items: 0, counseling: 0, reviews: 0 };
+    const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+    if (cat === 'item') byMonth[month].items++;
+    if (cat === 'counseling') byMonth[month].counseling++;
+    if (cat === 'review') byMonth[month].reviews++;
+  }
+  const monthKeys = Object.keys(byMonth).sort().slice(-12);
+  const monthData = {
+    labels: monthKeys,
+    items: monthKeys.map(m => byMonth[m].items),
+    counseling: monthKeys.map(m => byMonth[m].counseling),
+    reviews: monthKeys.map(m => byMonth[m].reviews)
+  };
+
+  // STAFF_DATA: スタッフ別詳細（ドリルダウン用）
+  const staffDataObj = {};
+  for (const [name, s] of staffList) {
+    staffDataObj[name] = {
+      itemsMap: s.itemsMap,
+      counselingMap: s.counselingMap,
+      treatmentMap: s.treatmentMap,
+      reviews: s.reviews,
+      freePhrases: s.freePhrases,
+    };
+  }
+
+  // 全スタッフ名（フィルター選択肢用）
+  const allStaffNames = [...new Set(allRecords.map(r => r.staffName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
+  const staffOptions = allStaffNames.map(n => `<option value="${esc(n)}"${staffFilter === n ? ' selected' : ''}>${esc(n)}</option>`).join('');
+
   const summaryRows = staffList.map(([name, s]) => {
     const itemsTotal = Object.values(s.itemsMap).reduce((x,y)=>x+y,0);
     const itemsDetail = Object.entries(s.itemsMap).map(([k,v])=>`${k}:${v}`).join('、') || '';
@@ -255,7 +291,7 @@ app.get('/dashboard', async (req, res) => {
     const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     return `
-      <tr>
+      <tr class="staff-row" data-staff="${esc(name)}" style="cursor:pointer;" onclick="openModal('${esc(name).replace(/'/g, "\\'")}')">
         <td><strong>${esc(name)}</strong></td>
         <td class="num">${s.count}</td>
         <td class="num">${s.patients.size}</td>
@@ -263,7 +299,16 @@ app.get('/dashboard', async (req, res) => {
         <td class="num">${counselingTotal}<br><small style="color:#666;font-size:11px">${esc(counselingDetail)}</small></td>
         <td class="num">${s.reviews}</td>
         <td style="font-size:12px;color:#555">${esc(treatmentDetail)}</td>
-        <td>
+        <td class="num goal-cell" onclick="event.stopPropagation()">
+          <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
+            <input type="number" min="0" class="goal-input" data-staff="${esc(name)}" placeholder="目標" style="width:58px;border:1px solid #ccc;border-radius:4px;padding:2px 5px;font-size:12px;text-align:right;" />
+            <div class="goal-gauge-wrap" style="width:80px;height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;">
+              <div class="goal-gauge-bar" data-staff="${esc(name)}" data-items="${itemsTotal}" style="height:100%;background:#2aab96;width:0%;transition:width .3s;"></div>
+            </div>
+            <span class="goal-pct" data-staff="${esc(name)}" style="font-size:11px;color:#065f46;min-width:32px;">-</span>
+          </div>
+        </td>
+        <td onclick="event.stopPropagation()">
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
           <a href="/evaluation?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-eval">評価表</a>
         </td>
@@ -288,6 +333,7 @@ app.get('/dashboard', async (req, res) => {
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>スタッフ実績ダッシュボード | のびのび歯科</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: sans-serif; background: #f3f4f6; color: #333; }
@@ -304,9 +350,24 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
 .btn-eval { background: #3b82f6; color: #fff; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; }
 .filter-bar { background:#fff; border-radius:8px; padding:14px 16px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,.08); display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:13px; }
 .filter-bar label { color:#065f46; font-weight:bold; }
-.filter-bar input { border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:13px; }
+.filter-bar input[type=date] { border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:13px; }
+.filter-bar select { border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:13px; background:#fff; }
 .filter-bar button { background:#2aab96; color:#fff; border:none; border-radius:6px; padding:6px 16px; font-size:13px; cursor:pointer; }
 .filter-bar a { color:#9ca3af; font-size:12px; text-decoration:underline; }
+.chart-wrap { background:#fff; border-radius:8px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:30px; }
+/* モーダル */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:#fff; border-radius:10px; padding:28px 30px; max-width:520px; width:92%; max-height:80vh; overflow-y:auto; position:relative; box-shadow:0 4px 24px rgba(0,0,0,.18); }
+.modal-close { position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#9ca3af; line-height:1; }
+.modal-close:hover { color:#333; }
+.modal-title { font-size:18px; font-weight:bold; color:#065f46; margin-bottom:16px; }
+.modal-section { margin-bottom:14px; }
+.modal-section h3 { font-size:13px; font-weight:bold; color:#2aab96; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-bottom:8px; }
+.modal-section ul { list-style:none; padding:0; margin:0; font-size:13px; color:#444; }
+.modal-section ul li { padding:3px 0; border-bottom:1px solid #f3f4f6; }
+.modal-section ul li:last-child { border-bottom:none; }
+.modal-empty { color:#9ca3af; font-size:13px; }
 </style>
 </head>
 <body>
@@ -317,19 +378,31 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
     <input type="date" name="from" value="${esc(from || '')}" />
     <span style="color:#9ca3af">〜</span>
     <input type="date" name="to" value="${esc(to || '')}" />
+    <label style="margin-left:8px">スタッフ</label>
+    <select name="staff" id="staffFilter">
+      <option value="">全スタッフ</option>
+      ${staffOptions}
+    </select>
     <button type="submit">絞り込む</button>
-    ${from || to ? '<a href="/dashboard">リセット</a>' : ''}
+    ${from || to || staffFilter ? '<a href="/dashboard">リセット</a>' : ''}
     ${from || to ? `<span style="color:#f59e0b;font-size:12px">★ 期間指定中</span>` : ''}
+    ${staffFilter ? `<span style="color:#2aab96;font-size:12px">★ スタッフ絞り込み中: ${esc(staffFilter)}</span>` : ''}
   </form>
-  <h2>スタッフ別 累計実績${from || to ? `（${from||''}〜${to||-''}）` : ''}</h2>
+
+  <h2>月別推移グラフ${staffFilter ? `（${esc(staffFilter)}）` : ''}</h2>
+  <div class="chart-wrap">
+    <canvas id="monthChart" style="width:100%;max-height:300px;"></canvas>
+  </div>
+
+  <h2>スタッフ別 累計実績${from || to ? `（${from||''}〜${to||''}）` : ''}${staffFilter ? `（${esc(staffFilter)}）` : ''}</h2>
   <div style="overflow-x:auto">
   <table>
     <thead><tr>
       <th>スタッフ名</th><th class="num">書き込み件数</th><th class="num">登録患者数</th><th class="num">物品販売</th>
       <th class="num">カウンセリング成約</th><th class="num">口コミ獲得</th>
-      <th>処置内訳</th><th>出力</th>
+      <th>処置内訳</th><th class="num">月間目標</th><th>出力</th>
     </tr></thead>
-    <tbody>${summaryRows || '<tr><td colspan="11" class="empty">まだデータがありません</td></tr>'}</tbody>
+    <tbody>${summaryRows || '<tr><td colspan="9" class="empty">まだデータがありません</td></tr>'}</tbody>
   </table>
   </div>
   <h2>入力履歴（新しい順）</h2>
@@ -352,7 +425,113 @@ td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
     <ul id="staffNameList" style="list-style:none;padding:0;margin:0;"></ul>
   </div>
 </div>
+
+<!-- ドリルダウンモーダル -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+  <div class="modal-box" id="modalBox">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-section">
+      <h3>物品販売</h3>
+      <ul id="modalItems"></ul>
+    </div>
+    <div class="modal-section">
+      <h3>カウンセリング</h3>
+      <ul id="modalCounseling"></ul>
+    </div>
+    <div class="modal-section">
+      <h3>処置</h3>
+      <ul id="modalTreatment"></ul>
+    </div>
+    <div class="modal-section">
+      <h3>行動・取り組みの記録</h3>
+      <ul id="modalPhrases"></ul>
+    </div>
+  </div>
+</div>
+
 <script>
+const STAFF_DATA = ${JSON.stringify(staffDataObj)};
+const MONTH_DATA = ${JSON.stringify(monthData)};
+
+// Chart.js 月別推移グラフ
+(function() {
+  const ctx = document.getElementById('monthChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: MONTH_DATA.labels,
+      datasets: [
+        { label: '物品販売', data: MONTH_DATA.items, backgroundColor: 'rgba(42,171,150,0.8)', stack: 'a' },
+        { label: 'カウンセリング', data: MONTH_DATA.counseling, backgroundColor: 'rgba(59,130,246,0.8)', stack: 'a' },
+        { label: '口コミ', data: MONTH_DATA.reviews, backgroundColor: 'rgba(249,115,22,0.8)', stack: 'a' },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+})();
+
+// ドリルダウンモーダル
+function openModal(staffName) {
+  const d = STAFF_DATA[staffName];
+  if (!d) return;
+  document.getElementById('modalTitle').textContent = staffName;
+  function renderList(ulId, map) {
+    const ul = document.getElementById(ulId);
+    const entries = Object.entries(map || {});
+    if (entries.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; return; }
+    ul.innerHTML = entries.map(([k, v]) => '<li>' + k + ': ' + v + '件</li>').join('');
+  }
+  renderList('modalItems', d.itemsMap);
+  renderList('modalCounseling', d.counselingMap);
+  renderList('modalTreatment', d.treatmentMap);
+  const ul = document.getElementById('modalPhrases');
+  if (!d.freePhrases || d.freePhrases.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; }
+  else { ul.innerHTML = [...new Set(d.freePhrases)].map(p => '<li>' + p + '</li>').join(''); }
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+function closeModalOnBg(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+// 月間目標（localStorage）
+function initGoals() {
+  document.querySelectorAll('.goal-input').forEach(input => {
+    const staff = input.dataset.staff;
+    const key = 'goal_' + staff;
+    const saved = localStorage.getItem(key);
+    if (saved) { input.value = saved; updateGauge(staff, parseInt(saved) || 0); }
+    input.addEventListener('input', function() {
+      const val = parseInt(this.value) || 0;
+      localStorage.setItem(key, this.value);
+      updateGauge(staff, val);
+    });
+  });
+}
+function updateGauge(staff, goal) {
+  const bar = document.querySelector('.goal-gauge-bar[data-staff="' + staff + '"]');
+  const pct = document.querySelector('.goal-pct[data-staff="' + staff + '"]');
+  if (!bar || !pct) return;
+  const items = parseInt(bar.dataset.items) || 0;
+  if (goal <= 0) { bar.style.width = '0%'; pct.textContent = '-'; return; }
+  const p = Math.min(Math.round(items / goal * 100), 100);
+  bar.style.width = p + '%';
+  bar.style.background = p >= 100 ? '#059669' : '#2aab96';
+  pct.textContent = p + '%';
+}
+initGoals();
+
+// スタッフ名管理
 async function loadMgmtStaffNames() {
   const res = await fetch('/api/staff-names');
   const names = await res.json();
@@ -382,7 +561,7 @@ async function deleteStaffName(name) {
   else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
 }
 loadMgmtStaffNames();
-</script>
+<\/script>
 </body>
 </html>`);
 });
