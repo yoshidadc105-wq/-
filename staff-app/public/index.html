@@ -4,58 +4,80 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>スタッフ実績入力 | のびのび歯科</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Hiragino Kaku Gothic Pro", "Meiryo", sans-serif; background: #f4f7f9; color: #333; font-size: 15px; line-height: 1.6; }
-    header { background: #2aab96; color: #fff; padding: 16px 20px; text-align: center; }
-    header h1 { font-size: 18px; font-weight: bold; }
-    header p { font-size: 12px; margin-top: 4px; opacity: .85; }
-    .container { max-width: 560px; margin: 20px auto; padding: 0 16px 60px; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #f0f4f8; color: #1e293b; font-size: 15px; line-height: 1.6; }
 
-    .tab-row { display: flex; gap: 0; margin-bottom: 16px; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-    .tab-btn { flex: 1; padding: 12px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; transition: background .2s, color .2s; background: #fff; color: #9ca3af; }
-    .tab-btn.active { background: #2aab96; color: #fff; }
+    /* ヘッダー */
+    header { background: linear-gradient(135deg, #0f766e 0%, #2aab96 60%, #34d399 100%); padding: 0; box-shadow: 0 2px 12px rgba(15,118,110,.35); }
+    .header-inner { max-width: 560px; margin: 0 auto; padding: 18px 20px; display: flex; align-items: center; gap: 12px; }
+    .header-icon { width: 42px; height: 42px; background: rgba(255,255,255,.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    header h1 { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: .03em; }
+    header p { font-size: 11px; color: rgba(255,255,255,.8); margin-top: 2px; }
 
-    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 20px; margin-bottom: 16px; }
-    .card-title { font-size: 14px; font-weight: bold; color: #fff; background: #2aab96; border-radius: 6px; padding: 5px 12px; margin-bottom: 14px; }
+    .container { max-width: 560px; margin: 0 auto; padding: 20px 16px 70px; }
+
+    /* タブ */
+    .tab-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 700; font-family: inherit; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: all .2s; background: #fff; color: #94a3b8; }
+    .tab-btn.active { background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border-color: transparent; box-shadow: 0 4px 14px rgba(42,171,150,.35); }
+
+    /* カード */
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04); padding: 20px; margin-bottom: 14px; }
+    .card-title { font-size: 12px; font-weight: 700; color: #0f766e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+    .card-title::before { content: ''; display: block; width: 3px; height: 14px; background: linear-gradient(180deg, #2aab96, #34d399); border-radius: 2px; }
+
+    /* フォーム */
     .form-group { margin-bottom: 14px; }
-    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; font-weight: bold; }
-    .required::after { content: "必須"; font-size: 11px; color: #fff; background: #e05; border-radius: 3px; padding: 1px 5px; margin-left: 6px; font-weight: normal; }
+    label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; }
+    .required::after { content: "必須"; font-size: 10px; color: #fff; background: linear-gradient(135deg,#ef4444,#f87171); border-radius: 3px; padding: 1px 5px; margin-left: 6px; font-weight: 600; }
     input[type="text"], input[type="date"], select, textarea {
-      width: 100%; border: 1px solid #ccc; border-radius: 6px; padding: 9px 12px;
-      font-size: 15px; font-family: inherit; outline: none; transition: border .2s; background: #fff;
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 14px;
+      font-size: 15px; font-family: inherit; outline: none; transition: border .2s, box-shadow .2s; background: #f8fafc; color: #1e293b;
     }
-    input:focus, select:focus, textarea:focus { border-color: #2aab96; }
-    textarea { resize: vertical; min-height: 80px; }
+    input:focus, select:focus, textarea:focus { border-color: #2aab96; background: #fff; box-shadow: 0 0 0 3px rgba(42,171,150,.12); }
+    textarea { resize: vertical; min-height: 88px; }
     .row2 { display: flex; flex-direction: column; gap: 10px; }
-    .row2 > * { flex: 1; }
     .patient-check { font-size: 12px; margin-top: 4px; min-height: 18px; }
     .check-ok { color: #059669; }
     .check-ng { color: #dc2626; font-weight: bold; }
-    .item-detail { display: none; margin-top: 8px; }
+    .item-detail { display: none; margin-top: 10px; }
 
-    .submit-btn { display: block; width: 100%; background: #2aab96; color: #fff; border: none; border-radius: 30px; padding: 14px; font-size: 17px; font-weight: bold; cursor: pointer; transition: background .2s; }
-    .submit-btn:hover { background: #228f7c; }
-    .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
-    .success-msg { display: none; text-align: center; padding: 36px 20px; }
-    .success-msg .icon { font-size: 56px; }
-    .success-msg h2 { font-size: 20px; color: #2aab96; margin: 14px 0 8px; }
-    .success-msg p { color: #666; font-size: 14px; }
-    .success-msg .again-btn { display: inline-block; margin-top: 16px; background: #2aab96; color: #fff; border: none; border-radius: 20px; padding: 10px 28px; font-size: 15px; cursor: pointer; }
+    /* 登録ボタン */
+    .submit-btn { display: block; width: 100%; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 14px; padding: 15px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity .2s, transform .1s; box-shadow: 0 4px 14px rgba(42,171,150,.4); letter-spacing: .05em; }
+    .submit-btn:hover { opacity: .9; }
+    .submit-btn:active { transform: scale(.98); }
+    .submit-btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
 
-    .recent-title { font-size: 14px; font-weight: bold; color: #065f46; margin-bottom: 10px; border-left: 4px solid #2aab96; padding-left: 8px; }
-    .record-item { background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
-    .record-item .record-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px; }
-    .record-item .staff-name { font-weight: bold; color: #2aab96; }
-    .record-item .record-date { font-size: 11px; color: #9ca3af; }
-    .record-item .record-body { margin-top: 4px; color: #555; }
-    .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; }
-    .badge-item      { background: #fef3c7; color: #92400e; }
-    .badge-counseling{ background: #dbeafe; color: #1e40af; }
+    /* 成功画面 */
+    .success-msg { display: none; text-align: center; padding: 40px 20px; }
+    .success-icon { width: 72px; height: 72px; background: linear-gradient(135deg, #0f766e, #34d399); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 34px; margin: 0 auto 16px; box-shadow: 0 8px 24px rgba(42,171,150,.35); }
+    .success-msg h2 { font-size: 20px; color: #0f766e; font-weight: 700; margin-bottom: 6px; }
+    .success-msg p { color: #64748b; font-size: 14px; }
+    .again-btn { display: inline-block; margin-top: 20px; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 30px; padding: 11px 32px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; box-shadow: 0 4px 12px rgba(42,171,150,.35); }
+
+    /* 履歴 */
+    .recent-title { font-size: 13px; font-weight: 700; color: #0f766e; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .recent-title::before { content: ''; display: block; width: 3px; height: 14px; background: linear-gradient(180deg, #2aab96, #34d399); border-radius: 2px; }
+    .record-item { background: #fff; border-radius: 12px; border: 1px solid #f1f5f9; padding: 12px 14px; margin-bottom: 8px; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: box-shadow .15s; }
+    .record-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+    .record-item .record-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+    .record-item .staff-name { font-weight: 700; color: #0f766e; display: flex; align-items: center; gap: 6px; }
+    .staff-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #2aab96, #0f766e); color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+    .record-item .record-date { font-size: 11px; color: #94a3b8; }
+    .record-item .record-body { color: #475569; }
+
+    .badge { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+    .badge-item      { background: #fef3c7; color: #b45309; }
+    .badge-counseling{ background: #dbeafe; color: #1d4ed8; }
     .badge-review    { background: #fce7f3; color: #9d174d; }
-    .badge-treatment { background: #e8f7f5; color: #065f46; }
-    .badge-behavior  { background: #f3e8ff; color: #6b21a8; }
-    .loading { text-align: center; color: #9ca3af; padding: 20px; font-size: 13px; }
+    .badge-treatment { background: #dcfce7; color: #15803d; }
+    .badge-behavior  { background: #ede9fe; color: #6d28d9; }
+    .loading { text-align: center; color: #94a3b8; padding: 20px; font-size: 13px; }
+
+    /* 例文チップ */
+    .phrase-chip { background: #f0fdf4; border: 1px solid #a7f3d0; color: #065f46; border-radius: 20px; padding: 4px 11px; font-size: 12px; display: inline-block; }
 
     .panel { display: none; }
     .panel.active { display: block; }
@@ -63,8 +85,13 @@
 </head>
 <body>
 <header>
-  <h1>スタッフ実績入力</h1>
-  <p>のびのび歯科・矯正歯科</p>
+  <div class="header-inner">
+    <div class="header-icon">🦷</div>
+    <div>
+      <h1>スタッフ実績入力</h1>
+      <p>のびのび歯科・矯正歯科</p>
+    </div>
+  </div>
 </header>
 <div class="container">
 
@@ -76,7 +103,7 @@
   <!-- ===== 患者実績パネル ===== -->
   <div id="panel-patient" class="panel active">
     <div id="success-patient" class="success-msg card">
-      <div class="icon">✅</div>
+      <div class="success-icon">✓</div>
       <h2>登録しました</h2>
       <p>患者実績を記録しました。</p>
       <button class="again-btn" onclick="resetPatient()">続けて入力する</button>
@@ -146,7 +173,7 @@
   <!-- ===== 行動・取り組みパネル ===== -->
   <div id="panel-behavior" class="panel">
     <div id="success-behavior" class="success-msg card">
-      <div class="icon">✅</div>
+      <div class="success-icon">✓</div>
       <h2>登録しました</h2>
       <p>取り組みを記録しました。</p>
       <button class="again-btn" onclick="resetBehavior()">続けて入力する</button>
@@ -253,7 +280,7 @@
   PHRASES.forEach(p => {
     const chip = document.createElement('span');
     chip.textContent = p;
-    chip.style.cssText = 'background:#f3e8ff;border:1px solid #d8b4fe;color:#6b21a8;border-radius:20px;padding:3px 10px;font-size:12px;display:inline-block;';
+    chip.className = 'phrase-chip';
     phraseContainer.appendChild(chip);
   });
 
@@ -388,7 +415,7 @@
         }
         return `<div class="record-item">
           <div class="record-header">
-            <span class="staff-name">${r.staffName}</span>${r.patientNo ? `<span style="color:#9ca3af;font-size:12px">患者:${r.patientNo}</span>` : ''}
+            <span class="staff-name"><span class="staff-avatar">${(r.staffName||'?').charAt(0)}</span>${r.staffName}</span>${r.patientNo ? `<span style="color:#94a3b8;font-size:11px;background:#f1f5f9;padding:1px 7px;border-radius:10px">患者 ${r.patientNo}</span>` : ''}
             <span class="record-date">${r.date}</span>
           </div>
           <div class="record-body">${badgeHtml}${body ? ` <span style="font-size:12px">${body}</span>` : ''}</div>
