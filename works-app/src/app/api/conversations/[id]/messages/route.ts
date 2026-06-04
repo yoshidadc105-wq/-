@@ -13,11 +13,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
   if (!member) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Mark as read
+  await prisma.conversationMember.update({
+    where: { id: member.id },
+    data: { lastReadAt: new Date() },
+  });
+
   const messages = await prisma.message.findMany({
     where: { conversationId: id },
     include: {
       sender: { select: { id: true, name: true, avatar: true } },
       files: true,
+      reactions: { include: { user: { select: { id: true, name: true } } } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -34,19 +41,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
   if (!member) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { content } = await req.json();
+  const { content, imageData } = await req.json();
   const message = await prisma.message.create({
-    data: { content, senderId: session.user.id, conversationId: id },
+    data: {
+      content: content || "",
+      imageData: imageData || null,
+      senderId: session.user.id,
+      conversationId: id,
+    },
     include: {
       sender: { select: { id: true, name: true, avatar: true } },
       files: true,
+      reactions: { include: { user: { select: { id: true, name: true } } } },
     },
   });
 
-  await prisma.conversation.update({
-    where: { id },
-    data: { updatedAt: new Date() },
-  });
+  await prisma.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
 
   return NextResponse.json(message);
 }

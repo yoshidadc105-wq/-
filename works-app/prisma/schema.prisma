@@ -12,18 +12,20 @@ model User {
   email     String   @unique
   password  String
   avatar    String?
-  role      String   @default("member") // admin, member
+  role      String   @default("member")
   createdAt DateTime @default(now())
 
-  sentMessages     Message[]       @relation("SentMessages")
-  conversations    ConversationMember[]
-  posts            Post[]
-  comments         Comment[]
-  questions        Question[]      @relation("QuestionAuthor")
-  answers          Answer[]
-  assignedQuestions Question[]     @relation("AssignedTo")
-  manualLinks      ManualLink[]
-  files            File[]
+  sentMessages      Message[]            @relation("SentMessages")
+  conversations     ConversationMember[]
+  posts             Post[]
+  comments          Comment[]
+  questions         Question[]           @relation("QuestionAuthor")
+  answers           Answer[]
+  assignedQuestions Question[]           @relation("AssignedTo")
+  manualLinks       ManualLink[]
+  files             File[]
+  messageReactions  MessageReaction[]
+  postReactions     PostReaction[]
 }
 
 model Conversation {
@@ -36,10 +38,11 @@ model Conversation {
 }
 
 model ConversationMember {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   conversationId String
-  joinedAt       DateTime     @default(now())
+  joinedAt       DateTime  @default(now())
+  lastReadAt     DateTime?
 
   user         User         @relation(fields: [userId], references: [id])
   conversation Conversation @relation(fields: [conversationId], references: [id])
@@ -50,13 +53,28 @@ model ConversationMember {
 model Message {
   id             String   @id @default(cuid())
   content        String
+  imageData      String?
   senderId       String
   conversationId String
   createdAt      DateTime @default(now())
 
-  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
-  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User              @relation("SentMessages", fields: [senderId], references: [id])
+  conversation Conversation      @relation(fields: [conversationId], references: [id])
   files        File[]
+  reactions    MessageReaction[]
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  userId    String
+  messageId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  message Message @relation(fields: [messageId], references: [id])
+
+  @@unique([userId, messageId, emoji])
 }
 
 model Post {
@@ -70,9 +88,23 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  author   User      @relation(fields: [authorId], references: [id])
-  comments Comment[]
-  files    File[]
+  author    User           @relation(fields: [authorId], references: [id])
+  comments  Comment[]
+  files     File[]
+  reactions PostReaction[]
+}
+
+model PostReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId, emoji])
 }
 
 model Comment {
@@ -92,12 +124,12 @@ model Question {
   authorId     String
   assignedToId String?
   isAnonymous  Boolean  @default(false)
-  status       String   @default("open") // open, answered, closed
+  status       String   @default("open")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  author     User    @relation("QuestionAuthor", fields: [authorId], references: [id])
-  assignedTo User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+  author     User     @relation("QuestionAuthor", fields: [authorId], references: [id])
+  assignedTo User?    @relation("AssignedTo", fields: [assignedToId], references: [id])
   answers    Answer[]
 }
 

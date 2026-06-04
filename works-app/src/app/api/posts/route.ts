@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
         include: { author: { select: { id: true, name: true } } },
         orderBy: { createdAt: "asc" },
       },
+      reactions: { include: { user: { select: { id: true, name: true } } } },
       files: true,
       _count: { select: { comments: true } },
     },
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
     include: {
       author: { select: { id: true, name: true, avatar: true } },
       comments: { include: { author: { select: { id: true, name: true } } } },
+      reactions: { include: { user: { select: { id: true, name: true } } } },
       files: true,
       _count: { select: { comments: true } },
     },
