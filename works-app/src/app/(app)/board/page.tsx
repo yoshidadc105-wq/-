@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
 
 const CATEGORIES = [
   "連絡ノート", "有給・欠勤・遅刻・早退", "インシデントレポート",
@@ -9,17 +8,14 @@ const CATEGORIES = [
 const STAMPS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🎉", "👏"];
 
 interface Comment { id: string; content: string; createdAt: string; author: { id: string; name: string }; }
-interface Reaction { id: string; emoji: string; user: { id: string; name: string }; }
 interface Post {
   id: string; title: string; content: string; imageData?: string;
   category: string; pinned: boolean; createdAt: string;
   author: { id: string; name: string };
   comments: Comment[];
-  reactions: Reaction[];
   _count: { comments: number };
 }
 
-// 色のリスト（ユーザーアバター用）
 const COLORS = ["bg-red-400","bg-orange-400","bg-yellow-400","bg-green-400","bg-teal-400","bg-blue-400","bg-indigo-400","bg-purple-400","bg-pink-400"];
 function avatarColor(name: string) {
   let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
@@ -27,7 +23,6 @@ function avatarColor(name: string) {
 }
 
 export default function BoardPage() {
-  const { data: session } = useSession();
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "連絡ノート", imageData: "" });
@@ -35,7 +30,6 @@ export default function BoardPage() {
   const [showCatMenu, setShowCatMenu] = useState(false);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<Record<string, string>>({});
-  const [stampTarget, setStampTarget] = useState<string | null>(null);
   const [commentStampTarget, setCommentStampTarget] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,34 +77,12 @@ export default function BoardPage() {
     }
   }
 
-  async function toggleReaction(postId: string, emoji: string) {
-    const res = await fetch(`/api/posts/${postId}/reactions`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji }),
-    });
-    if (res.ok) {
-      const reactions = await res.json();
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, reactions } : p));
-    }
-    setStampTarget(null);
-  }
-
-  // emoji ごとに押した人の一覧を作る
-  function groupReactions(reactions: Reaction[]) {
-    const map: Record<string, { users: { id: string; name: string }[] }> = {};
-    for (const r of reactions) {
-      if (!map[r.emoji]) map[r.emoji] = { users: [] };
-      map[r.emoji].users.push(r.user);
-    }
-    return map;
-  }
-
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
   return (
-    <div className="flex h-full" onClick={() => { setStampTarget(null); setCommentStampTarget(null); setShowCatMenu(false); }}>
+    <div className="flex h-full" onClick={() => { setCommentStampTarget(null); setShowCatMenu(false); }}>
       {/* Desktop sidebar */}
       <div className="hidden md:flex w-52 border-r border-gray-200 bg-white flex-col flex-shrink-0">
         <div className="p-3 border-b border-gray-200">
@@ -189,7 +161,6 @@ export default function BoardPage() {
               <div className="text-center py-12 text-gray-400"><p className="text-4xl mb-3">📋</p><p className="text-sm">まだ投稿がありません</p></div>
             )}
             {posts.map(post => {
-              const grouped = groupReactions(post.reactions);
               const isExpanded = expandedPost === post.id;
               return (
                 <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-200" onClick={e => e.stopPropagation()}>
@@ -216,50 +187,8 @@ export default function BoardPage() {
                       </div>
                     </div>
 
-                    {/* リアクション表示（LINE WORKSスタイル：誰が押したか） */}
-                    {Object.keys(grouped).length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs text-gray-400 mb-2">リアクション</p>
-                        <div className="flex flex-wrap gap-3">
-                          {Object.entries(grouped).map(([emoji, { users }]) => (
-                            <div key={emoji} className="flex flex-col items-center gap-1">
-                              {/* アバター一覧 */}
-                              <div className="flex flex-wrap gap-1 max-w-48">
-                                {users.map(u => (
-                                  <button key={u.id} onClick={() => toggleReaction(post.id, emoji)}
-                                    title={`${u.name}が${emoji}を押しました`}
-                                    className={`w-8 h-8 ${avatarColor(u.name)} rounded-full flex items-center justify-center text-xs font-bold text-white hover:opacity-80 transition-opacity ${u.id === session?.user?.id ? "ring-2 ring-indigo-400" : ""}`}>
-                                    {u.name[0]}
-                                  </button>
-                                ))}
-                              </div>
-                              <span className="text-sm">{emoji} <span className="text-xs text-gray-500">{users.length}</span></span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* アクションバー */}
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                      {/* スタンプボタン */}
-                      <div className="relative">
-                        <button onClick={e => { e.stopPropagation(); setStampTarget(stampTarget === post.id ? null : post.id); }}
-                          className="flex items-center gap-1 text-sm text-gray-500 hover:text-yellow-500 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                          😊 スタンプ
-                        </button>
-                        {stampTarget === post.id && (
-                          <div className="absolute bottom-10 left-0 flex gap-1 bg-white rounded-2xl shadow-xl border border-gray-200 px-3 py-2 z-20"
-                            onClick={e => e.stopPropagation()}>
-                            {STAMPS.map(e => (
-                              <button key={e} onClick={() => toggleReaction(post.id, e)}
-                                className="text-xl hover:scale-125 transition-transform p-1">{e}</button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* コメントボタン（目立つデザイン） */}
+                    {/* コメントボタン */}
+                    <div className="mt-3 pt-3 border-t border-gray-100">
                       <button onClick={() => setExpandedPost(isExpanded ? null : post.id)}
                         className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors font-medium ${isExpanded ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100 hover:text-indigo-600"}`}>
                         💬 コメント
@@ -292,7 +221,7 @@ export default function BoardPage() {
                         ))}
                       </div>
                       <div className="flex gap-2 items-center relative">
-                        {/* スタンプピッカー（コメントとして送信） */}
+                        {/* スタンプをコメントとして送信 */}
                         <div className="relative">
                           <button type="button"
                             onClick={e => { e.stopPropagation(); setCommentStampTarget(commentStampTarget === post.id ? null : post.id); }}
