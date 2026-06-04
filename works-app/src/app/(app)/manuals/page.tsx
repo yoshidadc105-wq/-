@@ -93,7 +93,6 @@ export default function ManualsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors text-sm">{m.title}</p>
                   {m.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{m.description}</p>}
-                  <p className="text-xs text-gray-400 mt-0.5">{m.createdBy.name}</p>
                 </div>
                 <button onClick={e => { e.preventDefault(); deleteManual(m.id); }}
                   className="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 p-1">
