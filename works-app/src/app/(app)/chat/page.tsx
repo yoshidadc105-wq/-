@@ -61,7 +61,7 @@ export default function ChatPage() {
       convIdRef.current = selectedConv.id;
       fetchMessages(selectedConv.id, true);
       if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => fetchMessages(selectedConv.id), 8000);
+      pollRef.current = setInterval(() => fetchMessages(selectedConv.id), 3000);
     }
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -107,12 +107,13 @@ export default function ChatPage() {
       if (res.ok) {
         const msg = await res.json();
         setMessages(prev => {
-          // 重複チェック
           if (prev.find(m => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         fetchConversations();
+        // 送信直後に即時ポーリングして相手側の更新を確認
+        setTimeout(() => fetchMessages(selectedConv.id), 500);
       }
     } finally {
       setSending(false);
@@ -182,9 +183,9 @@ export default function ChatPage() {
     return new Date(other.lastReadAt) >= new Date(msgCreatedAt);
   }
 
-  // 送信から5分以内か
+  // 送信から24時間以内か（LINEと同仕様）
   function canDelete(createdAt: string) {
-    return Date.now() - new Date(createdAt).getTime() < 5 * 60 * 1000;
+    return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000;
   }
 
   return (
