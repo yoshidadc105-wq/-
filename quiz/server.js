@@ -118,7 +118,8 @@ function normalizeAns(s) {
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[\s　]+/g, '')
     .replace(/[、。，．・〜～ー]/g, '')
-    .replace(/[おご](?=[一-龥ぁ-ん])/g, ''); // 敬語プレフィックス（お鼻→鼻、ご確認→確認）を正規化
+    .replace(/[おご](?=[一-龥ぁ-ん])/g, '') // 敗語プレフィックス（お鼻→鼻、ご確認→確認）
+    .replace(/の/g, ''); // 助詞「の」を除去（LINEの親変更→LINE親変更）
 }
 
 app.get('/api/sets', async (req, res) => {
