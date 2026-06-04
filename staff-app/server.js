@@ -290,141 +290,286 @@ app.get('/dashboard', async (req, res) => {
     const counselingTotal = Object.values(s.counselingMap).reduce((x,y)=>x+y,0);
     const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
+    const initial = name.charAt(0);
     return `
-      <tr class="staff-row" data-staff="${esc(name)}" style="cursor:pointer;" onclick="openModal('${esc(name).replace(/'/g, "\\'")}')">
-        <td><strong>${esc(name)}</strong></td>
-        <td class="num">${s.count}</td>
+      <tr class="staff-row" onclick="openModal('${esc(name).replace(/'/g, "\\'")}')">
+        <td><span class="avatar">${esc(initial)}</span><strong>${esc(name)}</strong></td>
+        <td class="num"><span class="badge badge-gray">${s.count}</span></td>
         <td class="num">${s.patients.size}</td>
-        <td class="num">${itemsTotal}${itemsDetail ? `<br><small style="color:#666;font-size:11px">${esc(itemsDetail)}</small>` : ''}</td>
-        <td class="num">${counselingTotal}<br><small style="color:#666;font-size:11px">${esc(counselingDetail)}</small></td>
-        <td class="num">${s.reviews}</td>
-        <td style="font-size:12px;color:#555">${esc(treatmentDetail)}</td>
+        <td class="num"><span class="badge badge-orange">${itemsTotal}</span>${itemsDetail ? `<br><small style="color:#94a3b8;font-size:11px">${esc(itemsDetail)}</small>` : ''}</td>
+        <td class="num"><span class="badge badge-blue">${counselingTotal}</span><br><small style="color:#94a3b8;font-size:11px">${esc(counselingDetail)}</small></td>
+        <td class="num"><span class="badge badge-green">${s.reviews}</span></td>
+        <td style="font-size:11px;color:#64748b;max-width:160px">${esc(treatmentDetail)}</td>
         <td class="num goal-cell" onclick="event.stopPropagation()">
-          <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
-            <input type="number" min="0" class="goal-input" data-staff="${esc(name)}" placeholder="目標" style="width:58px;border:1px solid #ccc;border-radius:4px;padding:2px 5px;font-size:12px;text-align:right;" />
-            <div class="goal-gauge-wrap" style="width:80px;height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;">
-              <div class="goal-gauge-bar" data-staff="${esc(name)}" data-items="${itemsTotal}" style="height:100%;background:#2aab96;width:0%;transition:width .3s;"></div>
-            </div>
-            <span class="goal-pct" data-staff="${esc(name)}" style="font-size:11px;color:#065f46;min-width:32px;">-</span>
+          <div class="goal-wrap">
+            <input type="number" min="0" class="goal-input" data-staff="${esc(name)}" placeholder="目標" />
+            <div class="goal-gauge-wrap"><div class="goal-gauge-bar" data-staff="${esc(name)}" data-items="${itemsTotal}" style="width:0%"></div></div>
+            <span class="goal-pct" data-staff="${esc(name)}">-</span>
           </div>
         </td>
-        <td onclick="event.stopPropagation()">
+        <td onclick="event.stopPropagation()" style="white-space:nowrap">
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
           <a href="/evaluation?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-eval">評価表</a>
         </td>
       </tr>`;
   }).join('');
 
-  const detailRows = records.map(r => {
-    const its = Array.isArray(r.selectedItems) ? r.selectedItems : [];
-    const itemStr = its.map(i => i.label).join('、') || '-';
+  const detailRows = records.slice().reverse().slice(0, 100).map(r => {
+    const actionLabel = r.action ? `<span class="badge badge-gray">${esc(r.action)}${r.itemName ? `（${esc(r.itemName)}）` : ''}${r.otherText ? `（${esc(r.otherText)}）` : ''}</span>` : '-';
+    const entryBadge = r.entryType === 'behavior' ? '<span class="badge badge-blue" style="margin-right:4px">行動</span>' : '';
     return `
       <tr>
-        <td>${esc(r.date)}</td>
-        <td><strong>${esc(r.staffName)}</strong></td>
-        <td>${esc(r.patientNo)}</td>
-        <td style="font-size:12px">${esc(itemStr)}</td>
-        <td style="font-size:12px">${esc(r.freeText)}</td>
+        <td style="white-space:nowrap;color:#64748b">${esc(r.date)}</td>
+        <td><span class="avatar" style="width:24px;height:24px;font-size:10px">${esc((r.staffName||'?').charAt(0))}</span><strong>${esc(r.staffName)}</strong></td>
+        <td style="color:#64748b">${esc(r.patientNo) || '-'}</td>
+        <td>${entryBadge}${actionLabel}</td>
+        <td style="font-size:12px;color:#475569">${esc(r.freeText) || '-'}</td>
       </tr>`;
   }).join('');
+
+  // KPIサマリー
+  const totalItems = staffList.reduce((s,[,d])=>s+Object.values(d.itemsMap).reduce((a,b)=>a+b,0),0);
+  const totalCounseling = staffList.reduce((s,[,d])=>s+Object.values(d.counselingMap).reduce((a,b)=>a+b,0),0);
+  const totalReviews = staffList.reduce((s,[,d])=>s+d.reviews,0);
+  const totalPatients = new Set(records.filter(r=>r.patientNo).map(r=>r.patientNo)).size;
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>スタッフ実績ダッシュボード | のびのび歯科</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: sans-serif; background: #f3f4f6; color: #333; }
-header { background: #2aab96; color: #fff; padding: 14px 24px; }
-header h1 { font-size: 17px; font-weight: bold; }
-.container { padding: 20px; max-width: 1200px; margin: 0 auto; }
-h2 { font-size: 15px; color: #065f46; margin: 20px 0 10px; font-weight: bold; border-left: 4px solid #2aab96; padding-left: 8px; }
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 30px; font-size: 13px; }
-th { background: #e8f7f5; padding: 8px 10px; text-align: left; color: #065f46; white-space: nowrap; }
-th.num, td.num { text-align: right; }
-td { padding: 8px 10px; border-top: 1px solid #e5e7eb; vertical-align: top; }
-.empty { text-align: center; padding: 40px; color: #9ca3af; }
-.btn-cert { background: #f59e0b; color: #fff; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; margin-right: 4px; display: inline-block; }
-.btn-eval { background: #3b82f6; color: #fff; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-block; }
-.filter-bar { background:#fff; border-radius:8px; padding:14px 16px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,.08); display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:13px; }
-.filter-bar label { color:#065f46; font-weight:bold; }
-.filter-bar input[type=date] { border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:13px; }
-.filter-bar select { border:1px solid #ccc; border-radius:6px; padding:5px 10px; font-size:13px; background:#fff; }
-.filter-bar button { background:#2aab96; color:#fff; border:none; border-radius:6px; padding:6px 16px; font-size:13px; cursor:pointer; }
-.filter-bar a { color:#9ca3af; font-size:12px; text-decoration:underline; }
-.chart-wrap { background:#fff; border-radius:8px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:30px; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#f0f4f8;color:#1e293b;font-size:14px}
+
+/* ヘッダー */
+header{background:linear-gradient(135deg,#0f766e 0%,#2aab96 60%,#34d399 100%);padding:0;box-shadow:0 2px 12px rgba(15,118,110,.3)}
+.header-inner{max-width:1280px;margin:0 auto;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.header-title{display:flex;align-items:center;gap:12px}
+.header-icon{width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+header h1{font-size:18px;font-weight:700;color:#fff;letter-spacing:.03em}
+header p{font-size:11px;color:rgba(255,255,255,.75);margin-top:2px}
+.header-badge{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:500}
+
+/* コンテナ */
+.container{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
+
+/* KPIカード */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:28px}
+.kpi-card{background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);border-left:4px solid transparent;transition:transform .15s,box-shadow .15s}
+.kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.kpi-card.green{border-color:#2aab96}
+.kpi-card.blue{border-color:#3b82f6}
+.kpi-card.orange{border-color:#f59e0b}
+.kpi-card.purple{border-color:#8b5cf6}
+.kpi-label{font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.kpi-value{font-size:30px;font-weight:700;line-height:1;margin-bottom:4px}
+.kpi-card.green .kpi-value{color:#0f766e}
+.kpi-card.blue .kpi-value{color:#2563eb}
+.kpi-card.orange .kpi-value{color:#d97706}
+.kpi-card.purple .kpi-value{color:#7c3aed}
+.kpi-sub{font-size:11px;color:#94a3b8}
+
+/* セクションヘッダー */
+.section-header{display:flex;align-items:center;gap:10px;margin:28px 0 14px}
+.section-header h2{font-size:15px;font-weight:700;color:#0f766e}
+.section-header .section-line{flex:1;height:1px;background:linear-gradient(90deg,#2aab96,transparent)}
+
+/* フィルターバー */
+.filter-card{background:#fff;border-radius:14px;padding:16px 20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.filter-card label{font-size:12px;font-weight:700;color:#0f766e;white-space:nowrap}
+.filter-card input[type=date],.filter-card select{border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc;color:#1e293b;outline:none;transition:border .2s}
+.filter-card input:focus,.filter-card select:focus{border-color:#2aab96;background:#fff}
+.filter-card .sep{color:#cbd5e1;font-size:18px;line-height:1}
+.btn-primary{background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .2s}
+.btn-primary:hover{opacity:.88}
+.btn-reset{background:transparent;color:#94a3b8;border:none;font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit}
+.filter-tag{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600}
+
+/* グラフ */
+.chart-card{background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);margin-bottom:28px}
+.chart-card h3{font-size:13px;font-weight:700;color:#475569;margin-bottom:16px}
+
+/* テーブル共通 */
+.table-card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);margin-bottom:28px}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:linear-gradient(180deg,#f0fdf4,#ecfdf5);padding:10px 14px;text-align:left;color:#065f46;font-weight:700;font-size:12px;white-space:nowrap;border-bottom:2px solid #a7f3d0}
+th.num,td.num{text-align:right}
+tbody tr{border-bottom:1px solid #f1f5f9;transition:background .12s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#f8fffe}
+td{padding:11px 14px;vertical-align:middle}
+.empty{text-align:center;padding:48px;color:#94a3b8;font-size:14px}
+
+/* スタッフ行 */
+.staff-row{cursor:pointer}
+.staff-row td:first-child{font-weight:700;color:#0f766e}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#2aab96,#0f766e);color:#fff;font-size:12px;font-weight:700;margin-right:8px;flex-shrink:0}
+
+/* バッジ */
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#15803d}
+.badge-blue{background:#dbeafe;color:#1d4ed8}
+.badge-orange{background:#fef3c7;color:#b45309}
+.badge-gray{background:#f1f5f9;color:#475569}
+
+/* 出力ボタン */
+.btn-cert{background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#fff;padding:4px 12px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:600;margin-right:4px;display:inline-block;transition:opacity .2s;white-space:nowrap}
+.btn-cert:hover{opacity:.85}
+.btn-eval{background:linear-gradient(135deg,#3b82f6,#60a5fa);color:#fff;padding:4px 12px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:600;display:inline-block;transition:opacity .2s;white-space:nowrap}
+.btn-eval:hover{opacity:.85}
+
+/* 目標ゲージ */
+.goal-wrap{display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.goal-input{width:54px;border:1.5px solid #e2e8f0;border-radius:6px;padding:3px 6px;font-size:12px;text-align:right;font-family:inherit;outline:none;transition:border .2s}
+.goal-input:focus{border-color:#2aab96}
+.goal-gauge-wrap{width:72px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+.goal-gauge-bar{height:100%;background:linear-gradient(90deg,#2aab96,#34d399);border-radius:4px;transition:width .4s}
+.goal-pct{font-size:11px;color:#0f766e;font-weight:600;min-width:30px;text-align:right}
+
+/* スタッフ管理 */
+.mgmt-card{background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);margin-bottom:28px;max-width:420px}
+.mgmt-input-row{display:flex;gap:8px;margin-bottom:12px}
+.mgmt-input{flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;transition:border .2s}
+.mgmt-input:focus{border-color:#2aab96}
+.btn-add{background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.mgmt-list li{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:14px}
+.mgmt-list li:last-child{border-bottom:none}
+.btn-del{background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s}
+.btn-del:hover{background:#fecaca}
+
 /* モーダル */
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
-.modal-overlay.open { display:flex; }
-.modal-box { background:#fff; border-radius:10px; padding:28px 30px; max-width:520px; width:92%; max-height:80vh; overflow-y:auto; position:relative; box-shadow:0 4px 24px rgba(0,0,0,.18); }
-.modal-close { position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; cursor:pointer; color:#9ca3af; line-height:1; }
-.modal-close:hover { color:#333; }
-.modal-title { font-size:18px; font-weight:bold; color:#065f46; margin-bottom:16px; }
-.modal-section { margin-bottom:14px; }
-.modal-section h3 { font-size:13px; font-weight:bold; color:#2aab96; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-bottom:8px; }
-.modal-section ul { list-style:none; padding:0; margin:0; font-size:13px; color:#444; }
-.modal-section ul li { padding:3px 0; border-bottom:1px solid #f3f4f6; }
-.modal-section ul li:last-child { border-bottom:none; }
-.modal-empty { color:#9ca3af; font-size:13px; }
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal-overlay.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;padding:28px 30px;max-width:540px;width:94%;max-height:85vh;overflow-y:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-close{position:absolute;top:14px;right:16px;background:#f1f5f9;border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;color:#64748b;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.modal-close:hover{background:#e2e8f0;color:#1e293b}
+.modal-title{font-size:20px;font-weight:700;color:#0f766e;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.modal-section{margin-bottom:16px}
+.modal-section h3{font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #f1f5f9}
+.modal-section ul{list-style:none;padding:0;margin:0}
+.modal-section ul li{padding:5px 0;font-size:13px;color:#334155;display:flex;justify-content:space-between;border-bottom:1px solid #f8fafc}
+.modal-section ul li:last-child{border-bottom:none}
+.modal-cnt{font-weight:700;color:#0f766e}
+.modal-empty{color:#94a3b8;font-size:13px;font-style:italic}
+
+@media(max-width:600px){
+  .header-inner{padding:14px 16px}
+  header h1{font-size:15px}
+  .container{padding:16px 12px 50px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .kpi-value{font-size:24px}
+  td{padding:8px 10px}
+}
 </style>
 </head>
 <body>
-<header><h1>スタッフ実績ダッシュボード｜のびのび歯科</h1></header>
+<header>
+  <div class="header-inner">
+    <div class="header-title">
+      <div class="header-icon">🦷</div>
+      <div>
+        <h1>スタッフ実績ダッシュボード</h1>
+        <p>のびのび歯科・矯正歯科</p>
+      </div>
+    </div>
+    <div class="header-badge">管理者専用</div>
+  </div>
+</header>
+
 <div class="container">
-  <form class="filter-bar" method="get" action="/dashboard">
-    <label>期間絞り込み</label>
+
+  <!-- KPIカード -->
+  <div class="kpi-grid">
+    <div class="kpi-card green">
+      <div class="kpi-label">登録患者数</div>
+      <div class="kpi-value">${totalPatients}</div>
+      <div class="kpi-sub">ユニーク患者番号</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">物品販売</div>
+      <div class="kpi-value">${totalItems}</div>
+      <div class="kpi-sub">合計件数</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">カウンセリング成約</div>
+      <div class="kpi-value">${totalCounseling}</div>
+      <div class="kpi-sub">合計件数</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">口コミ獲得</div>
+      <div class="kpi-value">${totalReviews}</div>
+      <div class="kpi-sub">合計件数</div>
+    </div>
+  </div>
+
+  <!-- フィルター -->
+  <form class="filter-card" method="get" action="/dashboard">
+    <label>期間</label>
     <input type="date" name="from" value="${esc(from || '')}" />
-    <span style="color:#9ca3af">〜</span>
+    <span class="sep">—</span>
     <input type="date" name="to" value="${esc(to || '')}" />
-    <label style="margin-left:8px">スタッフ</label>
+    <label>スタッフ</label>
     <select name="staff" id="staffFilter">
-      <option value="">全スタッフ</option>
+      <option value="">全員</option>
       ${staffOptions}
     </select>
-    <button type="submit">絞り込む</button>
-    ${from || to || staffFilter ? '<a href="/dashboard">リセット</a>' : ''}
-    ${from || to ? `<span style="color:#f59e0b;font-size:12px">★ 期間指定中</span>` : ''}
-    ${staffFilter ? `<span style="color:#2aab96;font-size:12px">★ スタッフ絞り込み中: ${esc(staffFilter)}</span>` : ''}
+    <button type="submit" class="btn-primary">絞り込む</button>
+    ${from || to || staffFilter ? '<button type="button" class="btn-reset" onclick="location.href=\'/dashboard\'">リセット</button>' : ''}
+    ${from || to ? `<span class="filter-tag">📅 期間指定中</span>` : ''}
+    ${staffFilter ? `<span class="filter-tag">👤 ${esc(staffFilter)}</span>` : ''}
   </form>
 
-  <h2>月別推移グラフ${staffFilter ? `（${esc(staffFilter)}）` : ''}</h2>
-  <div class="chart-wrap">
-    <canvas id="monthChart" style="width:100%;max-height:300px;"></canvas>
+  <!-- 月別グラフ -->
+  <div class="section-header"><h2>月別推移</h2><div class="section-line"></div></div>
+  <div class="chart-card">
+    <h3>物品販売・カウンセリング・口コミの月次推移</h3>
+    <canvas id="monthChart" style="max-height:280px"></canvas>
   </div>
 
-  <h2>スタッフ別 累計実績${from || to ? `（${from||''}〜${to||''}）` : ''}${staffFilter ? `（${esc(staffFilter)}）` : ''}</h2>
-  <div style="overflow-x:auto">
-  <table>
-    <thead><tr>
-      <th>スタッフ名</th><th class="num">書き込み件数</th><th class="num">登録患者数</th><th class="num">物品販売</th>
-      <th class="num">カウンセリング成約</th><th class="num">口コミ獲得</th>
-      <th>処置内訳</th><th class="num">月間目標</th><th>出力</th>
-    </tr></thead>
-    <tbody>${summaryRows || '<tr><td colspan="9" class="empty">まだデータがありません</td></tr>'}</tbody>
-  </table>
-  </div>
-  <h2>入力履歴（新しい順）</h2>
-  <div style="overflow-x:auto">
-  <table>
-    <thead><tr>
-      <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th>
-    </tr></thead>
-    <tbody>${detailRows || '<tr><td colspan="7" class="empty">まだデータがありません</td></tr>'}</tbody>
-  </table>
+  <!-- スタッフ別テーブル -->
+  <div class="section-header"><h2>スタッフ別 累計実績</h2><div class="section-line"></div></div>
+  <div class="table-card">
+    <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th><th class="num">物品販売</th>
+        <th class="num">カウンセリング</th><th class="num">口コミ</th>
+        <th>処置内訳</th><th class="num">月間目標</th><th>出力</th>
+      </tr></thead>
+      <tbody>${summaryRows || '<tr><td colspan="9" class="empty">まだデータがありません</td></tr>'}</tbody>
+    </table>
+    </div>
   </div>
 
-  <h2>スタッフ名管理</h2>
-  <div id="staff-mgmt" style="background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:30px;max-width:400px;">
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <input type="text" id="newStaffInput" placeholder="新しいスタッフ名" style="flex:1;border:1px solid #ccc;border-radius:6px;padding:7px 10px;font-size:14px;" />
-      <button onclick="addStaffName()" style="background:#2aab96;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:14px;cursor:pointer;white-space:nowrap;">追加</button>
+  <!-- 入力履歴 -->
+  <div class="section-header"><h2>入力履歴（新しい順）</h2><div class="section-line"></div></div>
+  <div class="table-card">
+    <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th>
+      </tr></thead>
+      <tbody>${detailRows || '<tr><td colspan="5" class="empty">まだデータがありません</td></tr>'}</tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- スタッフ名管理 -->
+  <div class="section-header"><h2>スタッフ名管理</h2><div class="section-line"></div></div>
+  <div class="mgmt-card">
+    <div class="mgmt-input-row">
+      <input type="text" id="newStaffInput" placeholder="新しいスタッフ名を入力" class="mgmt-input" />
+      <button onclick="addStaffName()" class="btn-add">追加</button>
     </div>
     <div id="staffNameMsg" style="font-size:12px;margin-bottom:10px;min-height:16px;"></div>
-    <ul id="staffNameList" style="list-style:none;padding:0;margin:0;"></ul>
+    <ul id="staffNameList" class="mgmt-list" style="list-style:none;padding:0;margin:0;"></ul>
   </div>
-</div>
+
+</div><!-- /container -->
 
 <!-- ドリルダウンモーダル -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
@@ -462,9 +607,9 @@ const MONTH_DATA = ${JSON.stringify(monthData)};
     data: {
       labels: MONTH_DATA.labels,
       datasets: [
-        { label: '物品販売', data: MONTH_DATA.items, backgroundColor: 'rgba(42,171,150,0.8)', stack: 'a' },
-        { label: 'カウンセリング', data: MONTH_DATA.counseling, backgroundColor: 'rgba(59,130,246,0.8)', stack: 'a' },
-        { label: '口コミ', data: MONTH_DATA.reviews, backgroundColor: 'rgba(249,115,22,0.8)', stack: 'a' },
+        { label: '物品販売', data: MONTH_DATA.items, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius:4, stack: 'a' },
+        { label: 'カウンセリング', data: MONTH_DATA.counseling, backgroundColor: 'rgba(59,130,246,0.85)', borderRadius:4, stack: 'a' },
+        { label: '口コミ', data: MONTH_DATA.reviews, backgroundColor: 'rgba(42,171,150,0.85)', borderRadius:4, stack: 'a' },
       ]
     },
     options: {
@@ -540,7 +685,7 @@ async function loadMgmtStaffNames() {
   names.forEach(n => {
     const li = document.createElement('li');
     li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:14px;';
-    li.innerHTML = '<span>' + n + '</span><button onclick="deleteStaffName(' + JSON.stringify(n) + ')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer;">削除</button>';
+    li.innerHTML = '<span>' + n + '</span><button onclick="deleteStaffName(' + JSON.stringify(n) + ')" class="btn-del">削除</button>';
     ul.appendChild(li);
   });
 }
