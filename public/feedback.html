@@ -532,15 +532,21 @@
 
   </form>`;
 
+  function fetchWithTimeout(url, ms) {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(tid));
+  }
+
   async function init() {
     const root = document.getElementById('root');
     let targets = [];
     try {
-      const res = await fetch('/api/targets');
+      const res = await fetchWithTimeout('/api/targets', 20000);
       if (!res.ok) throw new Error();
       targets = await res.json();
     } catch {
-      root.innerHTML = '<div class="error-msg">対象者リストの読み込みに失敗しました。<br>管理者にご連絡ください。</div>';
+      root.innerHTML = '<div class="error-msg">読み込みに失敗しました。<br>ページを再読み込みしてください。<br><br><button onclick="location.reload()" style="padding:8px 20px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">再読み込み</button></div>';
       return;
     }
 

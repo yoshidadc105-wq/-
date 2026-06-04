@@ -706,10 +706,10 @@ app.patch('/api/quiz-subs/:id', async (req, res) => {
 // ===== 360度評価 対象者管理 =====
 
 // 公開: 対象者一覧（名前のみ）
-app.get('/api/targets', async (req, res) => {
+app.get('/api/targets', ah(async (req, res) => {
   const targets = await (await getDb()).collection('targets').find({}).sort({ order: 1, createdAt: 1 }).toArray();
   res.json(targets.map(({ id, name }) => ({ id, name })));
-});
+}));
 
 // 管理者: 対象者追加
 app.post('/api/targets', async (req, res) => {
@@ -744,10 +744,10 @@ app.put('/api/targets/reorder', ah(async (req, res) => {
 }));
 
 // ===== 回答者管理 =====
-app.get('/api/respondents', async (req, res) => {
+app.get('/api/respondents', ah(async (req, res) => {
   const list = await (await getDb()).collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray();
   res.json(list.map(({ id, name }) => ({ id, name })));
-});
+}));
 app.post('/api/respondents', ah(async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
   const name = (req.body.name || '').trim();
@@ -1660,10 +1660,10 @@ async function loadQuestions() {
   return rest;
 }
 
-app.get('/api/questions', async (req, res) => {
+app.get('/api/questions', ah(async (req, res) => {
   const questions = await loadQuestions();
   res.json(questions);
-});
+}));
 app.put('/api/questions', async (req, res) => {
   if (!checkFeedbackAuth(req, res)) return;
   const data = { ...req.body, _id: 'questions' };
