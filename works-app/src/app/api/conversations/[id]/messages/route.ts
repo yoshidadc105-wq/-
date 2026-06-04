@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -13,7 +14,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
   if (!member) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  // Mark as read
   await prisma.conversationMember.update({
     where: { id: member.id },
     data: { lastReadAt: new Date() },
@@ -36,10 +36,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const member = await prisma.conversationMember.findFirst({
-    where: { conversationId: id, userId: session.user.id },
+  const members = await prisma.conversationMember.findMany({
+    where: { conversationId: id },
   });
-  if (!member) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const memberIds = members.map(m => m.userId);
+  if (!memberIds.includes(session.user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { content, imageData } = await req.json();
   const message = await prisma.message.create({
@@ -57,6 +58,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   await prisma.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
+
+  // 自分以外のメンバーに通知
+  const otherIds = memberIds.filter(uid => uid !== session.user.id);
+  await sendPushToUsers(otherIds, {
+    title: `💬 ${message.sender.name}`,
+    body: imageData ? "📷 画像を送信しました" : (content || ""),
+    url: "/chat",
+  });
 
   return NextResponse.json(message);
 }

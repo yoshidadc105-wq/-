@@ -12,10 +12,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!message) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (message.senderId !== session.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  // 送信から5分以内のみ取り消し可能
+  // 送信から24時間以内のみ取り消し可能（LINEと同じ仕様）
   const elapsed = Date.now() - new Date(message.createdAt).getTime();
-  if (elapsed > 5 * 60 * 1000) {
-    return NextResponse.json({ error: "送信から5分以上経過しているため取り消しできません" }, { status: 400 });
+  if (elapsed > 24 * 60 * 60 * 1000) {
+    return NextResponse.json({ error: "送信から24時間以上経過しているため取り消しできません" }, { status: 400 });
   }
 
   await prisma.messageReaction.deleteMany({ where: { messageId: id } });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -47,5 +48,17 @@ export async function POST(req: NextRequest) {
       _count: { select: { comments: true } },
     },
   });
+
+  // 自分以外の全員に通知
+  const allUsers = await prisma.user.findMany({
+    where: { id: { not: session.user.id } },
+    select: { id: true },
+  });
+  await sendPushToUsers(allUsers.map(u => u.id), {
+    title: `📋 ${post.author.name}が投稿しました`,
+    body: title,
+    url: "/board",
+  });
+
   return NextResponse.json(post);
 }

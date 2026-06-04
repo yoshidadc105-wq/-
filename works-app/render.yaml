@@ -16,6 +16,10 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
+      - key: VAPID_PUBLIC_KEY
+        value: BDeuGR14ThpnFywEC5JbEsUnf-sl48IlF9lp6AYgr4Z5dF6yOOP4ixL61lSdxxJKbeSTIBPAGIn5Al5XGDb_YVU
+      - key: VAPID_PRIVATE_KEY
+        value: HhenR1vR8yxrAUfiLfPpNQ4eDii-vuIGoEvvXxLeMHk
 
 databases:
   - name: works-db
