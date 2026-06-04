@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 
 const STAMP_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🎉", "👏"];
@@ -10,10 +10,11 @@ interface Message {
   id: string; content: string; imageData?: string; createdAt: string;
   sender: { id: string; name: string; avatar?: string; };
   reactions: Reaction[];
+  deleted?: boolean;
 }
+interface ConvMember { user: User; lastReadAt?: string; }
 interface Conversation {
-  id: string;
-  members: { user: User; lastReadAt?: string }[];
+  id: string; members: ConvMember[];
   messages: (Message & { sender: { name: string } })[];
   updatedAt: string;
 }
@@ -28,22 +29,44 @@ export default function ChatPage() {
   const [showUsers, setShowUsers] = useState(false);
   const [showList, setShowList] = useState(true);
   const [stampTarget, setStampTarget] = useState<string | null>(null);
+  const [menuTarget, setMenuTarget] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [sendImageData, setSendImageData] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const convIdRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => { fetchConversations(); fetchUsers(); }, []);
+
+  const fetchMessages = useCallback(async (convId: string, scrollBottom = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const res = await fetch(`/api/conversations/${convId}/messages`);
+      if (res.ok && convIdRef.current === convId) {
+        const data = await res.json();
+        setMessages(data);
+        if (scrollBottom) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     if (selectedConv) {
-      fetchMessages(selectedConv.id);
+      convIdRef.current = selectedConv.id;
+      fetchMessages(selectedConv.id, true);
       if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => fetchMessages(selectedConv.id), 5000);
+      pollRef.current = setInterval(() => fetchMessages(selectedConv.id), 8000);
     }
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [selectedConv?.id]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [selectedConv?.id, fetchMessages]);
 
   async function fetchConversations() {
     const res = await fetch("/api/conversations");
@@ -53,10 +76,7 @@ export default function ChatPage() {
     const res = await fetch("/api/users");
     if (res.ok) setUsers(await res.json());
   }
-  async function fetchMessages(convId: string) {
-    const res = await fetch(`/api/conversations/${convId}/messages`);
-    if (res.ok) setMessages(await res.json());
-  }
+
   async function startConversation(userId: string) {
     const res = await fetch("/api/conversations", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -70,20 +90,46 @@ export default function ChatPage() {
       setShowList(false);
     }
   }
+
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
-    if ((!newMsg.trim() && !sendImageData) || !selectedConv) return;
-    const res = await fetch(`/api/conversations/${selectedConv.id}/messages`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: newMsg, imageData: sendImageData }),
-    });
-    if (res.ok) {
-      const msg = await res.json();
-      setMessages(prev => [...prev, msg]);
-      setNewMsg(""); setSendImageData(null);
-      fetchConversations();
+    if ((!newMsg.trim() && !sendImageData) || !selectedConv || sending) return;
+    setSending(true);
+    const content = newMsg;
+    const img = sendImageData;
+    setNewMsg(""); setSendImageData(null);
+
+    try {
+      const res = await fetch(`/api/conversations/${selectedConv.id}/messages`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, imageData: img }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        setMessages(prev => {
+          // 重複チェック
+          if (prev.find(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        fetchConversations();
+      }
+    } finally {
+      setSending(false);
     }
   }
+
+  async function deleteMessage(messageId: string) {
+    const res = await fetch(`/api/messages/${messageId}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } else {
+      const data = await res.json();
+      alert(data.error || "取り消しできませんでした");
+    }
+    setMenuTarget(null);
+  }
+
   async function toggleReaction(messageId: string, emoji: string) {
     const res = await fetch(`/api/messages/${messageId}/reactions`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -103,6 +149,7 @@ export default function ChatPage() {
     const reader = new FileReader();
     reader.onload = () => setSendImageData(reader.result as string);
     reader.readAsDataURL(file);
+    e.target.value = "";
   }
 
   function getOtherUser(conv: Conversation) {
@@ -115,13 +162,10 @@ export default function ChatPage() {
     return new Date(d).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
   }
   function formatListTime(d: string) {
-    const date = new Date(d);
-    const now = new Date();
+    const date = new Date(d); const now = new Date();
     if (date.toDateString() === now.toDateString()) return formatTime(d);
     return date.toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" });
   }
-
-  // Group reactions by emoji
   function groupReactions(reactions: Reaction[]) {
     const map: Record<string, { count: number; users: string[]; hasMe: boolean }> = {};
     for (const r of reactions) {
@@ -132,20 +176,23 @@ export default function ChatPage() {
     }
     return map;
   }
-
-  // Check if other user has read up to this message
   function isRead(conv: Conversation, msgCreatedAt: string) {
     const other = getOtherMember(conv);
     if (!other?.lastReadAt) return false;
     return new Date(other.lastReadAt) >= new Date(msgCreatedAt);
   }
 
+  // 送信から5分以内か
+  function canDelete(createdAt: string) {
+    return Date.now() - new Date(createdAt).getTime() < 5 * 60 * 1000;
+  }
+
   return (
-    <div className="flex h-full bg-gray-100">
+    <div className="flex h-full bg-gray-100" onClick={() => { setStampTarget(null); setMenuTarget(null); }}>
       {/* Conversation list */}
       <div className={`${showList ? "flex" : "hidden"} md:flex w-full md:w-80 bg-white flex-col flex-shrink-0 border-r border-gray-200`}>
-        <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-bold text-gray-800 text-base">トーク</h2>
+        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="font-bold text-gray-800">トーク</h2>
           <button onClick={() => setShowUsers(!showUsers)}
             className="w-8 h-8 bg-green-500 text-white rounded-full text-lg flex items-center justify-center hover:bg-green-600">+</button>
         </div>
@@ -170,15 +217,13 @@ export default function ChatPage() {
         )}
 
         <div className="flex-1 overflow-y-auto">
-          {conversations.length === 0 && (
-            <p className="text-sm text-gray-400 text-center mt-10 px-4">+ボタンでトークを始めましょう</p>
-          )}
+          {conversations.length === 0 && <p className="text-sm text-gray-400 text-center mt-10 px-4">+ボタンでトークを始めましょう</p>}
           {conversations.map(conv => {
             const other = getOtherUser(conv);
             const lastMsg = conv.messages[0];
             return (
               <button key={conv.id} onClick={() => { setSelectedConv(conv); setShowList(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-100 transition-colors ${selectedConv?.id === conv.id ? "bg-green-50" : ""}`}>
+                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-100 ${selectedConv?.id === conv.id ? "bg-green-50" : ""}`}>
                 <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center text-base font-bold text-green-700 flex-shrink-0">{other?.name[0] ?? "?"}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
@@ -194,11 +239,10 @@ export default function ChatPage() {
       </div>
 
       {/* Chat area */}
-      <div className={`${!showList ? "flex" : "hidden"} md:flex flex-1 flex-col`}>
+      <div className={`${!showList ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0`}>
         {selectedConv ? (
           <>
-            {/* Header */}
-            <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 shadow-sm">
+            <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 shadow-sm flex-shrink-0">
               <button onClick={() => setShowList(true)} className="md:hidden text-gray-500 text-xl mr-1">←</button>
               <div className="w-9 h-9 bg-green-200 rounded-full flex items-center justify-center text-sm font-bold text-green-700 flex-shrink-0">
                 {getOtherUser(selectedConv)?.name[0]}
@@ -207,20 +251,22 @@ export default function ChatPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-1" onClick={() => setStampTarget(null)}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1"
+              onClick={() => { setStampTarget(null); setMenuTarget(null); }}
               style={{ backgroundImage: "radial-gradient(circle, #e8f5e9 1px, transparent 1px)", backgroundSize: "20px 20px", backgroundColor: "#f1f8e9" }}>
               {messages.map((msg, i) => {
                 const isMe = msg.sender.id === session?.user?.id;
                 const grouped = groupReactions(msg.reactions);
                 const prevMsg = messages[i - 1];
-                const showSenderName = !isMe && (!prevMsg || prevMsg.sender.id !== msg.sender.id);
+                const showName = !isMe && (!prevMsg || prevMsg.sender.id !== msg.sender.id);
+                const showMenu = menuTarget === msg.id;
+                const showStamp = stampTarget === msg.id;
 
                 return (
-                  <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"} mb-1`}>
-                    {showSenderName && (
-                      <span className="text-xs text-gray-500 ml-10 mb-1">{msg.sender.name}</span>
-                    )}
-                    <div className={`flex items-end gap-2 max-w-[80%] ${isMe ? "flex-row-reverse" : ""}`}>
+                  <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                    {showName && <span className="text-xs text-gray-500 ml-10 mb-0.5">{msg.sender.name}</span>}
+
+                    <div className={`flex items-end gap-1.5 max-w-[85%] ${isMe ? "flex-row-reverse" : ""}`}>
                       {!isMe && (
                         <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center text-xs font-bold text-green-700 flex-shrink-0 self-end">
                           {msg.sender.name[0]}
@@ -228,49 +274,69 @@ export default function ChatPage() {
                       )}
                       <div className="flex flex-col gap-1">
                         <div className={`flex items-end gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
-                          {/* Bubble */}
+                          {/* 吹き出し */}
                           <div
-                            className={`relative rounded-2xl px-3 py-2 shadow-sm cursor-pointer select-none
-                              ${isMe ? "bg-green-400 text-white rounded-br-sm" : "bg-white text-gray-900 rounded-bl-sm"}
-                              ${msg.content || msg.imageData ? "" : "hidden"}`}
-                            onDoubleClick={() => setStampTarget(stampTarget === msg.id ? null : msg.id)}
+                            className={`relative rounded-2xl shadow-sm
+                              ${msg.content || msg.imageData ? "px-3 py-2" : ""}
+                              ${isMe ? "bg-green-400 text-white rounded-br-sm" : "bg-white text-gray-900 rounded-bl-sm"}`}
+                            onDoubleClick={e => { e.stopPropagation(); setStampTarget(msg.id); setMenuTarget(null); }}
+                            onClick={e => { e.stopPropagation(); if (isMe) { setMenuTarget(showMenu ? null : msg.id); setStampTarget(null); } }}
                           >
-                            {msg.content && <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>}
+                            {msg.content && <p className="text-sm whitespace-pre-wrap break-words max-w-[200px] md:max-w-xs">{msg.content}</p>}
                             {msg.imageData && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={msg.imageData} alt="画像" className="max-w-48 max-h-48 rounded-xl cursor-pointer mt-1" onClick={() => setPreviewImage(msg.imageData!)} />
+                              <img src={msg.imageData} alt="画像" className="max-w-[180px] md:max-w-[220px] max-h-48 rounded-xl cursor-pointer mt-1" onClick={e => { e.stopPropagation(); setPreviewImage(msg.imageData!); }} />
+                            )}
+
+                            {/* 自分のメッセージ：取り消しメニュー */}
+                            {isMe && showMenu && (
+                              <div className="absolute bottom-full right-0 mb-1 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-20 min-w-32"
+                                onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => { setStampTarget(msg.id); setMenuTarget(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                                  😊 スタンプ
+                                </button>
+                                {canDelete(msg.createdAt) && (
+                                  <button onClick={() => { if (confirm("このメッセージを取り消しますか？")) deleteMessage(msg.id); }}
+                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 border-t border-gray-100">
+                                    🗑 送信取り消し
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
-                          {/* Time + read */}
-                          <div className={`flex flex-col items-${isMe ? "end" : "start"} gap-0.5`}>
+
+                          {/* 時刻・既読 */}
+                          <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} gap-0.5 flex-shrink-0`}>
                             {isMe && isRead(selectedConv, msg.createdAt) && (
                               <span className="text-xs text-green-600 font-medium">既読</span>
                             )}
-                            <span className="text-xs text-gray-400 whitespace-nowrap">{formatTime(msg.createdAt)}</span>
+                            <span className="text-xs text-gray-400">{formatTime(msg.createdAt)}</span>
                           </div>
                         </div>
 
-                        {/* Reactions */}
+                        {/* リアクション */}
                         {Object.keys(grouped).length > 0 && (
-                          <div className={`flex flex-wrap gap-1 ${isMe ? "justify-end" : "justify-start"} ml-1`}>
+                          <div className={`flex flex-wrap gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
                             {Object.entries(grouped).map(([emoji, { count, users, hasMe }]) => (
-                              <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
+                              <button key={emoji} onClick={e => { e.stopPropagation(); toggleReaction(msg.id, emoji); }}
                                 title={users.join(", ")}
                                 className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs border transition-colors
-                                  ${hasMe ? "bg-green-100 border-green-400 text-green-700" : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
-                                <span>{emoji}</span><span>{count}</span>
+                                  ${hasMe ? "bg-green-100 border-green-400 text-green-700" : "bg-white border-gray-300 text-gray-600"}`}>
+                                {emoji} {count}
                               </button>
                             ))}
                           </div>
                         )}
 
-                        {/* Stamp picker */}
-                        {stampTarget === msg.id && (
-                          <div className={`flex gap-1 bg-white rounded-full shadow-lg border border-gray-200 px-2 py-1.5 ${isMe ? "self-end" : "self-start"}`}
+                        {/* スタンプピッカー */}
+                        {showStamp && (
+                          <div className={`flex gap-1 bg-white rounded-full shadow-xl border border-gray-200 px-2 py-1.5 z-20 ${isMe ? "self-end" : "self-start"}`}
                             onClick={e => e.stopPropagation()}>
                             {STAMP_EMOJIS.map(e => (
                               <button key={e} onClick={() => toggleReaction(msg.id, e)}
-                                className="text-lg hover:scale-125 transition-transform p-0.5">{e}</button>
+                                className="text-xl hover:scale-125 transition-transform p-0.5">{e}</button>
                             ))}
                           </div>
                         )}
@@ -282,26 +348,27 @@ export default function ChatPage() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Image preview before send */}
+            {/* 画像プレビュー（送信前） */}
             {sendImageData && (
-              <div className="px-4 py-2 bg-white border-t border-gray-100 flex items-center gap-2">
+              <div className="px-4 py-2 bg-white border-t border-gray-100 flex items-center gap-3 flex-shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={sendImageData} alt="preview" className="h-16 rounded-lg border border-gray-200" />
-                <button onClick={() => setSendImageData(null)} className="text-red-400 hover:text-red-600 text-sm">✕ 取り消す</button>
+                <img src={sendImageData} alt="preview" className="h-14 rounded-lg border border-gray-200" />
+                <span className="text-xs text-gray-500">画像を送信</span>
+                <button onClick={() => setSendImageData(null)} className="ml-auto text-red-400 text-sm">✕ 取り消す</button>
               </div>
             )}
 
-            {/* Input bar */}
-            <form onSubmit={sendMessage} className="px-3 py-2 bg-white border-t border-gray-200 flex items-center gap-2">
+            {/* 入力バー */}
+            <form onSubmit={sendMessage} className="px-3 py-2 bg-white border-t border-gray-200 flex items-center gap-2 flex-shrink-0">
               <button type="button" onClick={() => fileInputRef.current?.click()}
-                className="text-gray-500 hover:text-green-600 text-xl flex-shrink-0">📷</button>
+                className="text-gray-400 hover:text-green-600 text-xl flex-shrink-0 p-1">📷</button>
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
               <input value={newMsg} onChange={e => setNewMsg(e.target.value)}
                 placeholder="メッセージを入力..."
-                className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
-              <button type="submit" disabled={!newMsg.trim() && !sendImageData}
-                className="w-9 h-9 bg-green-500 text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-green-600 flex-shrink-0 text-sm">
-                ➤
+                className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 min-w-0" />
+              <button type="submit" disabled={(!newMsg.trim() && !sendImageData) || sending}
+                className="w-9 h-9 bg-green-500 text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-green-600 flex-shrink-0">
+                {sending ? "…" : "➤"}
               </button>
             </form>
           </>
@@ -316,12 +383,12 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* Image full preview */}
+      {/* 画像フルスクリーン */}
       {previewImage && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewImage} alt="フルサイズ" className="max-w-full max-h-full rounded-lg" />
-          <button className="absolute top-4 right-4 text-white text-2xl">✕</button>
+          <button className="absolute top-4 right-4 text-white text-3xl">✕</button>
         </div>
       )}
     </div>
