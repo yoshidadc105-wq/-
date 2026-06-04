@@ -11,19 +11,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const question = await prisma.question.findUnique({ where: { id } });
   if (!question) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Only allow answering if: assigned to this user, or no assignment, or admin
   const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
   const canAnswer =
     user?.role === "admin" ||
-    question.authorId === session.user.id ||
     question.assignedToId === session.user.id ||
     question.assignedToId === null;
 
+  // 質問者自身は回答できない（自分の質問には回答しない）
+  if (question.authorId === session.user.id) {
+    return NextResponse.json({ error: "自分の質問には回答できません" }, { status: 403 });
+  }
+
   if (!canAnswer) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { content } = await req.json();
+  const { content, imageData } = await req.json();
   const answer = await prisma.answer.create({
-    data: { content, authorId: session.user.id, questionId: id },
+    data: {
+      content: content || "",
+      imageData: imageData || null,
+      authorId: session.user.id,
+      questionId: id,
+    },
     include: { author: { select: { id: true, name: true } } },
   });
 

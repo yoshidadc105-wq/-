@@ -136,6 +136,7 @@ model Question {
 model Answer {
   id         String   @id @default(cuid())
   content    String
+  imageData  String?
   authorId   String
   questionId String
   createdAt  DateTime @default(now())

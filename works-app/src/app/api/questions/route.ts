@@ -8,67 +8,39 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = session.user.id;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const isAdmin = user?.role === "admin";
 
-  // Users can see: their own questions, questions assigned to them, and questions they've answered
+  // 自分が書いた質問 + 自分に割り当てられた質問 + 割り当てなしの質問（誰でも回答可）
   const questions = await prisma.question.findMany({
-    where: {
+    where: isAdmin ? undefined : {
       OR: [
         { authorId: userId },
         { assignedToId: userId },
-        { answers: { some: { authorId: userId } } },
-        // Admins see all - handled below
+        { assignedToId: null, status: "open" },
       ],
     },
     include: {
       author: { select: { id: true, name: true, avatar: true } },
       assignedTo: { select: { id: true, name: true } },
-      answers: {
+      // 回答は質問者 or 管理者にのみ返す（回答者は内容を見せない）
+      answers: userId ? {
+        where: isAdmin ? undefined : { question: { authorId: userId } },
         include: { author: { select: { id: true, name: true } } },
         orderBy: { createdAt: "asc" },
-      },
+      } : false,
       _count: { select: { answers: true } },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-  if (user?.role === "admin") {
-    const allQuestions = await prisma.question.findMany({
-      include: {
-        author: { select: { id: true, name: true, avatar: true } },
-        assignedTo: { select: { id: true, name: true } },
-        answers: {
-          include: { author: { select: { id: true, name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-        _count: { select: { answers: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json(allQuestions);
-  }
+  // 回答者には回答内容を隠す（自分が書いた質問でない場合）
+  const result = questions.map(q => ({
+    ...q,
+    answers: q.authorId === userId || isAdmin ? q.answers : [],
+  }));
 
-  // For non-admins: also show questions with no assignee (open to anyone)
-  const openQuestions = await prisma.question.findMany({
-    where: {
-      assignedToId: null,
-      authorId: { not: userId },
-      status: "open",
-    },
-    include: {
-      author: { select: { id: true, name: true, avatar: true } },
-      assignedTo: { select: { id: true, name: true } },
-      answers: {
-        include: { author: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "asc" },
-      },
-      _count: { select: { answers: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const combined = [...questions, ...openQuestions.filter(q => !questions.find(q2 => q2.id === q.id))];
-  return NextResponse.json(combined);
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
