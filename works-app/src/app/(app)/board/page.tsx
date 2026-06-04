@@ -19,6 +19,13 @@ interface Post {
   _count: { comments: number };
 }
 
+// 色のリスト（ユーザーアバター用）
+const COLORS = ["bg-red-400","bg-orange-400","bg-yellow-400","bg-green-400","bg-teal-400","bg-blue-400","bg-indigo-400","bg-purple-400","bg-pink-400"];
+function avatarColor(name: string) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
+  return COLORS[h];
+}
+
 export default function BoardPage() {
   const { data: session } = useSession();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -29,6 +36,7 @@ export default function BoardPage() {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [stampTarget, setStampTarget] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchPosts(); }, [selectedCategory]);
@@ -67,9 +75,7 @@ export default function BoardPage() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     });
-    if (res.ok) {
-      setCommentText({ ...commentText, [postId]: "" }); fetchPosts();
-    }
+    if (res.ok) { setCommentText({ ...commentText, [postId]: "" }); fetchPosts(); }
   }
 
   async function toggleReaction(postId: string, emoji: string) {
@@ -84,23 +90,22 @@ export default function BoardPage() {
     setStampTarget(null);
   }
 
+  // emoji ごとに押した人の一覧を作る
   function groupReactions(reactions: Reaction[]) {
-    const map: Record<string, { count: number; users: string[]; hasMe: boolean }> = {};
+    const map: Record<string, { users: { id: string; name: string }[] }> = {};
     for (const r of reactions) {
-      if (!map[r.emoji]) map[r.emoji] = { count: 0, users: [], hasMe: false };
-      map[r.emoji].count++;
-      map[r.emoji].users.push(r.user.name);
-      if (r.user.id === session?.user?.id) map[r.emoji].hasMe = true;
+      if (!map[r.emoji]) map[r.emoji] = { users: [] };
+      map[r.emoji].users.push(r.user);
     }
     return map;
   }
 
   function formatDate(d: string) {
-    return new Date(d).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return new Date(d).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
   return (
-    <div className="flex h-full" onClick={() => setStampTarget(null)}>
+    <div className="flex h-full" onClick={() => { setStampTarget(null); setShowCatMenu(false); }}>
       {/* Desktop sidebar */}
       <div className="hidden md:flex w-52 border-r border-gray-200 bg-white flex-col flex-shrink-0">
         <div className="p-3 border-b border-gray-200">
@@ -180,6 +185,7 @@ export default function BoardPage() {
             )}
             {posts.map(post => {
               const grouped = groupReactions(post.reactions);
+              const isExpanded = expandedPost === post.id;
               return (
                 <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-200" onClick={e => e.stopPropagation()}>
                   <div className="p-4">
@@ -187,73 +193,107 @@ export default function BoardPage() {
                       {post.pinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">📌 固定</span>}
                       <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{post.category}</span>
                     </div>
-                    <h2 className="font-semibold text-gray-900 text-sm mt-1">{post.title}</h2>
-                    <p className="text-gray-600 text-sm whitespace-pre-wrap mt-1">{post.content}</p>
-                    {post.imageData && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={post.imageData} alt="添付" className="mt-2 max-h-56 w-full object-contain rounded-lg border border-gray-200 cursor-pointer" onClick={() => window.open(post.imageData)} />
-                    )}
-
-                    {/* Reactions display */}
-                    {Object.keys(grouped).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {Object.entries(grouped).map(([emoji, { count, users, hasMe }]) => (
-                          <button key={emoji} onClick={() => toggleReaction(post.id, emoji)} title={users.join(", ")}
-                            className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs border transition-colors
-                              ${hasMe ? "bg-indigo-100 border-indigo-400 text-indigo-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}>
-                            <span>{emoji}</span><span>{count}</span>
-                          </button>
-                        ))}
+                    <div className="flex items-start gap-3 mt-2">
+                      <div className={`w-8 h-8 ${avatarColor(post.author.name)} rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0`}>
+                        {post.author.name[0]}
                       </div>
-                    )}
-
-                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 flex-wrap">
-                      <div className="w-5 h-5 bg-indigo-200 rounded-full flex items-center justify-center text-xs font-bold text-indigo-700">{post.author.name[0]}</div>
-                      <span className="text-xs text-gray-500">{post.author.name}</span>
-                      <span className="text-xs text-gray-400">{formatDate(post.createdAt)}</span>
-                      <div className="ml-auto flex items-center gap-2">
-                        {/* Stamp button */}
-                        <div className="relative">
-                          <button onClick={e => { e.stopPropagation(); setStampTarget(stampTarget === post.id ? null : post.id); }}
-                            className="text-gray-400 hover:text-yellow-500 text-sm px-2 py-0.5 rounded-full hover:bg-gray-100">
-                            😊 スタンプ
-                          </button>
-                          {stampTarget === post.id && (
-                            <div className="absolute bottom-8 right-0 flex gap-1 bg-white rounded-full shadow-xl border border-gray-200 px-2 py-1.5 z-10"
-                              onClick={e => e.stopPropagation()}>
-                              {STAMPS.map(e => (
-                                <button key={e} onClick={() => toggleReaction(post.id, e)}
-                                  className="text-lg hover:scale-125 transition-transform p-0.5">{e}</button>
-                              ))}
-                            </div>
-                          )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-900">{post.author.name}</span>
+                          <span className="text-xs text-gray-400">{formatDate(post.createdAt)}</span>
                         </div>
-                        <button onClick={() => setExpandedPost(expandedPost === post.id ? null : post.id)}
-                          className="text-xs text-gray-500 hover:text-indigo-600">
-                          💬 {post._count.comments} {expandedPost === post.id ? "▲" : "▼"}
-                        </button>
+                        <h2 className="font-semibold text-gray-900 text-sm mt-1">{post.title}</h2>
+                        <p className="text-gray-600 text-sm whitespace-pre-wrap mt-1">{post.content}</p>
+                        {post.imageData && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={post.imageData} alt="添付" className="mt-2 max-h-56 w-full object-contain rounded-lg border border-gray-200 cursor-pointer" onClick={() => setPreviewImage(post.imageData!)} />
+                        )}
                       </div>
+                    </div>
+
+                    {/* リアクション表示（LINE WORKSスタイル：誰が押したか） */}
+                    {Object.keys(grouped).length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-xs text-gray-400 mb-2">リアクション</p>
+                        <div className="flex flex-wrap gap-3">
+                          {Object.entries(grouped).map(([emoji, { users }]) => (
+                            <div key={emoji} className="flex flex-col items-center gap-1">
+                              {/* アバター一覧 */}
+                              <div className="flex flex-wrap gap-1 max-w-48">
+                                {users.map(u => (
+                                  <button key={u.id} onClick={() => toggleReaction(post.id, emoji)}
+                                    title={`${u.name}が${emoji}を押しました`}
+                                    className={`w-8 h-8 ${avatarColor(u.name)} rounded-full flex items-center justify-center text-xs font-bold text-white hover:opacity-80 transition-opacity ${u.id === session?.user?.id ? "ring-2 ring-indigo-400" : ""}`}>
+                                    {u.name[0]}
+                                  </button>
+                                ))}
+                              </div>
+                              <span className="text-sm">{emoji} <span className="text-xs text-gray-500">{users.length}</span></span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* アクションバー */}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                      {/* スタンプボタン */}
+                      <div className="relative">
+                        <button onClick={e => { e.stopPropagation(); setStampTarget(stampTarget === post.id ? null : post.id); }}
+                          className="flex items-center gap-1 text-sm text-gray-500 hover:text-yellow-500 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                          😊 スタンプ
+                        </button>
+                        {stampTarget === post.id && (
+                          <div className="absolute bottom-10 left-0 flex gap-1 bg-white rounded-2xl shadow-xl border border-gray-200 px-3 py-2 z-20"
+                            onClick={e => e.stopPropagation()}>
+                            {STAMPS.map(e => (
+                              <button key={e} onClick={() => toggleReaction(post.id, e)}
+                                className="text-xl hover:scale-125 transition-transform p-1">{e}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* コメントボタン（目立つデザイン） */}
+                      <button onClick={() => setExpandedPost(isExpanded ? null : post.id)}
+                        className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors font-medium ${isExpanded ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100 hover:text-indigo-600"}`}>
+                        💬 コメント
+                        {post._count.comments > 0 && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${isExpanded ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-600"}`}>
+                            {post._count.comments}
+                          </span>
+                        )}
+                      </button>
                     </div>
                   </div>
 
-                  {expandedPost === post.id && (
-                    <div className="border-t border-gray-100 px-4 pb-4">
-                      <div className="mt-3 space-y-2">
+                  {/* コメント欄 */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 bg-gray-50 px-4 py-4">
+                      <div className="space-y-3 mb-3">
+                        {post.comments.length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-2">まだコメントはありません</p>
+                        )}
                         {post.comments.map(c => (
                           <div key={c.id} className="flex gap-2">
-                            <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{c.author.name[0]}</div>
-                            <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2">
-                              <p className="text-xs font-medium text-gray-700">{c.author.name}</p>
-                              <p className="text-sm text-gray-600">{c.content}</p>
+                            <div className={`w-7 h-7 ${avatarColor(c.author.name)} rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0`}>
+                              {c.author.name[0]}
+                            </div>
+                            <div className="flex-1 bg-white rounded-xl px-3 py-2 shadow-sm">
+                              <p className="text-xs font-semibold text-gray-700">{c.author.name}</p>
+                              <p className="text-sm text-gray-600 mt-0.5">{c.content}</p>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-2 flex gap-2">
-                        <input value={commentText[post.id] ?? ""} onChange={e => setCommentText({ ...commentText, [post.id]: e.target.value })}
-                          placeholder="コメント..." className="flex-1 border border-gray-300 rounded-full px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      <div className="flex gap-2">
+                        <input value={commentText[post.id] ?? ""}
+                          onChange={e => setCommentText({ ...commentText, [post.id]: e.target.value })}
+                          placeholder="コメントを入力..."
+                          className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           onKeyDown={e => { if (e.key === "Enter") addComment(post.id); }} />
-                        <button onClick={() => addComment(post.id)} className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-full">送信</button>
+                        <button onClick={() => addComment(post.id)}
+                          className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-full hover:bg-indigo-700 font-medium">送信</button>
                       </div>
                     </div>
                   )}
@@ -263,6 +303,15 @@ export default function BoardPage() {
           </div>
         </div>
       </div>
+
+      {/* Image full preview */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewImage} alt="フルサイズ" className="max-w-full max-h-full rounded-lg" />
+          <button className="absolute top-4 right-4 text-white text-2xl">✕</button>
+        </div>
+      )}
     </div>
   );
 }

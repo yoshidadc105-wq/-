@@ -9,7 +9,7 @@ export async function GET() {
 
   const manuals = await prisma.manualLink.findMany({
     include: { createdBy: { select: { name: true } } },
-    orderBy: [{ category: "asc" }, { createdAt: "desc" }],
+    orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(manuals);
 }
@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { title, url, description, category } = await req.json();
+  const { title, url, description } = await req.json();
   const manual = await prisma.manualLink.create({
-    data: { title, url, description, category: category || "general", createdById: session.user.id },
+    data: { title, url, description, createdById: session.user.id },
     include: { createdBy: { select: { name: true } } },
   });
   return NextResponse.json(manual);
