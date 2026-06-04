@@ -36,6 +36,7 @@ export default function BoardPage() {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [stampTarget, setStampTarget] = useState<string | null>(null);
+  const [commentStampTarget, setCommentStampTarget] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,14 +69,18 @@ export default function BoardPage() {
     }
   }
 
-  async function addComment(postId: string) {
-    const content = commentText[postId];
+  async function addComment(postId: string, overrideContent?: string) {
+    const content = overrideContent ?? commentText[postId];
     if (!content?.trim()) return;
     const res = await fetch(`/api/posts/${postId}/comments`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     });
-    if (res.ok) { setCommentText({ ...commentText, [postId]: "" }); fetchPosts(); }
+    if (res.ok) {
+      if (!overrideContent) setCommentText({ ...commentText, [postId]: "" });
+      setCommentStampTarget(null);
+      fetchPosts();
+    }
   }
 
   async function toggleReaction(postId: string, emoji: string) {
@@ -105,7 +110,7 @@ export default function BoardPage() {
   }
 
   return (
-    <div className="flex h-full" onClick={() => { setStampTarget(null); setShowCatMenu(false); }}>
+    <div className="flex h-full" onClick={() => { setStampTarget(null); setCommentStampTarget(null); setShowCatMenu(false); }}>
       {/* Desktop sidebar */}
       <div className="hidden md:flex w-52 border-r border-gray-200 bg-white flex-col flex-shrink-0">
         <div className="p-3 border-b border-gray-200">
@@ -286,10 +291,25 @@ export default function BoardPage() {
                           </div>
                         ))}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center relative">
+                        {/* スタンプピッカー（コメントとして送信） */}
+                        <div className="relative">
+                          <button type="button"
+                            onClick={e => { e.stopPropagation(); setCommentStampTarget(commentStampTarget === post.id ? null : post.id); }}
+                            className="text-xl hover:scale-110 transition-transform p-1 text-gray-400 hover:text-yellow-500">😊</button>
+                          {commentStampTarget === post.id && (
+                            <div className="absolute bottom-10 left-0 flex gap-1 bg-white rounded-2xl shadow-xl border border-gray-200 px-3 py-2 z-30"
+                              onClick={e => e.stopPropagation()}>
+                              {STAMPS.map(emoji => (
+                                <button key={emoji} onClick={() => addComment(post.id, emoji)}
+                                  className="text-xl hover:scale-125 transition-transform p-1">{emoji}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <input value={commentText[post.id] ?? ""}
                           onChange={e => setCommentText({ ...commentText, [post.id]: e.target.value })}
-                          placeholder="コメントを入力..."
+                          placeholder="コメントを入力してください"
                           className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           onKeyDown={e => { if (e.key === "Enter") addComment(post.id); }} />
                         <button onClick={() => addComment(post.id)}
