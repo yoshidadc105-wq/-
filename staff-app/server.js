@@ -264,8 +264,8 @@ app.get('/dashboard', async (req, res) => {
         <td class="num">${s.reviews}</td>
         <td style="font-size:12px;color:#555">${esc(treatmentDetail)}</td>
         <td>
-          <a href="/certificate?name=${encodeURIComponent(name)}" target="_blank" class="btn-cert">賞状</a>
-          <a href="/evaluation?name=${encodeURIComponent(name)}" target="_blank" class="btn-eval">評価表</a>
+          <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
+          <a href="/evaluation?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-eval">評価表</a>
         </td>
       </tr>`;
   }).join('');
@@ -392,8 +392,15 @@ app.get('/certificate', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const name = req.query.name || '';
   if (!name) return res.status(400).send('スタッフ名が必要です');
+  const from = req.query.from || '';
+  const to = req.query.to || '';
   const allRecords = await loadDB();
-  const staffRecords = allRecords.filter(r => r.staffName === name);
+  const staffRecords = allRecords.filter(r => {
+    if (r.staffName !== name) return false;
+    if (from && r.date < from) return false;
+    if (to && r.date > to) return false;
+    return true;
+  });
   let itemsTotal = 0, counselingTotal = 0, reviewsTotal = 0, treatmentTotal = 0, patientCount = 0;
   const counselingTypes = new Set();
   const itemNames = new Set();
@@ -450,29 +457,35 @@ h1 { font-size: 44px; letter-spacing: 0.4em; color: #8b6914; margin: 20px 0 36px
 </style>
 </head>
 <body>
-<div class="no-print">
-  <button class="back-btn" onclick="window.close(); location.href='/dashboard'">← 戻る</button>
-  <button class="print-btn" onclick="window.print()">印刷する</button>
+<div class="no-print" style="flex-direction:column;align-items:center;gap:10px;max-width:720px;width:100%;">
+  <div style="display:flex;gap:12px;">
+    <button class="back-btn" onclick="window.close(); location.href='/dashboard'">← 戻る</button>
+    <button class="print-btn" onclick="window.print()">印刷する</button>
+  </div>
+  <div style="width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">
+    <div style="font-size:12px;color:#666;margin-bottom:6px;">本文を編集できます（印刷には反映されます）</div>
+    <textarea id="certBody" rows="6" style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;" oninput="updateBody()">あなたは日々の診療業務において、患者様お一人おひとりに対して真心のこもった対応を実践し、チームの一員として常に高い意識と誠実な姿勢で職務に励んでまいりました。
+
+その献身的な取り組みと積み重ねた実績は医院の発展と患者様の信頼向上に大きく貢献するものであり、ここにその功績を讃え、表彰いたします。</textarea>
+  </div>
 </div>
 <div class="cert">
   <h1>表　彰　状</h1>
   <div class="name">${esc(name)}　殿</div>
-  <div class="body">
-    あなたは日々の診療業務において、患者様お一人おひとりに対して<br>
-    真心のこもった対応を実践し、チームの一員として<br>
-    常に高い意識と誠実な姿勢で職務に励んでまいりました。<br>
-    <br>
-    その献身的な取り組みと積み重ねた実績は<br>
-    医院の発展と患者様の信頼向上に大きく貢献するものであり<br>
-    ここにその功績を讃え、表彰いたします。
-  </div>
+  <div class="body" id="certBodyDisplay"></div>
   ${highlights.length ? `<div class="highlights">${highlightHtml}</div>` : ''}
   <div class="footer">
     <div class="date">${today}</div>
     <div class="clinic">のびのび歯科・矯正歯科</div>
-    <div class="seal">院長　印</div>
   </div>
 </div>
+<script>
+function updateBody() {
+  const text = document.getElementById('certBody').value;
+  document.getElementById('certBodyDisplay').innerHTML = text.split('\\n').map(l => l ? l : '<br>').join('<br>');
+}
+updateBody();
+</script>
 </body>
 </html>`);
 });
@@ -482,8 +495,15 @@ app.get('/evaluation', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const name = req.query.name || '';
   if (!name) return res.status(400).send('スタッフ名が必要です');
+  const from = req.query.from || '';
+  const to = req.query.to || '';
   const allRecords = await loadDB();
-  const staffRecords = allRecords.filter(r => r.staffName === name);
+  const staffRecords = allRecords.filter(r => {
+    if (r.staffName !== name) return false;
+    if (from && r.date < from) return false;
+    if (to && r.date > to) return false;
+    return true;
+  });
 
   const itemsMap2 = {}, counselingMap2 = {}, treatmentMap2 = {};
   let reviews2 = 0;
