@@ -117,7 +117,8 @@ function normalizeAns(s) {
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[\s　]+/g, '')
-    .replace(/[、。，．・〜～ー]/g, '');
+    .replace(/[、。，．・〜～ー]/g, '')
+    .replace(/[おご](?=[一-龥ぁ-ん])/g, ''); // 敬語プレフィックス（お鼻→鼻、ご確認→確認）を正規化
 }
 
 app.get('/api/sets', async (req, res) => {
@@ -395,7 +396,6 @@ function isDuplicateQuestion(candidate, accepted) {
     const answerNorm = normalizeForSimilarity(answerText);
     const existingAnswerNorm = normalizeForSimilarity(existingAnswer);
     if (answerNorm && !['true', 'false'].includes(answerNorm) && answerNorm.length >= 4 && answerNorm === existingAnswerNorm) return true;
-    // 同じ出題場面かつ同じ問題タイプは低い閾値でも重複と判定
     const sameContext = candidate.context && q.context && candidate.context === q.context;
     const threshold = sameContext ? 0.45 : 0.62;
     return similarityScore(candidate.question + ' ' + answerText, q.question + ' ' + existingAnswer) >= threshold;
@@ -450,7 +450,6 @@ function makeLocalQuizQuestions(manualText, count, manualName = '') {
   const source = sentences.length ? sentences : [String(manualText || '').trim()].filter(Boolean);
   const questions = [];
 
-  // 各文を一度だけ使用して重複を防ぐ
   for (let i = 0; questions.length < count && i < source.length; i++) {
     const sentence = source[i];
     const context = inferQuestionContext(sentence, manualName);
