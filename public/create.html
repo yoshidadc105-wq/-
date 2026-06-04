@@ -6,6 +6,7 @@
   <title>マニュアル作成 - 社内マニュアルシステム</title>
   <link rel="stylesheet" href="/css/style.css">
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <style>
     .ql-container { font-size: 15px; min-height: 400px; }
     .ql-editor { min-height: 400px; }
@@ -20,7 +21,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     .step-media-drop:hover { border-color: var(--primary); background: var(--primary-light); }
     .step-media-drop img { max-width: 100%; max-height: 300px; border-radius: 4px; }
@@ -67,6 +68,90 @@
       color: var(--text-muted);
       pointer-events: none;
     }
+    /* Annotation Modal */
+    #annotationModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(0,0,0,0.85);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .annot-panel {
+      background: white;
+      border-radius: 8px;
+      width: 95vw;
+      max-width: 900px;
+      max-height: 95vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .annot-toolbar {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: #f8f9fa;
+    }
+    .annot-toolbar button {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .annot-toolbar button:hover, .annot-toolbar button.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .annot-canvas-wrap {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e5e7eb;
+      padding: 16px;
+      min-height: 200px;
+    }
+    .annot-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .color-dot {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid #ccc;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .color-dot.selected { border: 3px solid #333; }
+    /* Video Trim Modal */
+    #videoTrimModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(0,0,0,0.85);
+      align-items: center;
+      justify-content: center;
+    }
+    .trim-panel {
+      background: white;
+      border-radius: 8px;
+      width: 95vw;
+      max-width: 700px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
   </style>
 </head>
 <body>
@@ -92,14 +177,12 @@
 
   <div id="alert" class="hidden"></div>
 
-  <!-- 種別タブ -->
   <div id="typeTabs" class="tabs">
     <div class="tab active" id="tabPdf" onclick="switchType('pdf', this)">📄 PDFをアップロード</div>
     <div class="tab" id="tabSteps" onclick="switchType('steps', this)">📋 ステップで作成</div>
   </div>
 
   <form id="manualForm">
-    <!-- 共通フィールド -->
     <div class="card mb-2">
       <div class="card-body">
         <div class="form-group">
@@ -119,7 +202,6 @@
       </div>
     </div>
 
-    <!-- テキストエディタ -->
     <div id="textSection" class="card mb-2">
       <div class="card-header"><span class="card-title">本文</span></div>
       <div class="card-body" style="padding: 0;">
@@ -127,7 +209,6 @@
       </div>
     </div>
 
-    <!-- PDFアップロード -->
     <div id="pdfSection" class="card mb-2 hidden">
       <div class="card-header"><span class="card-title">PDFファイル</span></div>
       <div class="card-body">
@@ -148,9 +229,7 @@
       </div>
     </div>
 
-    <!-- ステップエディタ -->
     <div id="stepsSection" class="hidden">
-      <!-- カバー画像 -->
       <div class="card mb-2">
         <div class="card-header"><span class="card-title">カバー画像（任意）</span></div>
         <div class="card-body">
@@ -161,7 +240,6 @@
         </div>
       </div>
 
-      <!-- ステップリスト -->
       <div id="stepsList"></div>
 
       <div class="mb-2">
@@ -176,6 +254,65 @@
   </form>
 </div>
 
+<!-- ===== Image Annotation Modal ===== -->
+<div id="annotationModal">
+  <div class="annot-panel">
+    <div class="annot-toolbar">
+      <strong style="margin-right:4px;">✏️ 画像に書き込む</strong>
+      <button id="annotToolDraw" onclick="setAnnotTool('draw')" class="active">✏️ ペン</button>
+      <button id="annotToolText" onclick="setAnnotTool('text')">T テキスト</button>
+      <button id="annotToolRect" onclick="setAnnotTool('rect')">□ 四角</button>
+      <button id="annotToolArrow" onclick="setAnnotTool('arrow')">→ 矢印</button>
+      <button id="annotToolSelect" onclick="setAnnotTool('select')">▶ 選択/移動</button>
+      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch;"></span>
+      <span style="font-size:12px;">色：</span>
+      <span class="color-dot selected" style="background:#ef4444;" onclick="setAnnotColor('#ef4444', this)"></span>
+      <span class="color-dot" style="background:#f97316;" onclick="setAnnotColor('#f97316', this)"></span>
+      <span class="color-dot" style="background:#eab308;" onclick="setAnnotColor('#eab308', this)"></span>
+      <span class="color-dot" style="background:#22c55e;" onclick="setAnnotColor('#22c55e', this)"></span>
+      <span class="color-dot" style="background:#3b82f6;" onclick="setAnnotColor('#3b82f6', this)"></span>
+      <span class="color-dot" style="background:#000000;" onclick="setAnnotColor('#000000', this)"></span>
+      <span class="color-dot" style="background:#ffffff;border-color:#999;" onclick="setAnnotColor('#ffffff', this)"></span>
+      <span style="width:1px;background:#ccc;margin:0 4px;align-self:stretch;"></span>
+      <span style="font-size:12px;">太さ：</span>
+      <input type="range" id="brushSize" min="1" max="24" value="4" style="width:70px;" oninput="setAnnotBrushSize(this.value)">
+      <button onclick="undoAnnot()" style="margin-left:4px;">↩ 元に戻す</button>
+      <button onclick="clearAnnot()" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5;">🗑 全消去</button>
+    </div>
+    <div class="annot-canvas-wrap">
+      <canvas id="annotCanvas"></canvas>
+    </div>
+    <div class="annot-footer">
+      <button onclick="closeAnnotation()" class="btn btn-secondary">キャンセル</button>
+      <button onclick="confirmAnnotation()" class="btn btn-primary" id="annotConfirmBtn">✓ 確定して保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Video Trim Modal ===== -->
+<div id="videoTrimModal">
+  <div class="trim-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <strong>✂️ 動画をトリミング</strong>
+      <button onclick="closeVideoTrim()" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <video id="trimVideoEl" controls playsinline style="width:100%;border-radius:6px;max-height:300px;background:#000;"></video>
+    <div>
+      <label style="font-size:13px;font-weight:600;">開始時刻 (秒): <span id="trimStartLabel">0.0</span></label>
+      <input type="range" id="trimStart" min="0" max="100" step="0.1" value="0" style="width:100%;" oninput="onTrimStartChange(this.value)">
+    </div>
+    <div>
+      <label style="font-size:13px;font-weight:600;">終了時刻 (秒): <span id="trimEndLabel">10.0</span></label>
+      <input type="range" id="trimEnd" min="0" max="100" step="0.1" value="100" style="width:100%;" oninput="onTrimEndChange(this.value)">
+    </div>
+    <div id="trimProgress" style="display:none;font-size:13px;color:var(--primary);text-align:center;">録画中... 動画が終了するまでお待ちください</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closeVideoTrim()" class="btn btn-secondary">キャンセル</button>
+      <button onclick="startVideoTrim()" class="btn btn-primary" id="trimConfirmBtn">✂️ トリミングして保存</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
 <script src="/js/common.js"></script>
 <script>
@@ -184,7 +321,6 @@ let editId = null;
 let currentType = 'pdf';
 let editManual = null;
 let quill = null;
-
 let coverImageName = null;
 let steps = [];
 let stepCounter = 0;
@@ -327,12 +463,8 @@ function toggleReplaceMode(checked) {
 }
 
 // ---- 書式設定 ----
-function formatCmd(cmd) {
-  document.execCommand(cmd, false, null);
-}
-function setForeColor(color) {
-  document.execCommand('foreColor', false, color);
-}
+function formatCmd(cmd) { document.execCommand(cmd, false, null); }
+function setForeColor(color) { document.execCommand('foreColor', false, color); }
 function clearFmt() {
   document.execCommand('removeFormat', false, null);
   document.execCommand('unlink', false, null);
@@ -384,11 +516,41 @@ async function uploadStepMedia(id, input) {
   const data = await res.json();
   const step = steps.find(s => s.id === id);
   if (step) { step.imageName = data.filename; step.imageType = data.type; }
-  if (drop) {
-    drop.innerHTML = data.type === 'video'
-      ? `<video src="/uploads/${data.filename}" controls playsinline style="max-width:100%; max-height:300px; border-radius:4px;"></video>`
-      : `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:300px; border-radius:4px;">`;
+  refreshStepMediaDrop(id, step);
+}
+
+function refreshStepMediaDrop(id, step) {
+  const drop = document.getElementById(`stepMediaDrop_${id}`);
+  if (!drop || !step) return;
+  if (!step.imageName) {
+    drop.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">📷🎬 クリックして画像または動画を追加（任意）</div>`;
+  } else if (step.imageType === 'video') {
+    drop.innerHTML = `<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%; max-height:300px; border-radius:4px;"></video>`;
+  } else {
+    drop.innerHTML = `<img src="/uploads/${step.imageName}" style="max-width:100%; max-height:300px; border-radius:4px;">`;
   }
+  // refresh action buttons
+  const btns = document.getElementById(`stepMediaBtns_${id}`);
+  if (btns) btns.innerHTML = buildMediaBtns(step);
+}
+
+function buildMediaBtns(step) {
+  if (!step.imageName) return '';
+  let html = `<button type="button" onclick="clearStepMedia(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px;">✕ 削除</button>`;
+  if (step.imageType !== 'video') {
+    html += ` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px;">✏️ 画像に書き込む</button>`;
+  } else {
+    html += ` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px;">✂️ 動画をトリミング</button>`;
+  }
+  return html;
+}
+
+function clearStepMedia(id) {
+  const step = steps.find(s => s.id === id);
+  if (!step) return;
+  step.imageName = null;
+  step.imageType = 'image';
+  refreshStepMediaDrop(id, step);
 }
 
 function renderSteps() {
@@ -416,6 +578,7 @@ function renderSteps() {
         </div>
         <input type="file" id="stepMediaInput_${step.id}" accept="image/*,video/*" style="display:none;"
           onchange="uploadStepMedia(${step.id}, this)">
+        <div id="stepMediaBtns_${step.id}" style="text-align:right; margin-bottom:6px; min-height:28px;">${buildMediaBtns(step)}</div>
         <div class="text-sm text-muted mb-1" style="font-size:12px;">画像: JPG/PNG など ／ 動画: MP4/MOV など（最大200MB）</div>
         <div class="fmt-toolbar">
           <button type="button" onmousedown="event.preventDefault();formatCmd('bold')" title="太字"><b>B</b></button>
@@ -441,7 +604,6 @@ function renderSteps() {
     </div>
   `).join('');
 
-  // contenteditable に既存の HTML をセット（templateリテラル内で直接埋め込むと構造が壊れるため後から設定）
   steps.forEach(step => {
     const el = document.getElementById(`stepDesc_${step.id}`);
     if (el && step.description) el.innerHTML = step.description;
@@ -449,47 +611,350 @@ function renderSteps() {
 }
 
 function escHtml(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function escAttr(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 }
 
-// ---- 保存処理 ----
+// ============================================================
+// Image Annotation
+// ============================================================
+let annotFabric = null;
+let annotStepId = null;
+let annotTool = 'draw';
+let annotColor = '#ef4444';
+
+function openAnnotation(stepId) {
+  const step = steps.find(s => s.id === stepId);
+  if (!step || !step.imageName || step.imageType === 'video') {
+    alert('画像を先にアップロードしてください');
+    return;
+  }
+  annotStepId = stepId;
+  const modal = document.getElementById('annotationModal');
+  modal.style.display = 'flex';
+
+  const imgObj = new Image();
+  imgObj.crossOrigin = 'anonymous';
+  imgObj.onload = () => {
+    const maxW = Math.min(window.innerWidth * 0.85, 840);
+    const maxH = Math.floor(window.innerHeight * 0.55);
+    let w = imgObj.naturalWidth, h = imgObj.naturalHeight;
+    const scale = Math.min(maxW / w, maxH / h, 1);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+
+    const canvasEl = document.getElementById('annotCanvas');
+    // Fabric.js manages the canvas element itself
+    if (annotFabric) { annotFabric.dispose(); annotFabric = null; }
+    // Reset canvas size via parent element
+    canvasEl.style.width = w + 'px';
+    canvasEl.style.height = h + 'px';
+
+    annotFabric = new fabric.Canvas('annotCanvas', { width: w, height: h });
+    fabric.Image.fromURL(imgObj.src, (fImg) => {
+      fImg.scaleToWidth(w);
+      fImg.scaleToHeight(h);
+      fImg.set({ selectable: false, evented: false });
+      annotFabric.setBackgroundImage(fImg, annotFabric.renderAll.bind(annotFabric));
+    }, { crossOrigin: 'anonymous' });
+
+    setAnnotTool('draw');
+  };
+  imgObj.src = `/uploads/${step.imageName}?t=${Date.now()}`;
+}
+
+function closeAnnotation() {
+  document.getElementById('annotationModal').style.display = 'none';
+  if (annotFabric) { annotFabric.dispose(); annotFabric = null; }
+  annotStepId = null;
+}
+
+async function confirmAnnotation() {
+  if (!annotFabric) return;
+  const btn = document.getElementById('annotConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+  try {
+    const dataURL = annotFabric.toDataURL({ format: 'png', quality: 1, multiplier: 1 });
+    const blob = await (await fetch(dataURL)).blob();
+    const form = new FormData();
+    form.append('image', blob, `annotated_${Date.now()}.png`);
+    const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
+    if (!res.ok) { alert('保存に失敗しました'); return; }
+    const data = await res.json();
+    const step = steps.find(s => s.id === annotStepId);
+    if (step) { step.imageName = data.filename; step.imageType = 'image'; }
+    refreshStepMediaDrop(annotStepId, step);
+    closeAnnotation();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✓ 確定して保存';
+  }
+}
+
+function setAnnotTool(tool) {
+  annotTool = tool;
+  // Update active button
+  document.querySelectorAll('.annot-toolbar button[id^="annotTool"]').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('annotTool' + tool.charAt(0).toUpperCase() + tool.slice(1));
+  if (btn) btn.classList.add('active');
+  if (!annotFabric) return;
+
+  // Clear event listeners
+  annotFabric.isDrawingMode = false;
+  annotFabric.selection = false;
+  annotFabric.off('mouse:down');
+  annotFabric.off('mouse:move');
+  annotFabric.off('mouse:up');
+  annotFabric.getObjects().forEach(o => { if (o.selectable !== false) o.selectable = (tool === 'select'); });
+
+  if (tool === 'select') {
+    annotFabric.selection = true;
+    annotFabric.getObjects().forEach(o => { o.selectable = true; });
+
+  } else if (tool === 'draw') {
+    annotFabric.isDrawingMode = true;
+    annotFabric.freeDrawingBrush.color = annotColor;
+    annotFabric.freeDrawingBrush.width = parseInt(document.getElementById('brushSize').value);
+
+  } else if (tool === 'text') {
+    annotFabric.on('mouse:down', (opt) => {
+      if (opt.target) return;
+      const p = annotFabric.getPointer(opt.e);
+      const txt = new fabric.IText('テキスト', {
+        left: p.x, top: p.y,
+        fontSize: 22, fill: annotColor, fontWeight: 'bold',
+        editable: true, selectable: true
+      });
+      annotFabric.add(txt);
+      annotFabric.setActiveObject(txt);
+      txt.enterEditing();
+      txt.selectAll();
+    });
+
+  } else if (tool === 'rect') {
+    let startX, startY, rect, drawing = false;
+    annotFabric.on('mouse:down', (opt) => {
+      if (opt.target) return;
+      const p = annotFabric.getPointer(opt.e);
+      startX = p.x; startY = p.y; drawing = true;
+      rect = new fabric.Rect({
+        left: startX, top: startY, width: 1, height: 1,
+        fill: 'transparent', stroke: annotColor, strokeWidth: 3, selectable: true
+      });
+      annotFabric.add(rect);
+    });
+    annotFabric.on('mouse:move', (opt) => {
+      if (!drawing) return;
+      const p = annotFabric.getPointer(opt.e);
+      rect.set({
+        width: Math.abs(p.x - startX), height: Math.abs(p.y - startY),
+        left: Math.min(p.x, startX), top: Math.min(p.y, startY)
+      });
+      annotFabric.renderAll();
+    });
+    annotFabric.on('mouse:up', () => { drawing = false; });
+
+  } else if (tool === 'arrow') {
+    let startX, startY, arrowLine, arrowHead, drawing = false;
+    annotFabric.on('mouse:down', (opt) => {
+      if (opt.target) return;
+      const p = annotFabric.getPointer(opt.e);
+      startX = p.x; startY = p.y; drawing = true;
+      arrowLine = new fabric.Line([startX, startY, startX, startY], {
+        stroke: annotColor, strokeWidth: 3, selectable: false, evented: false
+      });
+      arrowHead = new fabric.Triangle({
+        width: 16, height: 16, fill: annotColor,
+        left: startX, top: startY, angle: 90, selectable: false, evented: false
+      });
+      annotFabric.add(arrowLine);
+      annotFabric.add(arrowHead);
+    });
+    annotFabric.on('mouse:move', (opt) => {
+      if (!drawing) return;
+      const p = annotFabric.getPointer(opt.e);
+      arrowLine.set({ x2: p.x, y2: p.y });
+      const angle = Math.atan2(p.y - startY, p.x - startX) * 180 / Math.PI;
+      arrowHead.set({ left: p.x, top: p.y, angle: angle + 90 });
+      annotFabric.renderAll();
+    });
+    annotFabric.on('mouse:up', () => { drawing = false; });
+  }
+}
+
+function setAnnotColor(color, dotEl) {
+  annotColor = color;
+  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+  if (dotEl) dotEl.classList.add('selected');
+  if (annotFabric) {
+    if (annotFabric.isDrawingMode) annotFabric.freeDrawingBrush.color = color;
+    const active = annotFabric.getActiveObject();
+    if (active) {
+      if (active.type === 'i-text' || active.type === 'text') active.set('fill', color);
+      else { active.set('stroke', color); if (active.fill !== 'transparent') active.set('fill', color); }
+      annotFabric.renderAll();
+    }
+  }
+}
+
+function setAnnotBrushSize(size) {
+  if (annotFabric && annotFabric.freeDrawingBrush) {
+    annotFabric.freeDrawingBrush.width = parseInt(size);
+  }
+}
+
+function undoAnnot() {
+  if (!annotFabric) return;
+  const objs = annotFabric.getObjects();
+  if (objs.length > 0) annotFabric.remove(objs[objs.length - 1]);
+  annotFabric.renderAll();
+}
+
+function clearAnnot() {
+  if (!annotFabric) return;
+  annotFabric.getObjects().slice().forEach(o => annotFabric.remove(o));
+  annotFabric.renderAll();
+}
+
+// ============================================================
+// Video Trim
+// ============================================================
+let trimStepId = null;
+let trimRecorder = null;
+let trimChunks = [];
+
+function openVideoTrim(stepId) {
+  const step = steps.find(s => s.id === stepId);
+  if (!step || !step.imageName || step.imageType !== 'video') {
+    alert('動画を先にアップロードしてください');
+    return;
+  }
+  trimStepId = stepId;
+  const video = document.getElementById('trimVideoEl');
+  video.src = `/uploads/${step.imageName}`;
+  video.load();
+  video.onloadedmetadata = () => {
+    const dur = video.duration;
+    const si = document.getElementById('trimStart');
+    const ei = document.getElementById('trimEnd');
+    si.max = dur; si.value = 0;
+    ei.max = dur; ei.value = dur;
+    document.getElementById('trimStartLabel').textContent = '0.0';
+    document.getElementById('trimEndLabel').textContent = dur.toFixed(1);
+  };
+  document.getElementById('videoTrimModal').style.display = 'flex';
+  document.getElementById('trimProgress').style.display = 'none';
+  document.getElementById('trimConfirmBtn').disabled = false;
+  document.getElementById('trimConfirmBtn').textContent = '✂️ トリミングして保存';
+}
+
+function closeVideoTrim() {
+  document.getElementById('videoTrimModal').style.display = 'none';
+  if (trimRecorder && trimRecorder.state === 'recording') trimRecorder.stop();
+  trimRecorder = null;
+  trimChunks = [];
+  trimStepId = null;
+}
+
+function onTrimStartChange(val) {
+  const v = parseFloat(val);
+  const endVal = parseFloat(document.getElementById('trimEnd').value);
+  if (v >= endVal) { document.getElementById('trimStart').value = endVal - 0.1; return; }
+  document.getElementById('trimStartLabel').textContent = v.toFixed(1);
+  const video = document.getElementById('trimVideoEl');
+  video.currentTime = v;
+}
+
+function onTrimEndChange(val) {
+  const v = parseFloat(val);
+  const startVal = parseFloat(document.getElementById('trimStart').value);
+  if (v <= startVal) { document.getElementById('trimEnd').value = startVal + 0.1; return; }
+  document.getElementById('trimEndLabel').textContent = v.toFixed(1);
+}
+
+async function startVideoTrim() {
+  const video = document.getElementById('trimVideoEl');
+  const startTime = parseFloat(document.getElementById('trimStart').value);
+  const endTime = parseFloat(document.getElementById('trimEnd').value);
+  const duration = endTime - startTime;
+  if (duration <= 0) { alert('終了時刻は開始時刻より後にしてください'); return; }
+
+  // Check MediaRecorder / captureStream support
+  if (!video.captureStream && !video.mozCaptureStream) {
+    alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');
+    return;
+  }
+
+  document.getElementById('trimConfirmBtn').disabled = true;
+  document.getElementById('trimProgress').style.display = 'block';
+  trimChunks = [];
+
+  video.currentTime = startTime;
+  await new Promise(r => video.onseeked = r);
+
+  const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
+    : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
+  trimRecorder = new MediaRecorder(stream, { mimeType });
+  trimRecorder.ondataavailable = e => { if (e.data.size > 0) trimChunks.push(e.data); };
+  trimRecorder.onstop = async () => {
+    const blob = new Blob(trimChunks, { type: mimeType });
+    const ext = mimeType.includes('mp4') ? '.mp4' : '.webm';
+    const form = new FormData();
+    form.append('image', blob, `trimmed_${Date.now()}${ext}`);
+    const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
+    if (!res.ok) { alert('保存に失敗しました'); return; }
+    const data = await res.json();
+    const step = steps.find(s => s.id === trimStepId);
+    if (step) { step.imageName = data.filename; step.imageType = 'video'; }
+    refreshStepMediaDrop(trimStepId, step);
+    closeVideoTrim();
+  };
+
+  trimRecorder.start();
+  video.play();
+
+  // Stop recording at endTime
+  const checkInterval = setInterval(() => {
+    if (video.currentTime >= endTime) {
+      clearInterval(checkInterval);
+      video.pause();
+      trimRecorder.stop();
+    }
+  }, 100);
+}
+
+// ============================================================
+// Save
+// ============================================================
 
 async function handleSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = '保存中...';
-
   const title = document.getElementById('title').value.trim();
   const description = document.getElementById('description').value.trim();
   const categoryId = document.getElementById('categorySelect').value;
-
   if (!title) {
     showAlert('alert', 'タイトルを入力してください', 'error');
-    btn.disabled = false;
-    btn.textContent = editId ? '更新する' : '保存する';
+    btn.disabled = false; btn.textContent = editId ? '更新する' : '保存する';
     return;
   }
-
   try {
-    if (editId) {
-      await updateManual(title, description, categoryId);
-    } else {
-      await createManual(title, description, categoryId);
-    }
+    if (editId) await updateManual(title, description, categoryId);
+    else await createManual(title, description, categoryId);
   } catch (err) {
     showAlert('alert', '予期せぬエラーが発生しました', 'error');
-    btn.disabled = false;
-    btn.textContent = editId ? '更新する' : '保存する';
+    btn.disabled = false; btn.textContent = editId ? '更新する' : '保存する';
   }
 }
 
 async function createManual(title, description, categoryId) {
-  let res, data;
-
+  let res;
   if (currentType === 'steps') {
     if (steps.length === 0) {
       showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
@@ -499,11 +964,10 @@ async function createManual(title, description, categoryId) {
     }
     const content = JSON.stringify({
       cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
+      steps: steps.map((s, i) => ({ order: i+1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
     });
     res = await fetch('/api/manuals/steps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, content, category_id: categoryId || null })
     });
   } else if (currentType === 'rich_text') {
@@ -515,8 +979,7 @@ async function createManual(title, description, categoryId) {
       return;
     }
     res = await fetch('/api/manuals/text', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, content, category_id: categoryId || null })
     });
   } else {
@@ -528,14 +991,11 @@ async function createManual(title, description, categoryId) {
       return;
     }
     const form = new FormData();
-    form.append('pdf', file);
-    form.append('title', title);
-    form.append('description', description);
+    form.append('pdf', file); form.append('title', title); form.append('description', description);
     if (categoryId) form.append('category_id', categoryId);
     res = await fetch('/api/manuals/pdf', { method: 'POST', body: form });
   }
-
-  data = await res.json();
+  const data = await res.json();
   if (res.ok) {
     window.location.href = `/view.html?id=${data.id}`;
   } else {
@@ -546,8 +1006,7 @@ async function createManual(title, description, categoryId) {
 }
 
 async function updateManual(title, description, categoryId) {
-  let res, data;
-
+  let res;
   if (editManual.type === 'pdf' && currentType === 'steps') {
     if (steps.length === 0) {
       showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
@@ -557,21 +1016,19 @@ async function updateManual(title, description, categoryId) {
     }
     const content = JSON.stringify({
       cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
+      steps: steps.map((s, i) => ({ order: i+1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
     });
     res = await fetch(`/api/manuals/${editId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, content, category_id: categoryId || null, convert_to_type: 'steps' })
     });
   } else if (editManual.type === 'steps') {
     const content = JSON.stringify({
       cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
+      steps: steps.map((s, i) => ({ order: i+1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
     });
     res = await fetch(`/api/manuals/${editId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, content, category_id: categoryId || null })
     });
   } else if (editManual.type === 'pdf') {
@@ -585,28 +1042,23 @@ async function updateManual(title, description, categoryId) {
         return;
       }
       const form = new FormData();
-      form.append('pdf', file);
-      form.append('title', title);
-      form.append('description', description);
+      form.append('pdf', file); form.append('title', title); form.append('description', description);
       if (categoryId) form.append('category_id', categoryId);
       res = await fetch(`/api/manuals/${editId}/pdf`, { method: 'PUT', body: form });
     } else {
       res = await fetch(`/api/manuals/${editId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, description, category_id: categoryId || null })
       });
     }
   } else {
     const content = quill.root.innerHTML;
     res = await fetch(`/api/manuals/${editId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, content, category_id: categoryId || null })
     });
   }
-
-  data = await res.json();
+  const data = await res.json();
   if (res.ok) {
     window.location.href = `/view.html?id=${editId}`;
   } else {
