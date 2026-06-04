@@ -10,7 +10,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      {/* pt-14 on mobile for the fixed top bar */}
+      <main className="flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
     </div>
   );
 }
