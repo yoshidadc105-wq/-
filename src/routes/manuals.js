@@ -39,20 +39,20 @@ const uploadMany = multer({
   }
 });
 
-const imageStorage = multer.diskStorage({
+const mediaStorage = multer.diskStorage({
   destination: (req, file, cb) => { cb(null, UPLOAD_DIR); },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    const ext = path.extname(file.originalname) || (file.mimetype.startsWith('video/') ? '.mp4' : '.jpg');
     cb(null, `step_${Date.now()}${ext}`);
   }
 });
 
-const uploadImage = multer({
-  storage: imageStorage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+const uploadMedia = multer({
+  storage: mediaStorage,
+  limits: { fileSize: 200 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('画像ファイルのみアップロードできます'));
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true);
+    else cb(new Error('画像または動画ファイルのみアップロードできます'));
   }
 });
 
@@ -205,10 +205,11 @@ router.delete('/:id', requireAdmin, (req, res) => {
   res.json({ message: 'マニュアルを削除しました' });
 });
 
-// ステップ画像アップロード
-router.post('/step-image', requireLogin, uploadImage.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: '画像ファイルを選択してください' });
-  res.json({ filename: req.file.filename });
+// ステップ用メディアアップロード（画像・動画）
+router.post('/step-image', requireLogin, uploadMedia.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'ファイルを選択してください' });
+  const isVideo = req.file.mimetype.startsWith('video/');
+  res.json({ filename: req.file.filename, type: isVideo ? 'video' : 'image' });
 });
 
 // ステップマニュアル作成

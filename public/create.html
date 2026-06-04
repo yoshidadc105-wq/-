@@ -9,7 +9,7 @@
   <style>
     .ql-container { font-size: 15px; min-height: 400px; }
     .ql-editor { min-height: 400px; }
-    .step-image-drop {
+    .step-media-drop {
       border: 2px dashed var(--border);
       border-radius: var(--radius);
       padding: 16px;
@@ -20,10 +20,53 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
-    .step-image-drop:hover { border-color: var(--primary); background: var(--primary-light); }
-    .step-image-drop img { max-width: 100%; max-height: 300px; border-radius: 4px; }
+    .step-media-drop:hover { border-color: var(--primary); background: var(--primary-light); }
+    .step-media-drop img { max-width: 100%; max-height: 300px; border-radius: 4px; }
+    .step-media-drop video { max-width: 100%; max-height: 300px; border-radius: 4px; }
+    .fmt-toolbar {
+      display: flex;
+      gap: 3px;
+      flex-wrap: wrap;
+      padding: 5px 8px;
+      background: #f8f9fa;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .fmt-toolbar button {
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.4;
+      min-width: 28px;
+    }
+    .fmt-toolbar button:hover { background: var(--primary-light); border-color: var(--primary); }
+    .fmt-toolbar .sep { width: 1px; background: var(--border); margin: 2px 3px; }
+    .step-desc-editor {
+      min-height: 80px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 0 0 var(--radius) var(--radius);
+      outline: none;
+      line-height: 1.8;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .step-desc-editor:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    .step-desc-editor:empty:before {
+      content: attr(data-placeholder);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -111,7 +154,7 @@
       <div class="card mb-2">
         <div class="card-header"><span class="card-title">カバー画像（任意）</span></div>
         <div class="card-body">
-          <div class="step-image-drop" id="coverImageDrop" onclick="document.getElementById('coverImageInput').click()">
+          <div class="step-media-drop" id="coverImageDrop" onclick="document.getElementById('coverImageInput').click()">
             <div style="color:var(--text-muted); font-size:14px;">🖼 クリックして画像を選択（任意）</div>
           </div>
           <input type="file" id="coverImageInput" accept="image/*" style="display:none;" onchange="uploadCoverImage(this)">
@@ -142,7 +185,6 @@ let currentType = 'pdf';
 let editManual = null;
 let quill = null;
 
-// ステップ管理
 let coverImageName = null;
 let steps = [];
 let stepCounter = 0;
@@ -226,7 +268,6 @@ async function loadEditData() {
   document.getElementById('categorySelect').value = editManual.category_id || '';
 
   if (editManual.type === 'pdf') {
-    // PDFマニュアル：タブを表示してステップへの変換を可能にする
     document.getElementById('tabPdf').textContent = '📄 PDFのまま編集';
     document.getElementById('tabSteps').textContent = '📋 ステップに変換';
     switchType('pdf');
@@ -236,7 +277,6 @@ async function loadEditData() {
       <div class="upload-area-hint">${formatFileSize(editManual.file_size)}</div>
     `;
     document.getElementById('replacePdfOption').classList.remove('hidden');
-    // タブは表示したまま（変換できるようにする）
   } else if (editManual.type === 'steps') {
     document.getElementById('typeTabs').classList.add('hidden');
     switchType('steps');
@@ -251,6 +291,7 @@ async function loadEditData() {
       id: ++stepCounter,
       title: s.title || '',
       imageName: s.image || null,
+      imageType: s.image_type || 'image',
       description: s.description || ''
     }));
     renderSteps();
@@ -265,7 +306,6 @@ function switchType(type, tabEl) {
   currentType = type;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   if (tabEl) tabEl.classList.add('active');
-  // タブが指定されていない場合は該当タブをアクティブに
   if (!tabEl) {
     if (type === 'pdf') document.getElementById('tabPdf').classList.add('active');
     if (type === 'steps') document.getElementById('tabSteps').classList.add('active');
@@ -286,10 +326,22 @@ function toggleReplaceMode(checked) {
   }
 }
 
+// ---- 書式設定 ----
+function formatCmd(cmd) {
+  document.execCommand(cmd, false, null);
+}
+function setForeColor(color) {
+  document.execCommand('foreColor', false, color);
+}
+function clearFmt() {
+  document.execCommand('removeFormat', false, null);
+  document.execCommand('unlink', false, null);
+}
+
 // ---- ステップ管理 ----
 
 function addStep() {
-  steps.push({ id: ++stepCounter, title: '', imageName: null, description: '' });
+  steps.push({ id: ++stepCounter, title: '', imageName: null, imageType: 'image', description: '' });
   renderSteps();
   setTimeout(() => {
     const cards = document.querySelectorAll('.step-card');
@@ -320,18 +372,23 @@ async function uploadCoverImage(input) {
   drop.innerHTML = `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:200px; border-radius:4px;">`;
 }
 
-async function uploadStepImage(id, input) {
+async function uploadStepMedia(id, input) {
   const file = input.files[0];
   if (!file) return;
+  const drop = document.getElementById(`stepMediaDrop_${id}`);
+  drop.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">アップロード中...</div>`;
   const form = new FormData();
   form.append('image', file);
   const res = await fetch('/api/manuals/step-image', { method: 'POST', body: form });
-  if (!res.ok) { alert('画像のアップロードに失敗しました'); return; }
+  if (!res.ok) { alert('アップロードに失敗しました'); return; }
   const data = await res.json();
   const step = steps.find(s => s.id === id);
-  if (step) step.imageName = data.filename;
-  const drop = document.getElementById(`stepImgDrop_${id}`);
-  if (drop) drop.innerHTML = `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:300px; border-radius:4px;">`;
+  if (step) { step.imageName = data.filename; step.imageType = data.type; }
+  if (drop) {
+    drop.innerHTML = data.type === 'video'
+      ? `<video src="/uploads/${data.filename}" controls playsinline style="max-width:100%; max-height:300px; border-radius:4px;"></video>`
+      : `<img src="/uploads/${data.filename}" style="max-width:100%; max-height:300px; border-radius:4px;">`;
+  }
 }
 
 function renderSteps() {
@@ -349,20 +406,46 @@ function renderSteps() {
         <button type="button" onclick="removeStep(${step.id})" class="btn btn-danger btn-sm">削除</button>
       </div>
       <div class="card-body">
-        <div class="step-image-drop" id="stepImgDrop_${step.id}"
-          onclick="document.getElementById('stepImgInput_${step.id}').click()">
+        <div class="step-media-drop" id="stepMediaDrop_${step.id}"
+          onclick="document.getElementById('stepMediaInput_${step.id}').click()">
           ${step.imageName
-            ? `<img src="/uploads/${step.imageName}" style="max-width:100%; max-height:300px; border-radius:4px;">`
-            : `<div style="color:var(--text-muted);font-size:13px;">📷 クリックして画像を追加（任意）</div>`}
+            ? (step.imageType === 'video'
+                ? `<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%; max-height:300px; border-radius:4px;"></video>`
+                : `<img src="/uploads/${step.imageName}" style="max-width:100%; max-height:300px; border-radius:4px;">`)
+            : `<div style="color:var(--text-muted);font-size:13px;">📷🎬 クリックして画像または動画を追加（任意）</div>`}
         </div>
-        <input type="file" id="stepImgInput_${step.id}" accept="image/*" style="display:none;"
-          onchange="uploadStepImage(${step.id}, this)">
-        <textarea class="form-control" rows="3" placeholder="このステップの説明（任意）"
-          oninput="updateStepField(${step.id}, 'description', this.value)"
-        >${escHtml(step.description)}</textarea>
+        <input type="file" id="stepMediaInput_${step.id}" accept="image/*,video/*" style="display:none;"
+          onchange="uploadStepMedia(${step.id}, this)">
+        <div class="text-sm text-muted mb-1" style="font-size:12px;">画像: JPG/PNG など ／ 動画: MP4/MOV など（最大200MB）</div>
+        <div class="fmt-toolbar">
+          <button type="button" onmousedown="event.preventDefault();formatCmd('bold')" title="太字"><b>B</b></button>
+          <button type="button" onmousedown="event.preventDefault();formatCmd('italic')" title="斜体"><i>I</i></button>
+          <button type="button" onmousedown="event.preventDefault();formatCmd('underline')" title="下線"><u>U</u></button>
+          <button type="button" onmousedown="event.preventDefault();formatCmd('strikeThrough')" title="取り消し線"><s>S</s></button>
+          <div class="sep"></div>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#ef4444')" style="color:#ef4444;font-weight:700;" title="赤">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#f97316')" style="color:#f97316;font-weight:700;" title="オレンジ">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#ca8a04')" style="color:#ca8a04;font-weight:700;" title="黄">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#16a34a')" style="color:#16a34a;font-weight:700;" title="緑">A</button>
+          <button type="button" onmousedown="event.preventDefault();setForeColor('#2563eb')" style="color:#2563eb;font-weight:700;" title="青">A</button>
+          <div class="sep"></div>
+          <button type="button" onmousedown="event.preventDefault();formatCmd('insertUnorderedList')" title="箇条書き">• リスト</button>
+          <button type="button" onmousedown="event.preventDefault();clearFmt()" title="書式クリア" style="color:var(--text-muted);">✕ 書式クリア</button>
+        </div>
+        <div class="step-desc-editor"
+          id="stepDesc_${step.id}"
+          contenteditable="true"
+          data-placeholder="このステップの説明（任意）"
+          oninput="updateStepField(${step.id}, 'description', this.innerHTML)"></div>
       </div>
     </div>
   `).join('');
+
+  // contenteditable に既存の HTML をセット（templateリテラル内で直接埋め込むと構造が壊れるため後から設定）
+  steps.forEach(step => {
+    const el = document.getElementById(`stepDesc_${step.id}`);
+    if (el && step.description) el.innerHTML = step.description;
+  });
 }
 
 function escHtml(str) {
@@ -416,7 +499,7 @@ async function createManual(title, description, categoryId) {
     }
     const content = JSON.stringify({
       cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
+      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
     });
     res = await fetch('/api/manuals/steps', {
       method: 'POST',
@@ -466,7 +549,6 @@ async function updateManual(title, description, categoryId) {
   let res, data;
 
   if (editManual.type === 'pdf' && currentType === 'steps') {
-    // PDFからステップへ変換
     if (steps.length === 0) {
       showAlert('alert', '少なくとも1つのステップを追加してください', 'error');
       document.getElementById('submitBtn').disabled = false;
@@ -475,7 +557,7 @@ async function updateManual(title, description, categoryId) {
     }
     const content = JSON.stringify({
       cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
+      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
     });
     res = await fetch(`/api/manuals/${editId}`, {
       method: 'PUT',
@@ -485,7 +567,7 @@ async function updateManual(title, description, categoryId) {
   } else if (editManual.type === 'steps') {
     const content = JSON.stringify({
       cover_image: coverImageName,
-      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, description: s.description }))
+      steps: steps.map((s, i) => ({ order: i + 1, title: s.title, image: s.imageName, image_type: s.imageType, description: s.description }))
     });
     res = await fetch(`/api/manuals/${editId}`, {
       method: 'PUT',

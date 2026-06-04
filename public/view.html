@@ -23,6 +23,14 @@
     .cat-option { padding: 8px 12px; cursor: pointer; border-radius: 6px; }
     .cat-option:hover { background: var(--bg); }
     .cat-option.selected { background: var(--primary); color: white; }
+    .step-desc { font-size: 15px; line-height: 1.8; word-break: break-word; }
+    .step-desc b, .step-desc strong { font-weight: 700; }
+    .step-desc i, .step-desc em { font-style: italic; }
+    .step-desc u { text-decoration: underline; }
+    .step-desc s { text-decoration: line-through; }
+    .step-desc ul { padding-left: 20px; margin: 6px 0; }
+    .step-desc ol { padding-left: 20px; margin: 6px 0; }
+    .step-desc li { margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -97,6 +105,30 @@ async function init() {
   await loadCheckStatus();
 }
 
+function renderStepDesc(desc) {
+  if (!desc) return '';
+  // HTMLタグが含まれていればそのままinnerHTMLとして使用、なければ改行→<br>に変換
+  if (/<[a-zA-Z]/.test(desc)) {
+    return `<div class="step-desc">${desc}</div>`;
+  }
+  const escaped = desc.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  return `<div class="step-desc">${escaped}</div>`;
+}
+
+function renderStepMedia(image, imageType) {
+  if (!image) return '';
+  const isVideo = imageType === 'video' || /\.(mp4|webm|mov|avi|m4v)$/i.test(image);
+  if (isVideo) {
+    return `<div style="text-align:center; margin-bottom:16px;">
+      <video src="/uploads/${image}" controls playsinline
+        style="max-width:100%; max-height:500px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);"></video>
+    </div>`;
+  }
+  return `<div style="text-align:center; margin-bottom:16px;">
+    <img src="/uploads/${image}" style="max-width:100%; max-height:500px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+  </div>`;
+}
+
 async function loadManual() {
   const res = await fetch(`/api/manuals/${manualId}`);
   if (!res.ok) {
@@ -157,8 +189,8 @@ async function loadManual() {
           </div>
         </div>
         <div class="card-body">
-          ${step.image ? `<div style="text-align:center; margin-bottom:16px;"><img src="/uploads/${step.image}" style="max-width:100%; max-height:500px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);"></div>` : ''}
-          ${step.description ? `<div style="white-space:pre-wrap; font-size:15px; line-height:1.8;">${escHtml(step.description)}</div>` : ''}
+          ${renderStepMedia(step.image, step.image_type)}
+          ${renderStepDesc(step.description)}
         </div>
       </div>`).join('');
     bodyHtml = coverHtml + (stepsList.length > 0 ? stepsHtml : '<div class="empty"><div class="empty-icon">📋</div>ステップがまだありません</div>');
