@@ -967,14 +967,6 @@ td{padding:11px 14px;vertical-align:middle}
     </table>
     </div>
   </div>
-  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;max-width:480px;margin-bottom:28px">
-    <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:8px">全員のパスワードを一括リセット</div>
-    <div style="display:flex;gap:8px">
-      <input type="password" id="bulkPwInput" placeholder="共通パスワード（4文字以上）" class="mgmt-input" style="font-size:13px" />
-      <button onclick="resetAllPasswords()" class="btn-add" style="font-size:13px;white-space:nowrap">設定</button>
-    </div>
-    <div id="bulkPwMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
-  </div>
 
 </div><!-- /container -->
 
