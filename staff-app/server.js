@@ -1061,15 +1061,19 @@ loadKuchikomiSettings();
 
 // ===== スタッフ管理テーブル =====
 async function loadStaffTable() {
-  const [accountsRes] = await Promise.all([adminFetch('/api/admin/accounts')]);
+  const [namesRes, accountsRes] = await Promise.all([fetch('/api/staff-names'), adminFetch('/api/admin/accounts')]);
+  const names = await namesRes.json();
   const accounts = await accountsRes.json();
+  const accountMap = {};
+  accounts.forEach(a => { accountMap[a.staffName] = a; });
   const tbody = document.getElementById('staffTableBody');
-  if (!accounts.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">スタッフが登録されていません</td></tr>'; return; }
+  if (!names.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">スタッフが登録されていません</td></tr>'; return; }
   tbody.innerHTML = '';
-  accounts.forEach(a => {
+  names.forEach(n => {
+    const a = accountMap[n] || {};
     const tr = document.createElement('tr');
     const loginTime = a.lastLogin ? new Date(a.lastLogin).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '未ログイン';
-    tr.innerHTML = '<td><strong>' + a.staffName + '</strong></td>' +
+    tr.innerHTML = '<td><strong>' + n + '</strong></td>' +
       '<td style="color:#475569">' + (a.email || '<span style="color:#cbd5e1">未設定</span>') + '</td>' +
       '<td style="color:#94a3b8;font-size:12px">' + loginTime + '</td>';
     const opTd = document.createElement('td');
@@ -1077,11 +1081,11 @@ async function loadStaffTable() {
     const editBtn = document.createElement('button');
     editBtn.textContent = '編集';
     editBtn.style.cssText = 'background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px;font-family:inherit';
-    editBtn.onclick = function() { openEditModal(a.staffName, a.email || ''); };
+    editBtn.onclick = function() { openEditModal(n, a.email || ''); };
     const delBtn = document.createElement('button');
     delBtn.textContent = '削除';
     delBtn.style.cssText = 'background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
-    delBtn.onclick = function() { deleteStaff(a.staffName, this); };
+    delBtn.onclick = function() { deleteStaff(n, this); };
     opTd.appendChild(editBtn); opTd.appendChild(delBtn);
     tr.appendChild(opTd);
     tbody.appendChild(tr);
