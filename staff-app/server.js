@@ -1523,10 +1523,13 @@ app.get('/my-stats', async (req, res) => {
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans JP',sans-serif;background:#f0f4f8;color:#1e293b;font-size:14px}
 header{background:linear-gradient(135deg,#0f766e 0%,#2aab96 60%,#34d399 100%);padding:0;box-shadow:0 2px 12px rgba(15,118,110,.3)}
-.header-inner{max-width:640px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;gap:12px}
+.header-inner{max-width:640px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.header-left{display:flex;align-items:center;gap:12px}
 .header-icon{width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 header h1{font-size:16px;font-weight:700;color:#fff}
 header p{font-size:11px;color:rgba(255,255,255,.8);margin-top:2px}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.logout-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
 .container{max-width:640px;margin:0 auto;padding:20px 16px 60px}
 .card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);margin-bottom:18px;overflow:hidden}
 .card-header{background:linear-gradient(135deg,#f0fdf4,#ecfdf5);padding:12px 16px;border-bottom:1px solid #a7f3d0;font-size:13px;font-weight:700;color:#065f46;display:flex;align-items:center;gap:6px}
@@ -1546,16 +1549,17 @@ tbody tr:last-child{border-bottom:none}
 <body>
 <header>
   <div class="header-inner">
-    <div class="header-icon">📊</div>
-    <div><h1>自分の実績</h1><p>自己申告デラックス | のびのび歯科</p></div>
+    <div class="header-left">
+      <div class="header-icon">📊</div>
+      <div><h1>自分の実績</h1><p>${esc(name)} さん</p></div>
+    </div>
+    <div class="header-right">
+      <a href="/staff-logout" class="logout-btn">ログアウト</a>
+    </div>
   </div>
 </header>
 <div class="container">
   <a href="/" class="back-link">← 入力フォームへ戻る</a>
-
-  <div class="card">
-    <div class="card-header">👤 ${esc(name)} さんの実績</div>
-  </div>
 
   <div class="card">
     <div class="card-header">📅 今月の実績 vs 先月 <span class="month-tag">${thisMonth}</span></div>
