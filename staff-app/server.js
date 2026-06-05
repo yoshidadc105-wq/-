@@ -128,7 +128,18 @@ app.get('/api/goals', async (req, res) => {
 app.get('/api/admin/accounts', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const accounts = await loadStaffAccounts();
-  res.json(accounts.map(a => ({ staffName: a.staffName, email: a.email || '' })));
+  res.json(accounts.map(a => ({ staffName: a.staffName, email: a.email || '', lastLogin: a.lastLogin || null })));
+});
+
+// 管理者：スタッフ追加（名前登録＋アカウント作成を同時に）
+app.post('/admin/add-staff', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, email, password } = req.body;
+  if (!staffName || !email || !password) return res.status(400).json({ error: '全項目を入力してください' });
+  if (password.length < 4) return res.status(400).json({ error: 'パスワードは4文字以上' });
+  await addStaffName(staffName.trim());
+  await upsertStaffAccount(staffName.trim(), hashPassword(password), email.trim().toLowerCase());
+  res.json({ ok: true });
 });
 
 // 管理者：個別アカウント設定（メール・パスワード）
@@ -266,6 +277,10 @@ app.post('/staff-login', async (req, res) => {
   if (account.passwordHash !== hashPassword(password)) return res.status(401).json({ error: 'メールアドレスまたはパスワードが違います。' });
   const token = createStaffToken(account.staffName);
   res.setHeader('Set-Cookie', `staffSession=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+  // 最終ログイン時刻を記録
+  if (staffAccountsCol) {
+    staffAccountsCol.updateOne({ staffName: account.staffName }, { $set: { lastLogin: new Date().toISOString() } }).catch(()=>{});
+  }
   res.json({ ok: true });
 });
 
@@ -823,35 +838,59 @@ td{padding:11px 14px;vertical-align:middle}
     <div id="kuchikomiMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
   </div>
 
-  <!-- スタッフ名管理 -->
-  <div class="section-header"><h2>スタッフ名管理</h2><div class="section-line"></div></div>
-  <div class="mgmt-card">
-    <div class="mgmt-input-row">
-      <input type="text" id="newStaffInput" placeholder="新しいスタッフ名を入力" class="mgmt-input" />
-      <button onclick="addStaffName()" class="btn-add">追加</button>
-    </div>
-    <div id="staffNameMsg" style="font-size:12px;margin-bottom:10px;min-height:16px;"></div>
-    <ul id="staffNameList" class="mgmt-list" style="list-style:none;padding:0;margin:0;"></ul>
+  <!-- スタッフ管理 -->
+  <div class="section-header">
+    <h2>スタッフ管理</h2><div class="section-line"></div>
+    <button onclick="openStaffModal()" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">＋ スタッフ追加</button>
   </div>
-
-  <!-- アカウント管理 -->
-  <div class="section-header"><h2>スタッフアカウント管理（パスワード）</h2><div class="section-line"></div></div>
-  <div class="mgmt-card" style="max-width:560px">
-    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフのログインパスワードを設定・リセットできます。</p>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:8px">全員のパスワードを一括設定</div>
-      <div style="display:flex;gap:8px">
-        <input type="password" id="bulkPwInput" placeholder="共通パスワード（4文字以上）" class="mgmt-input" style="font-size:13px" />
-        <button onclick="resetAllPasswords()" class="btn-add" style="font-size:13px;white-space:nowrap">一括設定</button>
-      </div>
-      <div id="bulkPwMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+  <div id="staffMsg" style="font-size:12px;margin-bottom:8px;min-height:16px;"></div>
+  <div class="table-card" style="margin-bottom:14px">
+    <div class="table-scroll">
+    <table id="staffTable">
+      <thead><tr>
+        <th>スタッフ名</th><th>メールアドレス</th><th>最終ログイン</th><th style="text-align:center">操作</th>
+      </tr></thead>
+      <tbody id="staffTableBody"></tbody>
+    </table>
     </div>
-    <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:8px">スタッフ別パスワードリセット</div>
-    <div id="accountList" style="display:flex;flex-direction:column;gap:8px;"></div>
-    <div id="accountMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
+  </div>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;max-width:480px;margin-bottom:28px">
+    <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:8px">全員のパスワードを一括リセット</div>
+    <div style="display:flex;gap:8px">
+      <input type="password" id="bulkPwInput" placeholder="共通パスワード（4文字以上）" class="mgmt-input" style="font-size:13px" />
+      <button onclick="resetAllPasswords()" class="btn-add" style="font-size:13px;white-space:nowrap">設定</button>
+    </div>
+    <div id="bulkPwMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
   </div>
 
 </div><!-- /container -->
+
+<!-- スタッフ追加・編集モーダル -->
+<div id="staffModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="closeStaffModal(event)">
+  <div style="background:#fff;border-radius:16px;padding:28px 28px 24px;max-width:440px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 id="staffModalTitle" style="font-size:17px;font-weight:700;color:#0f766e"></h2>
+      <button onclick="document.getElementById('staffModalOverlay').style.display='none'" style="background:#f1f5f9;border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;color:#64748b">×</button>
+    </div>
+    <div id="staffNameField" class="form-group" style="margin-bottom:14px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">スタッフ名 <span style="color:#ef4444">*</span></label>
+      <input type="text" id="modalStaffName" placeholder="例：山田 太郎" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" />
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">メールアドレス <span style="color:#ef4444">*</span></label>
+      <input type="email" id="modalEmail" placeholder="例：yamada@example.com" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" />
+    </div>
+    <div style="margin-bottom:18px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px" id="pwLabel">パスワード <span style="color:#ef4444">*</span></label>
+      <input type="password" id="modalPassword" placeholder="4文字以上" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" />
+    </div>
+    <div id="staffModalMsg" style="font-size:12px;min-height:16px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('staffModalOverlay').style.display='none'" style="flex:1;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;font-family:inherit">キャンセル</button>
+      <button id="staffModalSaveBtn" style="flex:2;padding:11px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">追加する</button>
+    </div>
+  </div>
+</div>
 
 <!-- ドリルダウンモーダル -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
@@ -1020,109 +1059,109 @@ async function toggleKuchikomi(btn) {
 }
 loadKuchikomiSettings();
 
-// スタッフ名管理
-async function loadMgmtStaffNames() {
-  const res = await fetch('/api/staff-names');
-  const names = await res.json();
-  const ul = document.getElementById('staffNameList');
-  ul.innerHTML = '';
-  names.forEach(n => {
-    const li = document.createElement('li');
-    li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:14px;';
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = n;
-    const btn = document.createElement('button');
-    btn.textContent = '削除';
-    btn.className = 'btn-del';
-    btn.onclick = function() { deleteStaffName(n, this); };
-    li.appendChild(nameSpan);
-    li.appendChild(btn);
-    ul.appendChild(li);
+// ===== スタッフ管理テーブル =====
+async function loadStaffTable() {
+  const [accountsRes] = await Promise.all([adminFetch('/api/admin/accounts')]);
+  const accounts = await accountsRes.json();
+  const tbody = document.getElementById('staffTableBody');
+  if (!accounts.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">スタッフが登録されていません</td></tr>'; return; }
+  tbody.innerHTML = '';
+  accounts.forEach(a => {
+    const tr = document.createElement('tr');
+    const loginTime = a.lastLogin ? new Date(a.lastLogin).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '未ログイン';
+    tr.innerHTML = '<td><strong>' + a.staffName + '</strong></td>' +
+      '<td style="color:#475569">' + (a.email || '<span style="color:#cbd5e1">未設定</span>') + '</td>' +
+      '<td style="color:#94a3b8;font-size:12px">' + loginTime + '</td>';
+    const opTd = document.createElement('td');
+    opTd.style.cssText = 'text-align:center;white-space:nowrap';
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '編集';
+    editBtn.style.cssText = 'background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px;font-family:inherit';
+    editBtn.onclick = function() { openEditModal(a.staffName, a.email || ''); };
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '削除';
+    delBtn.style.cssText = 'background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+    delBtn.onclick = function() { deleteStaff(a.staffName, this); };
+    opTd.appendChild(editBtn); opTd.appendChild(delBtn);
+    tr.appendChild(opTd);
+    tbody.appendChild(tr);
   });
 }
-async function addStaffName() {
-  const input = document.getElementById('newStaffInput');
-  const name = input.value.trim();
-  if (!name) return;
-  const msg = document.getElementById('staffNameMsg');
-  const res = await adminFetch('/admin/staff-names', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
-  if (res.ok) { input.value=''; msg.style.color='#059669'; msg.textContent='追加しました'; loadMgmtStaffNames(); }
-  else { msg.style.color='#dc2626'; msg.textContent='追加に失敗しました ('+res.status+')'; }
+
+let editingStaff = null;
+function openStaffModal() {
+  editingStaff = null;
+  document.getElementById('staffModalTitle').textContent = 'スタッフ追加';
+  document.getElementById('staffNameField').style.display = '';
+  document.getElementById('modalStaffName').value = '';
+  document.getElementById('modalEmail').value = '';
+  document.getElementById('modalPassword').value = '';
+  document.getElementById('pwLabel').innerHTML = 'パスワード <span style="color:#ef4444">*</span>';
+  document.getElementById('staffModalMsg').textContent = '';
+  const saveBtn = document.getElementById('staffModalSaveBtn');
+  saveBtn.textContent = '追加する';
+  saveBtn.onclick = submitAddStaff;
+  document.getElementById('staffModalOverlay').style.display = 'flex';
 }
-async function deleteStaffName(name, btn) {
+function openEditModal(staffName, email) {
+  editingStaff = staffName;
+  document.getElementById('staffModalTitle').textContent = staffName + ' を編集';
+  document.getElementById('staffNameField').style.display = 'none';
+  document.getElementById('modalEmail').value = email;
+  document.getElementById('modalPassword').value = '';
+  document.getElementById('pwLabel').innerHTML = 'パスワード（変更する場合のみ）';
+  document.getElementById('staffModalMsg').textContent = '';
+  const saveBtn = document.getElementById('staffModalSaveBtn');
+  saveBtn.textContent = '保存する';
+  saveBtn.onclick = submitEditStaff;
+  document.getElementById('staffModalOverlay').style.display = 'flex';
+}
+function closeStaffModal(e) {
+  if (e.target === document.getElementById('staffModalOverlay')) document.getElementById('staffModalOverlay').style.display = 'none';
+}
+async function submitAddStaff() {
+  const staffName = document.getElementById('modalStaffName').value.trim();
+  const email = document.getElementById('modalEmail').value.trim();
+  const password = document.getElementById('modalPassword').value;
+  const msg = document.getElementById('staffModalMsg');
+  if (!staffName || !email || !password) { msg.style.color='#dc2626'; msg.textContent='全項目を入力してください'; return; }
+  const res = await adminFetch('/admin/add-staff', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, email, password }) });
+  const data = await res.json();
+  if (res.ok) { document.getElementById('staffModalOverlay').style.display='none'; loadStaffTable(); document.getElementById('staffMsg').style.color='#059669'; document.getElementById('staffMsg').textContent=staffName+'を追加しました'; setTimeout(()=>document.getElementById('staffMsg').textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent=data.error||'追加に失敗しました'; }
+}
+async function submitEditStaff() {
+  const email = document.getElementById('modalEmail').value.trim();
+  const password = document.getElementById('modalPassword').value;
+  const msg = document.getElementById('staffModalMsg');
+  if (!email) { msg.style.color='#dc2626'; msg.textContent='メールアドレスを入力してください'; return; }
+  const body = { staffName: editingStaff, email };
+  if (password) body.password = password;
+  const res = await adminFetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (res.ok) { document.getElementById('staffModalOverlay').style.display='none'; loadStaffTable(); document.getElementById('staffMsg').style.color='#059669'; document.getElementById('staffMsg').textContent='保存しました'; setTimeout(()=>document.getElementById('staffMsg').textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; }
+}
+async function deleteStaff(name, btn) {
   if (btn.dataset.confirm !== '1') {
-    btn.dataset.confirm = '1';
-    btn.textContent = '本当に削除？';
-    btn.style.cssText = 'background:#ef4444;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;';
-    setTimeout(() => { btn.dataset.confirm = ''; btn.textContent = '削除'; btn.style.cssText = ''; btn.className = 'btn-del'; }, 3000);
+    btn.dataset.confirm = '1'; btn.textContent = '本当に削除？'; btn.style.background = '#ef4444'; btn.style.color = '#fff';
+    setTimeout(() => { if(btn.dataset.confirm==='1'){btn.dataset.confirm='';btn.textContent='削除';btn.style.background='#fee2e2';btn.style.color='#dc2626';} }, 3000);
     return;
   }
-  const msg = document.getElementById('staffNameMsg');
-  try {
-    const res = await adminFetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
-    if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; await loadMgmtStaffNames(); }
-    else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました ('+res.status+')'; }
-  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
-}
-loadMgmtStaffNames();
-
-// アカウント管理
-async function loadAccountList() {
-  const [namesRes, accountsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/admin/accounts')]);
-  const names = await namesRes.json();
-  const accounts = await accountsRes.json();
-  const accountMap = {};
-  accounts.forEach(a => { accountMap[a.staffName] = a.email || ''; });
-  const container = document.getElementById('accountList');
-  container.innerHTML = '';
-  names.forEach(n => {
-    const row = document.createElement('div');
-    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
-    const emailInput = document.createElement('input');
-    emailInput.type = 'email'; emailInput.placeholder = 'メールアドレス';
-    emailInput.value = accountMap[n] || ''; emailInput.dataset.type = 'email';
-    emailInput.style.cssText = 'flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none';
-    const pwInput = document.createElement('input');
-    pwInput.type = 'password'; pwInput.placeholder = 'パスワード（変更する場合のみ）';
-    pwInput.dataset.type = 'pw';
-    pwInput.style.cssText = 'flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none';
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = '保存';
-    saveBtn.style.cssText = 'background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
-    saveBtn.onclick = function() { saveAccount(n, this); };
-    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>';
-    const inputRow = document.createElement('div');
-    inputRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
-    inputRow.appendChild(emailInput); inputRow.appendChild(pwInput); inputRow.appendChild(saveBtn);
-    row.appendChild(inputRow);
-    container.appendChild(row);
-  });
-}
-async function saveAccount(staffName, btn) {
-  const row = btn.closest('div[style]');
-  const emailInput = row.querySelector('[data-type="email"]');
-  const pwInput = row.querySelector('[data-type="pw"]');
-  const email = emailInput.value.trim();
-  const pw = pwInput.value.trim();
-  const msg = document.getElementById('accountMsg');
-  if (!email) { msg.style.color='#dc2626'; msg.textContent='メールアドレスを入力してください'; return; }
-  const body = { staffName, email };
-  if (pw) body.password = pw;
-  const res = await adminFetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  if (res.ok) { pwInput.value=''; msg.style.color='#059669'; msg.textContent=staffName+'のアカウントを保存しました'; setTimeout(()=>msg.textContent='',3000); }
-  else { msg.style.color='#dc2626'; msg.textContent='保存失敗 ('+res.status+')'; }
+  const msg = document.getElementById('staffMsg');
+  const res = await adminFetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent=name+'を削除しました'; loadStaffTable(); setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました ('+res.status+')'; }
 }
 async function resetAllPasswords() {
   const pw = document.getElementById('bulkPwInput').value.trim();
   const msg = document.getElementById('bulkPwMsg');
   if (!pw || pw.length < 4) { msg.style.color='#dc2626'; msg.textContent='4文字以上のパスワードを入力してください'; return; }
-  if (!confirm('全スタッフのパスワードを「' + pw + '」に設定します。よろしいですか？')) return;
   const res = await adminFetch('/admin/reset-all-passwords', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
   const data = await res.json();
   if (res.ok) { document.getElementById('bulkPwInput').value=''; msg.style.color='#059669'; msg.textContent=data.count+'名に設定しました'; setTimeout(()=>msg.textContent='',3000); }
   else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
 }
-loadAccountList();
+loadStaffTable();
 
 async function deleteAllRecords() {
   if (!confirm('⚠️ 入力されたデータをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
