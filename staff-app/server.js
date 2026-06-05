@@ -774,6 +774,35 @@ app.get('/certificate', async (req, res) => {
 
   const highlightHtml = highlights.map(h => `<div class="hl">・${esc(h)}</div>`).join('');
 
+  // 実績に応じた本文を自動生成
+  const bodyParts = [];
+  // 1文目：患者対応の基本姿勢
+  bodyParts.push('あなたは日々の診療業務において、患者様お一人おひとりに対して真心のこもった対応を実践し、チームの一員として常に高い意識と誠実な姿勢で職務に励んでまいりました。');
+
+  // 2文目：特に目立つ実績を具体的に
+  const achievements = [];
+  if (patientCount > 0) achievements.push(`${patientCount}名の患者様を担当`);
+  if (counselingTotal > 0) achievements.push(`${[...counselingTypes].join('・')}のカウンセリングで${counselingTotal}件の成約`);
+  if (itemsTotal > 0) {
+    const itemList = [...itemNames].slice(0, 2).join('・');
+    achievements.push(`${itemList ? itemList + 'など' : ''}物品販売${itemsTotal}件`);
+  }
+  if (reviewsTotal > 0) achievements.push(`口コミ${reviewsTotal}件獲得`);
+
+  if (achievements.length > 0) {
+    bodyParts.push(`特に${achievements.join('、')}など、具体的な成果を通じて医院の発展に大きく貢献されました。`);
+  }
+
+  // 3文目：行動・取り組みがあれば
+  if (uniqueBehaviors.length > 0) {
+    bodyParts.push(`また、${uniqueBehaviors[0]}など、日常の一つひとつの行動においても模範となる姿勢を示し続けてくださいました。`);
+  }
+
+  // 締め
+  bodyParts.push('その献身的な取り組みと積み重ねた実績はここに特筆すべきものであり、表彰いたします。');
+
+  const autoBody = bodyParts.join('\n\n');
+
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -807,10 +836,8 @@ h1 { font-size: 44px; letter-spacing: 0.4em; color: #8b6914; margin: 20px 0 36px
     <button class="print-btn" onclick="window.print()">印刷する</button>
   </div>
   <div style="width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">
-    <div style="font-size:12px;color:#666;margin-bottom:6px;">本文を編集できます（印刷には反映されます）</div>
-    <textarea id="certBody" rows="6" style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;" oninput="updateBody()">あなたは日々の診療業務において、患者様お一人おひとりに対して真心のこもった対応を実践し、チームの一員として常に高い意識と誠実な姿勢で職務に励んでまいりました。
-
-その献身的な取り組みと積み重ねた実績は医院の発展と患者様の信頼向上に大きく貢献するものであり、ここにその功績を讃え、表彰いたします。</textarea>
+    <div style="font-size:12px;color:#666;margin-bottom:6px;">📝 実績をもとに自動生成しました。自由に編集できます（印刷に反映されます）</div>
+    <textarea id="certBody" rows="8" style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;" oninput="updateBody()">${esc(autoBody)}</textarea>
   </div>
 </div>
 <div class="cert">
