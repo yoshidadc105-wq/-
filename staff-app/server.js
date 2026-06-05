@@ -65,19 +65,25 @@ async function loadStaffAccounts() {
   if (staffAccountsCol) return await staffAccountsCol.find({}).toArray();
   try { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')); } catch { return []; }
 }
+async function getStaffAccountByEmail(email) {
+  if (staffAccountsCol) return await staffAccountsCol.findOne({ email });
+  return (await loadStaffAccounts()).find(a => a.email === email) || null;
+}
 async function getStaffAccount(staffName) {
   if (staffAccountsCol) return await staffAccountsCol.findOne({ staffName });
   return (await loadStaffAccounts()).find(a => a.staffName === staffName) || null;
 }
-async function upsertStaffAccount(staffName, passwordHash) {
+async function upsertStaffAccount(staffName, passwordHash, email) {
+  const doc = { staffName, passwordHash };
+  if (email !== undefined) doc.email = email;
   if (staffAccountsCol) {
-    await staffAccountsCol.updateOne({ staffName }, { $set: { staffName, passwordHash } }, { upsert: true });
+    await staffAccountsCol.updateOne({ staffName }, { $set: doc }, { upsert: true });
     return;
   }
   const list = await loadStaffAccounts();
   const idx = list.findIndex(a => a.staffName === staffName);
-  if (idx >= 0) list[idx].passwordHash = passwordHash;
-  else list.push({ staffName, passwordHash });
+  if (idx >= 0) Object.assign(list[idx], doc);
+  else list.push(doc);
   fs.mkdirSync(path.dirname(ACCOUNTS_FILE), { recursive: true });
   fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(list, null, 2));
 }
@@ -118,12 +124,21 @@ app.get('/api/goals', async (req, res) => {
   res.json(goals);
 });
 // 全データ削除
-// 管理者：個別パスワードリセット
+// 管理者：アカウント一覧取得
+app.get('/api/admin/accounts', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const accounts = await loadStaffAccounts();
+  res.json(accounts.map(a => ({ staffName: a.staffName, email: a.email || '' })));
+});
+
+// 管理者：個別アカウント設定（メール・パスワード）
 app.post('/admin/reset-password', async (req, res) => {
   if (!checkAuth(req, res)) return;
-  const { staffName, password } = req.body;
-  if (!staffName || !password) return res.status(400).json({ error: 'invalid' });
-  await upsertStaffAccount(staffName, hashPassword(password));
+  const { staffName, password, email } = req.body;
+  if (!staffName) return res.status(400).json({ error: 'invalid' });
+  const existing = await getStaffAccount(staffName);
+  const newHash = password ? hashPassword(password) : (existing ? existing.passwordHash : hashPassword('nobinobi'));
+  await upsertStaffAccount(staffName, newHash, email !== undefined ? email.trim().toLowerCase() : undefined);
   res.json({ ok: true });
 });
 
@@ -133,7 +148,11 @@ app.post('/admin/reset-all-passwords', async (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ error: 'invalid' });
   const names = await loadStaffNames();
-  await Promise.all(names.map(n => upsertStaffAccount(n, hashPassword(password))));
+  const accounts = await loadStaffAccounts();
+  await Promise.all(names.map(n => {
+    const existing = accounts.find(a => a.staffName === n);
+    return upsertStaffAccount(n, hashPassword(password), existing ? existing.email : undefined);
+  }));
   res.json({ ok: true, count: names.length });
 });
 
@@ -240,12 +259,12 @@ app.get('/staff-login', (req, res) => {
 });
 
 app.post('/staff-login', async (req, res) => {
-  const { staffName, password } = req.body;
-  if (!staffName || !password) return res.status(400).json({ error: 'invalid' });
-  const account = await getStaffAccount(staffName);
-  if (!account) return res.status(401).json({ error: 'アカウントが設定されていません。管理者にお問い合わせください。' });
-  if (account.passwordHash !== hashPassword(password)) return res.status(401).json({ error: 'パスワードが違います。' });
-  const token = createStaffToken(staffName);
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'invalid' });
+  const account = await getStaffAccountByEmail(email.trim().toLowerCase());
+  if (!account) return res.status(401).json({ error: 'メールアドレスまたはパスワードが違います。' });
+  if (account.passwordHash !== hashPassword(password)) return res.status(401).json({ error: 'メールアドレスまたはパスワードが違います。' });
+  const token = createStaffToken(account.staffName);
   res.setHeader('Set-Cookie', `staffSession=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
   res.json({ ok: true });
 });
@@ -1020,27 +1039,38 @@ loadMgmtStaffNames();
 
 // アカウント管理
 async function loadAccountList() {
-  const res = await fetch('/api/staff-names');
-  const names = await res.json();
+  const [namesRes, accountsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/admin/accounts')]);
+  const names = await namesRes.json();
+  const accounts = await accountsRes.json();
+  const accountMap = {};
+  accounts.forEach(a => { accountMap[a.staffName] = a.email || ''; });
   const container = document.getElementById('accountList');
   container.innerHTML = '';
   names.forEach(n => {
     const row = document.createElement('div');
-    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-    row.innerHTML = '<span style="font-size:14px;font-weight:600;min-width:90px">' + n + '</span>' +
-      '<input type="password" placeholder="新パスワード" style="flex:1;min-width:130px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none" />' +
-      '<button onclick="resetOnePassword(' + JSON.stringify(n) + ', this)" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">リセット</button>';
+    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
+    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<input type="email" placeholder="メールアドレス" value="' + (accountMap[n]||'') + '" data-type="email" style="flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none" />' +
+      '<input type="password" placeholder="パスワード（変更する場合のみ）" data-type="pw" style="flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none" />' +
+      '<button onclick="saveAccount(' + JSON.stringify(n) + ', this)" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">保存</button>' +
+      '</div>';
     container.appendChild(row);
   });
 }
-async function resetOnePassword(staffName, btn) {
-  const input = btn.previousElementSibling;
-  const pw = input.value.trim();
+async function saveAccount(staffName, btn) {
+  const row = btn.closest('div[style]');
+  const emailInput = row.querySelector('[data-type="email"]');
+  const pwInput = row.querySelector('[data-type="pw"]');
+  const email = emailInput.value.trim();
+  const pw = pwInput.value.trim();
   const msg = document.getElementById('accountMsg');
-  if (!pw) { msg.style.color='#dc2626'; msg.textContent='パスワードを入力してください'; return; }
-  const res = await fetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, password: pw }) });
-  if (res.ok) { input.value=''; msg.style.color='#059669'; msg.textContent=staffName+'のパスワードをリセットしました'; setTimeout(()=>msg.textContent='',3000); }
-  else { msg.style.color='#dc2626'; msg.textContent='リセット失敗'; }
+  if (!email) { msg.style.color='#dc2626'; msg.textContent='メールアドレスを入力してください'; return; }
+  const body = { staffName, email };
+  if (pw) body.password = pw;
+  const res = await fetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (res.ok) { pwInput.value=''; msg.style.color='#059669'; msg.textContent=staffName+'のアカウントを保存しました'; setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='保存失敗 ('+res.status+')'; }
 }
 async function resetAllPasswords() {
   const pw = document.getElementById('bulkPwInput').value.trim();

@@ -15,11 +15,11 @@
     .logo p { font-size: 12px; color: #94a3b8; margin-top: 3px; }
     .form-group { margin-bottom: 16px; }
     label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; }
-    select, input[type="password"] {
+    input[type="email"], input[type="password"] {
       width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 11px 14px;
       font-size: 15px; font-family: inherit; outline: none; transition: border .2s, box-shadow .2s; background: #f8fafc;
     }
-    select:focus, input:focus { border-color: #2aab96; background: #fff; box-shadow: 0 0 0 3px rgba(42,171,150,.12); }
+    input:focus { border-color: #2aab96; background: #fff; box-shadow: 0 0 0 3px rgba(42,171,150,.12); }
     .btn { display: block; width: 100%; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity .2s, transform .1s; box-shadow: 0 4px 14px rgba(42,171,150,.4); margin-top: 8px; letter-spacing: .03em; }
     .btn:hover { opacity: .9; }
     .btn:active { transform: scale(.98); }
@@ -39,10 +39,8 @@
   <div class="error-msg" id="errorMsg"></div>
 
   <div class="form-group">
-    <label>スタッフ名</label>
-    <select id="staffSelect">
-      <option value="">選択してください</option>
-    </select>
+    <label>メールアドレス</label>
+    <input type="email" id="emailInput" placeholder="例：yamada@example.com" autocomplete="email" />
   </div>
   <div class="form-group">
     <label>パスワード</label>
@@ -53,35 +51,26 @@
 </div>
 
 <script>
-  async function loadNames() {
-    const res = await fetch('/api/staff-names');
-    const names = await res.json();
-    const sel = document.getElementById('staffSelect');
-    names.forEach(n => {
-      const opt = document.createElement('option');
-      opt.value = opt.textContent = n;
-      sel.appendChild(opt);
-    });
-  }
-  loadNames();
-
+  document.getElementById('emailInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('password').focus();
+  });
   document.getElementById('password').addEventListener('keydown', e => {
     if (e.key === 'Enter') doLogin();
   });
 
   async function doLogin() {
-    const staffName = document.getElementById('staffSelect').value;
+    const email = document.getElementById('emailInput').value.trim();
     const password = document.getElementById('password').value;
     const errEl = document.getElementById('errorMsg');
     const btn = document.getElementById('loginBtn');
     errEl.style.display = 'none';
-    if (!staffName) { errEl.textContent = 'スタッフ名を選択してください'; errEl.style.display = 'block'; return; }
+    if (!email) { errEl.textContent = 'メールアドレスを入力してください'; errEl.style.display = 'block'; return; }
     if (!password) { errEl.textContent = 'パスワードを入力してください'; errEl.style.display = 'block'; return; }
     btn.disabled = true; btn.textContent = 'ログイン中...';
     try {
       const res = await fetch('/staff-login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffName, password })
+        body: JSON.stringify({ email, password })
       });
       if (res.ok) {
         location.href = '/';
