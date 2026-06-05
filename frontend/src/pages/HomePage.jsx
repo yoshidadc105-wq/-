@@ -164,8 +164,8 @@ export default function HomePage() {
           const groups = [];
           const seen = new Set();
           filtered.forEach(p => {
-            const cat = p.category || '未分類';
-            if (!seen.has(cat)) { seen.add(cat); groups.push(cat); }
+            if (!p.category) return;
+            if (!seen.has(p.category)) { seen.add(p.category); groups.push(p.category); }
           });
           return groups.map(cat => (
             <div key={cat}>
@@ -176,10 +176,10 @@ export default function HomePage() {
                 marginBottom: 8,
                 letterSpacing: '0.05em',
               }}>
-                {cat === '未分類' ? '─ その他' : `─ ${cat}`}
+                ─ {cat}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {filtered.filter(p => (p.category || '未分類') === cat).map(p => (
+                {filtered.filter(p => p.category === cat).map(p => (
                   <ProductCard key={p.id} product={p}
                     onUse={() => openSheet(p, 'use')}
                     onReceive={() => openSheet(p, 'receive')}
