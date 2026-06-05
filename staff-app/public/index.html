@@ -208,7 +208,8 @@
   const today = todayDate.toLocaleDateString('sv-SE');
   const todayDisplay = todayDate.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
   document.getElementById('dateInput').value = today;
-  document.querySelector('#mainForm .form-group:first-child label').textContent = '日付（今日：' + todayDisplay + '）';
+  const dateLabel = document.getElementById('dateInput').closest('.form-group').querySelector('label');
+  if (dateLabel) dateLabel.textContent = '日付（今日：' + todayDisplay + '）';
 
   function onActionChange() {
     const val = document.getElementById('actionSelect').value;
