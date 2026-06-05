@@ -101,6 +101,64 @@ function requireStaffAuth(req, res, next) {
 const NAMES_FILE = path.join(__dirname, 'data', 'staff_names.json');
 const SETTINGS_FILE = path.join(__dirname, 'data', 'staff_settings.json');
 const ITEMS_FILE = path.join(__dirname, 'data', 'action_items.json');
+const CONFIG_FILE = path.join(__dirname, 'data', 'action_config.json');
+
+const DEFAULT_GROUPS = ['物品', 'カウンセリング', 'アポ管理', '口コミ', '処置', 'チームサポート', 'その他'];
+const DEFAULT_CATEGORIES = [
+  { id: 'item', label: '物品販売' },
+  { id: 'item_recommend', label: '物品すすめ' },
+  { id: 'counseling', label: '成約' },
+  { id: 'counseling_approach', label: 'ジャブ打ち' },
+  { id: 'appointment', label: 'アポ転換' },
+  { id: 'review', label: '口コミ' },
+  { id: 'treatment', label: '処置・その他' },
+  { id: 'team_support', label: 'チームサポート' },
+];
+
+async function loadActionConfig() {
+  try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch {}
+  return { groups: [...DEFAULT_GROUPS], categories: DEFAULT_CATEGORIES.map(c => ({...c})) };
+}
+async function saveActionConfig(config) {
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+app.get('/api/action-config', async (req, res) => res.json(await loadActionConfig()));
+
+app.post('/admin/action-config/groups', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const config = await loadActionConfig();
+  if (!config.groups.includes(name.trim())) config.groups.push(name.trim());
+  await saveActionConfig(config);
+  res.json({ ok: true });
+});
+app.delete('/admin/action-config/groups/:name', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const config = await loadActionConfig();
+  config.groups = config.groups.filter(g => g !== decodeURIComponent(req.params.name));
+  await saveActionConfig(config);
+  res.json({ ok: true });
+});
+app.post('/admin/action-config/categories', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { label } = req.body;
+  if (!label) return res.status(400).json({ error: 'label required' });
+  const config = await loadActionConfig();
+  const id = 'cat_' + Date.now();
+  config.categories.push({ id, label: label.trim() });
+  await saveActionConfig(config);
+  res.json({ ok: true, id });
+});
+app.delete('/admin/action-config/categories/:id', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const config = await loadActionConfig();
+  config.categories = config.categories.filter(c => c.id !== req.params.id);
+  await saveActionConfig(config);
+  res.json({ ok: true });
+});
 
 const DEFAULT_ACTION_ITEMS = [
   { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true },
@@ -934,6 +992,29 @@ td{padding:11px 14px;vertical-align:middle}
     <div id="kuchikomiMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
   </div>
 
+  <!-- グループ・カテゴリ管理 -->
+  <div class="section-header"><h2>グループ・カテゴリ管理</h2><div class="section-line"></div></div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:28px">
+    <div class="mgmt-card" style="flex:1;min-width:220px;max-width:340px">
+      <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:10px">グループ</div>
+      <div id="groupList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newGroupInput" placeholder="新しいグループ名" class="mgmt-input" style="font-size:13px;flex:1" />
+        <button onclick="addGroup()" class="btn-add" style="font-size:13px;white-space:nowrap">追加</button>
+      </div>
+      <div id="groupMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+    </div>
+    <div class="mgmt-card" style="flex:1;min-width:220px;max-width:340px">
+      <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:10px">カテゴリ</div>
+      <div id="categoryList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newCategoryInput" placeholder="新しいカテゴリ名" class="mgmt-input" style="font-size:13px;flex:1" />
+        <button onclick="addCategory()" class="btn-add" style="font-size:13px;white-space:nowrap">追加</button>
+      </div>
+      <div id="categoryMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+    </div>
+  </div>
+
   <!-- アクション項目管理 -->
   <div class="section-header">
     <h2>アクション項目管理</h2><div class="section-line"></div>
@@ -1393,6 +1474,83 @@ async function saveNewItem() {
   } else { msg.style.color='#dc2626'; msg.textContent = editingItemId ? '更新に失敗しました' : '追加に失敗しました'; }
 }
 loadItemTable();
+
+// グループ・カテゴリ管理
+let currentConfig = { groups: [], categories: [] };
+async function loadConfig() {
+  const res = await fetch('/api/action-config');
+  currentConfig = await res.json();
+  renderGroupList();
+  renderCategoryList();
+  const catSel = document.getElementById('newItemCategory');
+  if (catSel) {
+    const cur = catSel.value;
+    catSel.innerHTML = currentConfig.categories.map(c => '<option value="'+c.id+'">'+(c.label||c.id)+'</option>').join('');
+    if (cur) catSel.value = cur;
+  }
+  const dl = document.getElementById('groupSuggestions');
+  if (dl) dl.innerHTML = currentConfig.groups.map(g => '<option value="'+g+'">').join('');
+}
+function renderGroupList() {
+  const el = document.getElementById('groupList');
+  if (!el) return;
+  el.innerHTML = '';
+  currentConfig.groups.forEach(g => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:5px 10px;font-size:13px;color:#334155';
+    row.textContent = g;
+    const btn = document.createElement('button');
+    btn.textContent = '×';
+    btn.style.cssText = 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;margin-left:8px';
+    btn.onclick = async () => {
+      await adminFetch('/admin/action-config/groups/'+encodeURIComponent(g), { method:'DELETE' });
+      loadConfig();
+    };
+    row.appendChild(btn);
+    el.appendChild(row);
+  });
+}
+function renderCategoryList() {
+  const el = document.getElementById('categoryList');
+  if (!el) return;
+  el.innerHTML = '';
+  currentConfig.categories.forEach(c => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:5px 10px;font-size:13px;color:#334155';
+    row.textContent = c.label || c.id;
+    const isDefault = ['item','item_recommend','counseling','counseling_approach','appointment','review','treatment','team_support'].includes(c.id);
+    if (!isDefault) {
+      const btn = document.createElement('button');
+      btn.textContent = '×';
+      btn.style.cssText = 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;margin-left:8px';
+      btn.onclick = async () => {
+        await adminFetch('/admin/action-config/categories/'+encodeURIComponent(c.id), { method:'DELETE' });
+        loadConfig();
+      };
+      row.appendChild(btn);
+    }
+    el.appendChild(row);
+  });
+}
+async function addGroup() {
+  const name = document.getElementById('newGroupInput').value.trim();
+  const msg = document.getElementById('groupMsg');
+  if (!name) { msg.style.color='#dc2626'; msg.textContent='グループ名を入力してください'; return; }
+  await adminFetch('/admin/action-config/groups', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+  document.getElementById('newGroupInput').value = '';
+  msg.style.color='#059669'; msg.textContent=name+'を追加しました';
+  loadConfig(); setTimeout(()=>msg.textContent='',3000);
+}
+async function addCategory() {
+  const label = document.getElementById('newCategoryInput').value.trim();
+  const msg = document.getElementById('categoryMsg');
+  if (!label) { msg.style.color='#dc2626'; msg.textContent='カテゴリ名を入力してください'; return; }
+  await adminFetch('/admin/action-config/categories', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ label }) });
+  document.getElementById('newCategoryInput').value = '';
+  msg.style.color='#059669'; msg.textContent=label+'を追加しました';
+  loadConfig(); setTimeout(()=>msg.textContent='',3000);
+}
+loadConfig();
 
 async function deleteAllRecords() {
   if (!confirm('⚠️ 入力されたデータをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
