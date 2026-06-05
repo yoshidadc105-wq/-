@@ -969,16 +969,19 @@ async function loadKuchikomiSettings() {
   });
 }
 async function toggleKuchikomi(staffName, checked, inputEl) {
-  const label = inputEl.parentElement;
-  const track = label.querySelector('.toggle-track');
-  const knob = label.querySelectorAll('span')[2];
+  const container = inputEl.parentElement;
+  const label = container.parentElement;
+  const track = container.querySelector('.toggle-track');
+  const knob = container.querySelectorAll('span')[1];
   track.style.background = checked ? '#2aab96' : '#cbd5e1';
   knob.style.left = checked ? '23px' : '3px';
   label.querySelector('span').textContent = checked ? 'ON' : 'OFF';
   const msg = document.getElementById('kuchikomiMsg');
-  const res = await fetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
-  if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
-  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; }
+  try {
+    const res = await fetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
+    else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
 }
 loadKuchikomiSettings();
 
@@ -1007,9 +1010,11 @@ async function addStaffName() {
 async function deleteStaffName(name) {
   if (!confirm(name + ' を削除しますか？')) return;
   const msg = document.getElementById('staffNameMsg');
-  const res = await fetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
-  if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; loadMgmtStaffNames(); }
-  else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
+  try {
+    const res = await fetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; await loadMgmtStaffNames(); }
+    else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました ('+res.status+')'; }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
 }
 loadMgmtStaffNames();
 
