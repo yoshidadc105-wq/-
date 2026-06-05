@@ -173,9 +173,37 @@ app.post('/admin/action-items', async (req, res) => {
   await saveActionItem(item);
   res.json({ ok: true, item });
 });
+app.put('/admin/action-items/:id', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { name, group, category, needsPatient, needsFreeText, showItemName } = req.body;
+  if (!name || !group || !category) return res.status(400).json({ error: '必須項目が不足しています' });
+  const items = await loadActionItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx < 0) return res.status(404).json({ error: 'not found' });
+  items[idx] = { ...items[idx], name: name.trim(), group: group.trim(), category, needsPatient: !!needsPatient, needsFreeText: !!needsFreeText, showItemName: !!showItemName };
+  // 全件上書き保存（標準項目をDBに書き込む場合も対応）
+  if (actionItemsCol) {
+    await actionItemsCol.deleteMany({});
+    if (items.length) await actionItemsCol.insertMany(items.map(i => { const d = {...i}; delete d._id; return d; }));
+  } else {
+    fs.mkdirSync(path.dirname(ITEMS_FILE), { recursive: true });
+    fs.writeFileSync(ITEMS_FILE, JSON.stringify(items, null, 2));
+  }
+  res.json({ ok: true });
+});
+
 app.delete('/admin/action-items/:id', async (req, res) => {
   if (!checkAuth(req, res)) return;
-  await deleteActionItem(req.params.id);
+  // 標準項目を削除する場合も全件上書き
+  const items = await loadActionItems();
+  const filtered = items.filter(i => i.id !== req.params.id);
+  if (actionItemsCol) {
+    await actionItemsCol.deleteMany({});
+    if (filtered.length) await actionItemsCol.insertMany(filtered.map(i => { const d = {...i}; delete d._id; return d; }));
+  } else {
+    fs.mkdirSync(path.dirname(ITEMS_FILE), { recursive: true });
+    fs.writeFileSync(ITEMS_FILE, JSON.stringify(filtered, null, 2));
+  }
   res.json({ ok: true });
 });
 
@@ -954,7 +982,7 @@ td{padding:11px 14px;vertical-align:middle}
 <div id="itemModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="if(event.target===this)this.style.display='none'">
   <div style="background:#fff;border-radius:16px;padding:28px 28px 24px;max-width:420px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <h2 style="font-size:17px;font-weight:700;color:#0f766e">項目を追加</h2>
+      <h2 id="itemModalTitle" style="font-size:17px;font-weight:700;color:#0f766e">項目を追加</h2>
       <button onclick="document.getElementById('itemModalOverlay').style.display='none'" style="background:#f1f5f9;border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;color:#64748b">×</button>
     </div>
     <div style="margin-bottom:12px">
@@ -992,7 +1020,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div id="itemModalMsg" style="font-size:12px;min-height:16px;margin-bottom:12px;"></div>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('itemModalOverlay').style.display='none'" style="flex:1;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;font-family:inherit">キャンセル</button>
-      <button onclick="saveNewItem()" style="flex:2;padding:11px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">追加する</button>
+      <button id="itemModalSaveBtn" onclick="saveNewItem()" style="flex:2;padding:11px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">追加する</button>
     </div>
   </div>
 </div>
@@ -1315,16 +1343,17 @@ async function loadItemTable() {
       '<td style="padding:10px 14px;color:#64748b">' + item.group + '</td>' +
       '<td style="padding:10px 14px;color:#64748b">' + (CATEGORY_LABELS[item.category]||item.category) + '</td>' +
       '<td style="padding:10px 14px;text-align:center">' + (item.needsPatient ? '✓' : '') + '</td>' +
-      '<td style="padding:10px 14px;text-align:center"></td>';
-    if (!item.builtin) {
-      const btn = document.createElement('button');
-      btn.textContent = '削除';
-      btn.style.cssText = 'background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
-      btn.onclick = function() { deleteItem(item.id, item.name, btn); };
-      tr.cells[4].appendChild(btn);
-    } else {
-      tr.cells[4].innerHTML = '<span style="font-size:11px;color:#94a3b8">標準</span>';
-    }
+      '<td style="padding:10px 14px;text-align:center;display:flex;gap:6px;justify-content:center"></td>';
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '編集';
+    editBtn.style.cssText = 'background:#e0f2fe;color:#0369a1;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+    editBtn.onclick = function() { openItemModal(item); };
+    tr.cells[4].appendChild(editBtn);
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '削除';
+    delBtn.style.cssText = 'background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+    delBtn.onclick = function() { deleteItem(item.id, item.name, delBtn); };
+    tr.cells[4].appendChild(delBtn);
     tbody.appendChild(tr);
   });
 }
@@ -1339,14 +1368,18 @@ async function deleteItem(id, name, btn) {
   if (res.ok) { msg.style.color='#059669'; msg.textContent=name+'を削除しました'; loadItemTable(); setTimeout(()=>msg.textContent='',3000); }
   else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
 }
-function openItemModal() {
-  document.getElementById('itemModalOverlay').style.display = 'flex';
+let editingItemId = null;
+function openItemModal(item) {
+  editingItemId = item ? item.id : null;
+  document.getElementById('itemModalTitle').textContent = item ? '項目を編集' : '項目を追加';
+  document.getElementById('itemModalSaveBtn').textContent = item ? '保存する' : '追加する';
   document.getElementById('itemModalMsg').textContent = '';
-  document.getElementById('newItemName').value = '';
-  document.getElementById('newItemGroup').value = '';
-  document.getElementById('newItemCategory').value = 'treatment';
-  document.getElementById('newItemNeedsPatient').checked = true;
-  document.getElementById('newItemNeedsFreeText').checked = false;
+  document.getElementById('newItemName').value = item ? item.name : '';
+  document.getElementById('newItemGroup').value = item ? item.group : '';
+  document.getElementById('newItemCategory').value = item ? item.category : 'treatment';
+  document.getElementById('newItemNeedsPatient').checked = item ? !!item.needsPatient : true;
+  document.getElementById('newItemNeedsFreeText').checked = item ? !!item.needsFreeText : false;
+  document.getElementById('itemModalOverlay').style.display = 'flex';
 }
 async function saveNewItem() {
   const name = document.getElementById('newItemName').value.trim();
@@ -1356,13 +1389,16 @@ async function saveNewItem() {
   const needsFreeText = document.getElementById('newItemNeedsFreeText').checked;
   const msg = document.getElementById('itemModalMsg');
   if (!name || !group) { msg.style.color='#dc2626'; msg.textContent='項目名とグループを入力してください'; return; }
-  const res = await adminFetch('/admin/action-items', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, group, category, needsPatient, needsFreeText }) });
+  const body = JSON.stringify({ name, group, category, needsPatient, needsFreeText });
+  const url = editingItemId ? '/admin/action-items/' + encodeURIComponent(editingItemId) : '/admin/action-items';
+  const method = editingItemId ? 'PUT' : 'POST';
+  const res = await adminFetch(url, { method, headers:{'Content-Type':'application/json'}, body });
   if (res.ok) {
     document.getElementById('itemModalOverlay').style.display = 'none';
     const imsg = document.getElementById('itemMsg');
-    imsg.style.color='#059669'; imsg.textContent=name+'を追加しました';
+    imsg.style.color='#059669'; imsg.textContent = (editingItemId ? name+'を更新しました' : name+'を追加しました');
     loadItemTable(); setTimeout(()=>imsg.textContent='',3000);
-  } else { msg.style.color='#dc2626'; msg.textContent='追加に失敗しました'; }
+  } else { msg.style.color='#dc2626'; msg.textContent = editingItemId ? '更新に失敗しました' : '追加に失敗しました'; }
 }
 loadItemTable();
 
