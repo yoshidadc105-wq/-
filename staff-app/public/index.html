@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>自己申告デラックス | のびのび歯科</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #f0f4f8; color: #1e293b; font-size: 15px; line-height: 1.6; }
+
+    /* ヘッダー */
+    header { background: linear-gradient(135deg, #0f766e 0%, #2aab96 60%, #34d399 100%); padding: 0; box-shadow: 0 2px 12px rgba(15,118,110,.35); }
+    .header-inner { max-width: 560px; margin: 0 auto; padding: 18px 20px; display: flex; align-items: center; gap: 12px; }
+    .header-icon { width: 42px; height: 42px; background: rgba(255,255,255,.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    header h1 { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: .03em; }
+    header p { font-size: 11px; color: rgba(255,255,255,.8); margin-top: 2px; }
+
+    .container { max-width: 560px; margin: 0 auto; padding: 20px 16px 70px; }
+
+    /* タブ */
+    .tab-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 700; font-family: inherit; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: all .2s; background: #fff; color: #94a3b8; }
+    .tab-btn.active { background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border-color: transparent; box-shadow: 0 4px 14px rgba(42,171,150,.35); }
+
+    /* カード */
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04); padding: 20px; margin-bottom: 14px; }
+    .card-title { font-size: 12px; font-weight: 700; color: #0f766e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+    .card-title::before { content: ''; display: block; width: 3px; height: 14px; background: linear-gradient(180deg, #2aab96, #34d399); border-radius: 2px; }
+
+    /* フォーム */
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; }
+    .required::after { content: "必須"; font-size: 10px; color: #fff; background: linear-gradient(135deg,#ef4444,#f87171); border-radius: 3px; padding: 1px 5px; margin-left: 6px; font-weight: 600; }
+    input[type="text"], input[type="date"], select, textarea {
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 14px;
+      font-size: 15px; font-family: inherit; outline: none; transition: border .2s, box-shadow .2s; background: #f8fafc; color: #1e293b;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #2aab96; background: #fff; box-shadow: 0 0 0 3px rgba(42,171,150,.12); }
+    textarea { resize: vertical; min-height: 88px; }
+    .row2 { display: flex; flex-direction: column; gap: 10px; }
+    .patient-check { font-size: 12px; margin-top: 4px; min-height: 18px; }
+    .check-ok { color: #059669; }
+    .check-ng { color: #dc2626; font-weight: bold; }
+    .item-detail { display: none; margin-top: 10px; }
+
+    /* 登録ボタン */
+    .submit-btn { display: block; width: 100%; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 14px; padding: 15px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity .2s, transform .1s; box-shadow: 0 4px 14px rgba(42,171,150,.4); letter-spacing: .05em; }
+    .submit-btn:hover { opacity: .9; }
+    .submit-btn:active { transform: scale(.98); }
+    .submit-btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+
+    /* 成功画面 */
+    .success-msg { display: none; text-align: center; padding: 40px 20px; }
+    .success-icon { width: 72px; height: 72px; background: linear-gradient(135deg, #0f766e, #34d399); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 34px; margin: 0 auto 16px; box-shadow: 0 8px 24px rgba(42,171,150,.35); }
+    .success-msg h2 { font-size: 20px; color: #0f766e; font-weight: 700; margin-bottom: 6px; }
+    .success-msg p { color: #64748b; font-size: 14px; }
+    .again-btn { display: inline-block; margin-top: 20px; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 30px; padding: 11px 32px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; box-shadow: 0 4px 12px rgba(42,171,150,.35); }
+
+    /* 履歴 */
+    .recent-title { font-size: 13px; font-weight: 700; color: #0f766e; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .recent-title::before { content: ''; display: block; width: 3px; height: 14px; background: linear-gradient(180deg, #2aab96, #34d399); border-radius: 2px; }
+    .record-item { background: #fff; border-radius: 12px; border: 1px solid #f1f5f9; padding: 12px 14px; margin-bottom: 8px; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: box-shadow .15s; }
+    .record-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+    .record-item .record-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+    .record-item .staff-name { font-weight: 700; color: #0f766e; display: flex; align-items: center; gap: 6px; }
+    .staff-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #2aab96, #0f766e); color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+    .record-item .record-date { font-size: 11px; color: #94a3b8; }
+    .record-item .record-body { color: #475569; }
+
+    .badge { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+    .badge-item      { background: #fef3c7; color: #b45309; }
+    .badge-counseling{ background: #dbeafe; color: #1d4ed8; }
+    .badge-review    { background: #fce7f3; color: #9d174d; }
+    .badge-treatment { background: #dcfce7; color: #15803d; }
+    .badge-behavior  { background: #ede9fe; color: #6d28d9; }
+    .loading { text-align: center; color: #94a3b8; padding: 20px; font-size: 13px; }
+
+    /* 例文チップ */
+    .phrase-chip { background: #f0fdf4; border: 1px solid #a7f3d0; color: #065f46; border-radius: 20px; padding: 4px 11px; font-size: 12px; display: inline-block; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-inner" style="justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="header-icon">🦷</div>
+      <div>
+        <h1>自己申告デラックス</h1>
+        <p>のびのび歯科・矯正歯科</p>
+      </div>
+    </div>
+    <div id="headerUser" style="display:flex;align-items:center;gap:10px;"></div>
+  </div>
+</header>
+<div class="container">
+
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="switchTab('patient')">患者実績を入力</button>
+    <button class="tab-btn" onclick="switchTab('behavior')">行動・取り組みを入力</button>
+  </div>
+
+  <!-- ===== 患者実績パネル ===== -->
+  <div id="panel-patient" class="panel active">
+    <div id="success-patient" class="success-msg card">
+      <div class="success-icon">✓</div>
+      <h2>登録しました</h2>
+      <p>患者実績を記録しました。</p>
+      <button class="again-btn" onclick="resetPatient()">続けて入力する</button>
+    </div>
+    <form id="form-patient">
+      <input type="hidden" name="entryType" value="patient" />
+      <div class="card">
+        <div class="card-title">基本情報</div>
+        <div class="row2">
+          <div class="form-group">
+            <label class="required">日付</label>
+            <input type="text" name="date" id="pDate" required readonly style="background:#f1f5f9;cursor:default;color:#475569;" />
+          </div>
+          <div class="form-group">
+            <label class="required">スタッフ名</label>
+            <input type="text" name="staffName" id="pStaffName" readonly style="background:#f1f5f9;cursor:default;color:#0f766e;font-weight:700;" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="required">患者番号</label>
+          <input type="text" name="patientNo" id="patientNo" placeholder="例：1234" required autocomplete="off" maxlength="10" />
+          <div class="patient-check" id="patientCheck"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">実施内容</div>
+        <div class="form-group">
+          <label class="required">内容を選択</label>
+          <select name="action" id="actionSelect" required onchange="onActionChange()">
+            <option value="">選択してください</option>
+            <optgroup label="── 物品 ──">
+              <option value="物品販売">物品販売（購入）</option>
+              <option value="物品をすすめた">物品をすすめた（未購入）</option>
+            </optgroup>
+            <optgroup label="── カウンセリング ──">
+              <option value="ジャブ打ち">ジャブ打ち（アプローチ）</option>
+              <option value="インプラント">インプラント成約</option>
+              <option value="マウスピース矯正">マウスピース矯正成約</option>
+              <option value="ホワイトニング">ホワイトニング成約</option>
+            </optgroup>
+            <optgroup label="── 口コミ ──" id="kuchikomiGroup" style="display:none">
+              <option value="口コミ獲得">口コミ獲得</option>
+            </optgroup>
+            <optgroup label="── 処置 ──">
+              <option value="シーラント">シーラント</option>
+              <option value="レントゲン">レントゲン</option>
+              <option value="フッ素塗布">フッ素塗布</option>
+            </optgroup>
+            <optgroup label="── その他 ──">
+              <option value="その他">その他（自由記述）</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="item-detail" id="itemNameWrap">
+          <label>販売した商品名</label>
+          <input type="text" name="itemName" placeholder="例：電動歯ブラシ、ホワイトニングジェルなど" />
+        </div>
+        <div class="item-detail" id="otherWrap">
+          <label>内容を記入</label>
+          <input type="text" name="otherText" placeholder="自由に記入してください" />
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="pSubmitBtn">登録する</button>
+    </form>
+  </div>
+
+  <!-- ===== 行動・取り組みパネル ===== -->
+  <div id="panel-behavior" class="panel">
+    <div id="success-behavior" class="success-msg card">
+      <div class="success-icon">✓</div>
+      <h2>登録しました</h2>
+      <p>取り組みを記録しました。</p>
+      <button class="again-btn" onclick="resetBehavior()">続けて入力する</button>
+    </div>
+    <form id="form-behavior">
+      <input type="hidden" name="entryType" value="behavior" />
+      <div class="card">
+        <div class="card-title">基本情報</div>
+        <div class="row2">
+          <div class="form-group">
+            <label class="required">日付</label>
+            <input type="text" name="date" id="bDate" required readonly style="background:#f1f5f9;cursor:default;color:#475569;" />
+          </div>
+          <div class="form-group">
+            <label class="required">スタッフ名</label>
+            <input type="text" name="staffName" id="bStaffName" readonly style="background:#f1f5f9;cursor:default;color:#0f766e;font-weight:700;" />
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">行動・取り組みの記録</div>
+        <div class="form-group">
+          <label class="required">内容</label>
+          <textarea name="freeText" id="freeText" placeholder="自由に入力してください" required></textarea>
+          <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;" id="phraseButtons"></div>
+        </div>
+      </div>
+      <button type="submit" class="submit-btn" id="bSubmitBtn">登録する</button>
+    </form>
+  </div>
+
+  <!-- 自分の実績リンク -->
+  <div style="margin-top:20px;margin-bottom:4px">
+    <a href="/my-stats" style="display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border-radius:12px;padding:13px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(42,171,150,.35)">
+      📊 自分の実績・目標達成状況を見る
+    </a>
+  </div>
+
+  <!-- 最近の入力一覧 -->
+  <div style="margin-top:28px">
+    <div class="recent-title">みんなの最近の入力（直近50件）</div>
+    <div id="recentList"><div class="loading">読み込み中...</div></div>
+  </div>
+
+<!-- パスワード変更モーダル -->
+<div id="pwModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+  <div style="background:#fff;border-radius:16px;padding:28px 28px;max-width:360px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <h2 style="font-size:17px;font-weight:700;color:#0f766e;margin-bottom:18px">パスワード変更</h2>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px">現在のパスワード</label>
+      <input type="password" id="pwCurrent" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;" />
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px">新しいパスワード（4文字以上）</label>
+      <input type="password" id="pwNew" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;" />
+    </div>
+    <div id="pwMsg" style="font-size:12px;min-height:16px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closePwModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;font-family:inherit">キャンセル</button>
+      <button onclick="changePassword()" style="flex:1;padding:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">変更する</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+  let loggedInStaff = null;
+
+  async function initAuth() {
+    try {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      if (!data.staffName) { location.href = '/staff-login'; return; }
+      loggedInStaff = data.staffName;
+    } catch { location.href = '/staff-login'; return; }
+
+    // ヘッダーにユーザー表示
+    const headerUser = document.getElementById('headerUser');
+    headerUser.innerHTML =
+      '<span style="color:rgba(255,255,255,.9);font-size:13px;font-weight:600">' + loggedInStaff + '</span>' +
+      '<button onclick="document.getElementById(\'pwModal\').style.display=\'flex\'" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔑 パスワード変更</button>' +
+      '<a href="/staff-logout" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;text-decoration:none">ログアウト</a>';
+
+    // スタッフ名を入力欄にセット
+    document.getElementById('pStaffName').value = loggedInStaff;
+    document.getElementById('bStaffName').value = loggedInStaff;
+
+    // 口コミ設定を反映
+    await loadKuchikomiForStaff(loggedInStaff);
+
+    loadRecent();
+  }
+
+  async function loadKuchikomiForStaff(staffName) {
+    try {
+      const res = await fetch('/api/staff-settings');
+      const settings = await res.json();
+      const s = settings.find(x => x.staffName === staffName);
+      const show = s && s.showKuchikomi;
+      document.getElementById('kuchikomiGroup').style.display = show ? '' : 'none';
+    } catch {}
+  }
+
+  function closePwModal() {
+    document.getElementById('pwModal').style.display = 'none';
+    document.getElementById('pwCurrent').value = '';
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwMsg').textContent = '';
+  }
+
+  async function changePassword() {
+    const currentPassword = document.getElementById('pwCurrent').value;
+    const newPassword = document.getElementById('pwNew').value;
+    const msg = document.getElementById('pwMsg');
+    if (!currentPassword || !newPassword) { msg.style.color='#dc2626'; msg.textContent='両方入力してください'; return; }
+    const res = await fetch('/staff-change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='変更しました'; setTimeout(closePwModal, 1200); }
+    else { msg.style.color='#dc2626'; msg.textContent = data.error || '変更に失敗しました'; }
+  }
+
+  initAuth();
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0) === (tab === 'patient'));
+    });
+    document.getElementById('panel-patient').classList.toggle('active', tab === 'patient');
+    document.getElementById('panel-behavior').classList.toggle('active', tab === 'behavior');
+  }
+
+  // 例文（表示のみ・クリック不可）
+  const PHRASES = [
+    '受付で患者さんを名前で呼んで笑顔でお迎えした',
+    '会計のたびに次回予約の声かけを必ず行った',
+    '治療前に緊張している患者さんへ一声かけ緊張をほぐした',
+    'お子さんが怖がらないようやさしく声かけしながら誘導した',
+    'ユニットの片付けと次の準備をスムーズに行いお待たせしなかった',
+    '器具の滅菌・準備を正確にミスゼロで行った',
+    '問診票の内容を確認しドクターに的確に申し送りした',
+    '在庫が少ない材料にいち早く気づき補充・報告した',
+    '急な予約変更や問い合わせに冷静・丁寧に対応した',
+    '患者さんからの質問に自信を持って分かりやすく答えた',
+    '院内清掃をだれよりも丁寧に毎日欠かさず行った',
+    '予防の重要性を患者さんにわかりやすく説明し定期検診につなげた',
+    '新人スタッフに自ら声をかけサポートした',
+    '診療後に気になったことをドクターにすぐ報告・相談した',
+    '勉強会や研修の内容を自分なりにまとめチームに共有した',
+    '1ヶ月間一日も休まず皆勤で勤務した',
+    '遅刻なく毎日時間通りに出勤した',
+  ];
+  const phraseContainer = document.getElementById('phraseButtons');
+  const exLabel = document.createElement('div');
+  exLabel.style.cssText = 'font-size:12px;color:#9ca3af;margin-bottom:6px;width:100%;';
+  exLabel.textContent = '▼ 記入例（参考）';
+  phraseContainer.appendChild(exLabel);
+  PHRASES.forEach(p => {
+    const chip = document.createElement('span');
+    chip.textContent = p;
+    chip.className = 'phrase-chip';
+    phraseContainer.appendChild(chip);
+  });
+
+  // 日付初期値（今日の日付・変更不可）
+  const todayDate = new Date();
+  const today = todayDate.toLocaleDateString('sv-SE'); // YYYY-MM-DD（サーバーへの送信値）
+  const todayDisplay = todayDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  document.getElementById('pDate').value = today;
+  document.getElementById('bDate').value = today;
+  // 表示用（ラベルに日本語を追加）
+  document.querySelectorAll('#pDate, #bDate').forEach(el => {
+    el.value = today;
+    el.setAttribute('data-display', todayDisplay);
+    el.style.color = '#475569';
+    // ラベルに今日の日付をわかりやすく表示
+    const label = el.closest('.form-group').querySelector('label');
+    if (label) label.textContent = '日付（今日：' + todayDisplay + '）';
+  });
+
+  // 実施内容変更時
+  function onActionChange() {
+    const val = document.getElementById('actionSelect').value;
+    document.getElementById('itemNameWrap').style.display = val === '物品販売' ? 'block' : 'none';
+    document.getElementById('otherWrap').style.display   = val === 'その他'    ? 'block' : 'none';
+  }
+
+  // 患者番号入力時：この患者の登録件数を表示（参考情報）
+  let checkTimer;
+  document.getElementById('patientNo').addEventListener('input', function() {
+    clearTimeout(checkTimer);
+    const val = this.value.trim();
+    const el = document.getElementById('patientCheck');
+    if (!val) { el.textContent = ''; return; }
+    el.className = 'patient-check';
+    el.textContent = '';
+    checkTimer = setTimeout(async () => {
+      try {
+        await fetch('/api/check-patient/' + encodeURIComponent(val));
+      } catch {}
+    }, 500);
+  });
+
+  // 患者実績フォーム送信
+  document.getElementById('form-patient').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('pSubmitBtn');
+    btn.disabled = true; btn.textContent = '登録中...';
+    const fd = new FormData(this);
+    const data = {};
+    for (const [k, v] of fd.entries()) data[k] = v;
+    try {
+      const res = await fetch('/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      });
+      if (res.status === 409) {
+        const err = await res.json();
+        alert(err.message);
+        btn.disabled = false; btn.textContent = '登録する';
+        return;
+      }
+      if (res.ok) {
+        this.style.display = 'none';
+        document.getElementById('success-patient').style.display = 'block';
+        window.scrollTo(0, 0);
+        loadRecent();
+      } else throw new Error();
+    } catch {
+      alert('登録に失敗しました。');
+      btn.disabled = false; btn.textContent = '登録する';
+    }
+  });
+
+  function resetPatient() {
+    const f = document.getElementById('form-patient');
+    f.reset();
+    document.getElementById('pDate').value = today;
+    document.getElementById('patientCheck').textContent = '';
+    document.getElementById('itemNameWrap').style.display = 'none';
+    document.getElementById('otherWrap').style.display = 'none';
+    document.getElementById('pStaffName').value = loggedInStaff;
+    f.style.display = '';
+    document.getElementById('success-patient').style.display = 'none';
+    document.getElementById('pSubmitBtn').disabled = false;
+    document.getElementById('pSubmitBtn').textContent = '登録する';
+    window.scrollTo(0, 0);
+  }
+
+  // 行動フォーム送信
+  document.getElementById('form-behavior').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('bSubmitBtn');
+    btn.disabled = true; btn.textContent = '登録中...';
+    const fd = new FormData(this);
+    const data = {};
+    for (const [k, v] of fd.entries()) data[k] = v;
+    try {
+      const res = await fetch('/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        this.style.display = 'none';
+        document.getElementById('success-behavior').style.display = 'block';
+        window.scrollTo(0, 0);
+        loadRecent();
+      } else throw new Error();
+    } catch {
+      alert('登録に失敗しました。');
+      btn.disabled = false; btn.textContent = '登録する';
+    }
+  });
+
+  function resetBehavior() {
+    const f = document.getElementById('form-behavior');
+    f.reset();
+    document.getElementById('bDate').value = today;
+    f.style.display = '';
+    document.getElementById('success-behavior').style.display = 'none';
+    document.getElementById('bSubmitBtn').disabled = false;
+    document.getElementById('bSubmitBtn').textContent = '登録する';
+    window.scrollTo(0, 0);
+  }
+
+  // 最近の入力一覧
+  async function loadRecent() {
+    const list = document.getElementById('recentList');
+    try {
+      const res = await fetch('/api/records');
+      const records = await res.json();
+      if (!records.length) { list.innerHTML = '<div class="loading">まだ入力がありません</div>'; return; }
+      list.innerHTML = records.map(r => {
+        let badgeHtml = '';
+        let body = '';
+        if (r.entryType === 'behavior') {
+          badgeHtml = `<span class="badge badge-behavior">行動記録</span>`;
+          body = r.freeText ? `「${r.freeText}」` : '';
+        } else {
+          const actionType = r.actionCategory || 'treatment';
+          const colorMap = { item: 'badge-item', counseling: 'badge-counseling', review: 'badge-review', treatment: 'badge-treatment' };
+          badgeHtml = `<span class="badge ${colorMap[actionType] || 'badge-treatment'}">${r.action}</span>`;
+          if (r.itemName) body += ` ${r.itemName}`;
+          if (r.otherText) body += ` ${r.otherText}`;
+          body = body.trim();
+        }
+        return `<div class="record-item">
+          <div class="record-header">
+            <span class="staff-name"><span class="staff-avatar">${(r.staffName||'?').charAt(0)}</span>${r.staffName}</span>${r.patientNo ? `<span style="color:#94a3b8;font-size:11px;background:#f1f5f9;padding:1px 7px;border-radius:10px">患者 ${r.patientNo}</span>` : ''}
+            <span class="record-date">${r.date}</span>
+          </div>
+          <div class="record-body">${badgeHtml}${body ? ` <span style="font-size:12px">${body}</span>` : ''}</div>
+        </div>`;
+      }).join('');
+    } catch { list.innerHTML = '<div class="loading">読み込みに失敗しました</div>'; }
+  }
+
+</script>
+</body>
+</html>
