@@ -249,24 +249,50 @@ app.get('/dashboard', async (req, res) => {
 
   const staffList = Object.entries(byStaff).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
 
-  // 月別集計（スタッフフィルター適用済みrecordsから）
-  const byMonth = {};
+  // 月別集計
+  const byStaffMonth = {}; // { staffName: { 'YYYY-MM': { total, items, counseling, reviews } } }
+  const allMonthSet = new Set();
   for (const r of records) {
-    if (r.entryType === 'behavior') continue;
-    const month = r.date ? r.date.slice(0, 7) : 'unknown';
-    if (!byMonth[month]) byMonth[month] = { items: 0, counseling: 0, reviews: 0 };
-    const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
-    if (cat === 'item') byMonth[month].items++;
-    if (cat === 'counseling') byMonth[month].counseling++;
-    if (cat === 'review') byMonth[month].reviews++;
+    const month = r.date ? r.date.slice(0, 7) : null;
+    if (!month) continue;
+    allMonthSet.add(month);
+    if (!byStaffMonth[r.staffName]) byStaffMonth[r.staffName] = {};
+    if (!byStaffMonth[r.staffName][month]) byStaffMonth[r.staffName][month] = { total: 0, items: 0, counseling: 0, reviews: 0 };
+    const sm = byStaffMonth[r.staffName][month];
+    sm.total++;
+    if (r.entryType !== 'behavior') {
+      const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+      if (cat === 'item') sm.items++;
+      if (cat === 'counseling') sm.counseling++;
+      if (cat === 'review') sm.reviews++;
+    }
   }
-  const monthKeys = Object.keys(byMonth).sort().slice(-12);
-  const monthData = {
-    labels: monthKeys,
-    items: monthKeys.map(m => byMonth[m].items),
-    counseling: monthKeys.map(m => byMonth[m].counseling),
-    reviews: monthKeys.map(m => byMonth[m].reviews)
-  };
+  const monthKeys = [...allMonthSet].sort().slice(-12);
+  const CHART_COLORS = ['#2aab96','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+
+  // 全スタッフ折れ線 or 特定スタッフ月別カテゴリ棒
+  let chartType, chartTitle, monthDatasets;
+  if (staffFilter) {
+    chartType = 'bar';
+    chartTitle = `${staffFilter} の月別実績内訳`;
+    const sm = byStaffMonth[staffFilter] || {};
+    monthDatasets = [
+      { label: '物品販売', data: monthKeys.map(m => (sm[m]||{}).items||0), backgroundColor: 'rgba(245,158,11,0.85)', borderRadius: 4, stack: 'a' },
+      { label: 'カウンセリング', data: monthKeys.map(m => (sm[m]||{}).counseling||0), backgroundColor: 'rgba(59,130,246,0.85)', borderRadius: 4, stack: 'a' },
+      { label: '口コミ', data: monthKeys.map(m => (sm[m]||{}).reviews||0), backgroundColor: 'rgba(42,171,150,0.85)', borderRadius: 4, stack: 'a' },
+    ];
+  } else {
+    chartType = 'line';
+    chartTitle = 'スタッフ別 月別書き込み件数';
+    monthDatasets = staffList.map(([name], i) => ({
+      label: name,
+      data: monthKeys.map(m => (byStaffMonth[name]&&byStaffMonth[name][m]) ? byStaffMonth[name][m].total : 0),
+      borderColor: CHART_COLORS[i % CHART_COLORS.length],
+      backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '22',
+      tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+    }));
+  }
+  const monthData = { labels: monthKeys, datasets: monthDatasets };
 
   // STAFF_DATA: スタッフ別詳細（ドリルダウン用）
   const staffDataObj = {};
@@ -526,7 +552,7 @@ td{padding:11px 14px;vertical-align:middle}
   <!-- 月別グラフ -->
   <div class="section-header"><h2>月別推移</h2><div class="section-line"></div></div>
   <div class="chart-card">
-    <h3>物品販売・カウンセリング・口コミの月次推移</h3>
+    <h3>${esc(chartTitle)}</h3>
     <canvas id="monthChart" style="max-height:280px"></canvas>
   </div>
 
@@ -602,22 +628,16 @@ const MONTH_DATA = ${JSON.stringify(monthData)};
 // Chart.js 月別推移グラフ
 (function() {
   const ctx = document.getElementById('monthChart').getContext('2d');
+  const isBar = ${JSON.stringify(!!staffFilter)};
   new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: MONTH_DATA.labels,
-      datasets: [
-        { label: '物品販売', data: MONTH_DATA.items, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius:4, stack: 'a' },
-        { label: 'カウンセリング', data: MONTH_DATA.counseling, backgroundColor: 'rgba(59,130,246,0.85)', borderRadius:4, stack: 'a' },
-        { label: '口コミ', data: MONTH_DATA.reviews, backgroundColor: 'rgba(42,171,150,0.85)', borderRadius:4, stack: 'a' },
-      ]
-    },
+    type: isBar ? 'bar' : 'line',
+    data: MONTH_DATA,
     options: {
       responsive: true,
       plugins: { legend: { position: 'top' } },
       scales: {
-        x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+        x: { stacked: isBar },
+        y: { stacked: isBar, beginAtZero: true, ticks: { stepSize: 1 } }
       }
     }
   });
