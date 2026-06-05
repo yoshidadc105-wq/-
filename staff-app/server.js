@@ -370,9 +370,11 @@ const ACTION_CATEGORY = {
   'インプラント': 'counseling',
   'マウスピース矯正': 'counseling',
   'ホワイトニング': 'counseling',
+  'アポ転換': 'appointment',
   'シーラント': 'treatment',
   'レントゲン': 'treatment',
   'フッ素塗布': 'treatment',
+  'ポジティブ声掛け': 'team_support',
   'その他': 'treatment',
 };
 
