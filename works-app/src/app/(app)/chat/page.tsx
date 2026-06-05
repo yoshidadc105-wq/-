@@ -240,7 +240,7 @@ export default function ChatPage() {
       </div>
 
       {/* Chat area */}
-      <div className={`${!showList ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0`}>
+      <div className={`${!showList ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden`}>
         {selectedConv ? (
           <>
             <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 shadow-sm flex-shrink-0">
@@ -360,18 +360,20 @@ export default function ChatPage() {
             )}
 
             {/* 入力バー */}
-            <form onSubmit={sendMessage} className="px-2 py-2 bg-white border-t border-gray-200 flex items-center gap-1.5 flex-shrink-0 w-full">
-              <button type="button" onClick={() => fileInputRef.current?.click()}
-                className="text-gray-400 hover:text-green-600 text-xl flex-shrink-0 p-1 w-8">📷</button>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-              <input value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                placeholder="メッセージを入力..."
-                className="flex-1 bg-gray-100 rounded-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 min-w-0 w-0" />
-              <button type="submit" disabled={(!newMsg.trim() && !sendImageData) || sending}
-                className="w-9 h-9 min-w-[2.25rem] bg-green-500 text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-green-600 flex-shrink-0">
-                {sending ? "…" : "➤"}
-              </button>
-            </form>
+            <div className="bg-white border-t border-gray-200 flex-shrink-0">
+              <form onSubmit={sendMessage} className="flex items-center gap-2 px-3 py-2">
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="text-gray-400 hover:text-green-600 text-xl flex-shrink-0">📷</button>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                <input value={newMsg} onChange={e => setNewMsg(e.target.value)}
+                  placeholder="メッセージを入力..."
+                  className="flex-1 min-w-0 bg-gray-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+                <button type="submit" disabled={(!newMsg.trim() && !sendImageData) || sending}
+                  className="flex-shrink-0 w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-green-600 text-base">
+                  {sending ? "…" : "➤"}
+                </button>
+              </form>
+            </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
