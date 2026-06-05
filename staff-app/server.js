@@ -55,6 +55,19 @@ app.get('/api/goals', async (req, res) => {
   settings.forEach(s => { if (s.goals) goals[s.staffName] = s.goals; });
   res.json(goals);
 });
+// 全データ削除
+app.delete('/admin/all-records', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (mongoCol) {
+    await mongoCol.deleteMany({});
+  } else {
+    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+    fs.writeFileSync(DB_FILE, '[]');
+  }
+  console.log('全レコード削除');
+  res.json({ ok: true });
+});
+
 app.post('/admin/goals', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { staffName, goals } = req.body;
@@ -568,7 +581,10 @@ td{padding:11px 14px;vertical-align:middle}
         <p>のびのび歯科・矯正歯科</p>
       </div>
     </div>
-    <div class="header-badge">管理者専用</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="header-badge">管理者専用</div>
+      <button onclick="deleteAllRecords()" style="background:rgba(239,68,68,.8);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🗑 全データ削除</button>
+    </div>
   </div>
 </header>
 
@@ -857,6 +873,14 @@ async function deleteStaffName(name) {
   else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
 }
 loadMgmtStaffNames();
+
+async function deleteAllRecords() {
+  if (!confirm('⚠️ 入力されたデータをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
+  if (!confirm('最終確認：本当にすべてのデータを削除しますか？')) return;
+  const res = await fetch('/admin/all-records', { method: 'DELETE' });
+  if (res.ok) { alert('削除しました。ページを更新します。'); location.reload(); }
+  else alert('削除に失敗しました。');
+}
 <\/script>
 </body>
 </html>`);
