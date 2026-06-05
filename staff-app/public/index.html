@@ -205,17 +205,17 @@
 
   // 日付セット（日本時間 9:01〜翌9:00 を1業務日として扱う）
   const now = new Date();
-  const jstOffset = 9 * 60; // JST = UTC+9
-  const jstNow = new Date(now.getTime() + (jstOffset - now.getTimezoneOffset()) * 60000);
-  // 9:00以前なら前日扱い
-  const businessDate = new Date(jstNow);
-  if (jstNow.getHours() < 9 || (jstNow.getHours() === 9 && jstNow.getMinutes() === 0)) {
-    businessDate.setDate(businessDate.getDate() - 1);
-  }
-  const today = businessDate.toLocaleDateString('sv-SE');
+  // UTC epoch に +9h して JST の UTC メソッドで読む
+  const jstMs = now.getTime() + 9 * 60 * 60 * 1000;
+  const jst = new Date(jstMs);
+  const jstH = jst.getUTCHours(), jstMin = jst.getUTCMinutes();
+  // 9:00以前（9:00ちょうど含む）なら前日扱い
+  if (jstH < 9 || (jstH === 9 && jstMin === 0)) jst.setUTCDate(jst.getUTCDate() - 1);
+  const y = jst.getUTCFullYear(), mo = jst.getUTCMonth() + 1, d = jst.getUTCDate();
+  const today = y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
   const weekdays = ['日','月','火','水','木','金','土'];
-  const wd = weekdays[businessDate.getDay()];
-  const todayDisplay = businessDate.getFullYear() + '年' + (businessDate.getMonth()+1) + '月' + businessDate.getDate() + '日（' + wd + '）';
+  const wd = weekdays[jst.getUTCDay()];
+  const todayDisplay = y + '年' + mo + '月' + d + '日（' + wd + '）';
   document.getElementById('dateInput').value = today;
   const dateLabel = document.getElementById('dateInput').closest('.form-group').querySelector('label');
   if (dateLabel) dateLabel.textContent = '日付　今日：' + todayDisplay;
