@@ -35,18 +35,33 @@ async function loadStaffSettings() {
   if (staffSettingsCol) return await staffSettingsCol.find({}).toArray();
   try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); } catch { return []; }
 }
-async function saveStaffSetting(staffName, showKuchikomi) {
+async function saveStaffSetting(staffName, fields) {
   if (staffSettingsCol) {
-    await staffSettingsCol.updateOne({ staffName }, { $set: { staffName, showKuchikomi } }, { upsert: true });
+    await staffSettingsCol.updateOne({ staffName }, { $set: { staffName, ...fields } }, { upsert: true });
     return;
   }
   const list = await loadStaffSettings();
   const idx = list.findIndex(s => s.staffName === staffName);
-  if (idx >= 0) list[idx].showKuchikomi = showKuchikomi;
-  else list.push({ staffName, showKuchikomi });
+  if (idx >= 0) Object.assign(list[idx], fields);
+  else list.push({ staffName, ...fields });
   fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(list, null, 2));
 }
+
+// 目標設定API（管理者用）
+app.get('/api/goals', async (req, res) => {
+  const settings = await loadStaffSettings();
+  const goals = {};
+  settings.forEach(s => { if (s.goals) goals[s.staffName] = s.goals; });
+  res.json(goals);
+});
+app.post('/admin/goals', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, goals } = req.body;
+  if (!staffName || !goals) return res.status(400).json({ error: 'invalid' });
+  await saveStaffSetting(staffName, { goals });
+  res.json({ ok: true });
+});
 
 async function loadStaffNames() {
   if (staffNamesCol) {
@@ -201,7 +216,7 @@ app.post('/admin/staff-settings', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { staffName, showKuchikomi } = req.body;
   if (!staffName) return res.status(400).json({ error: 'staffName required' });
-  await saveStaffSetting(staffName, !!showKuchikomi);
+  await saveStaffSetting(staffName, { showKuchikomi: !!showKuchikomi });
   res.json({ ok: true });
 });
 
@@ -369,12 +384,20 @@ app.get('/dashboard', async (req, res) => {
         <td class="num"><span class="badge badge-blue">${counselingTotal}</span><br><small style="color:#94a3b8;font-size:11px">${esc(counselingDetail)}</small></td>
         <td class="num"><span class="badge badge-green">${s.reviews}</span></td>
         <td style="font-size:11px;color:#64748b;max-width:160px">${esc(treatmentDetail)}</td>
-        <td class="num goal-cell" onclick="event.stopPropagation()">
-          <div class="goal-wrap">
-            <input type="number" min="0" class="goal-input" data-staff="${esc(name)}" placeholder="目標" />
-            <div class="goal-gauge-wrap"><div class="goal-gauge-bar" data-staff="${esc(name)}" data-items="${itemsTotal}" style="width:0%"></div></div>
-            <span class="goal-pct" data-staff="${esc(name)}">-</span>
-          </div>
+        <td class="num" onclick="event.stopPropagation()" style="min-width:90px">
+          ${(() => {
+            const g = (staffSettings.find(s=>s.staffName===name)||{}).goals||{};
+            const target = g.items || 0;
+            const pct = target > 0 ? Math.min(Math.round(itemsTotal/target*100),100) : 0;
+            const color = pct>=100 ? '#059669' : pct>=70 ? '#f59e0b' : '#2aab96';
+            return target > 0
+              ? `<div style="font-size:11px;color:#64748b">物品 ${itemsTotal}/${target}</div>
+                 <div style="height:6px;background:#e2e8f0;border-radius:3px;margin-top:3px;overflow:hidden">
+                   <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
+                 </div>
+                 <div style="font-size:11px;font-weight:700;color:${color};margin-top:2px">${pct}%${pct>=100?' ✓':''}</div>`
+              : '<span style="color:#cbd5e1;font-size:11px">未設定</span>';
+          })()}
         </td>
         <td onclick="event.stopPropagation()" style="white-space:nowrap">
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
@@ -627,6 +650,14 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
   </div>
 
+  <!-- 月間目標設定 -->
+  <div class="section-header"><h2>月間目標設定</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:560px">
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとの月間目標件数を設定します。ダッシュボードの達成率ゲージに反映されます。</p>
+    <div id="goalSettings" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <div id="goalMsg" style="font-size:12px;margin-top:10px;min-height:16px;"></div>
+  </div>
+
   <!-- 口コミ表示設定 -->
   <div class="section-header"><h2>口コミ獲得 表示設定</h2><div class="section-line"></div></div>
   <div class="mgmt-card" style="max-width:520px">
@@ -720,32 +751,43 @@ function closeModalOnBg(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 }
 
-// 月間目標（localStorage）
-function initGoals() {
-  document.querySelectorAll('.goal-input').forEach(input => {
-    const staff = input.dataset.staff;
-    const key = 'goal_' + staff;
-    const saved = localStorage.getItem(key);
-    if (saved) { input.value = saved; updateGauge(staff, parseInt(saved) || 0); }
-    input.addEventListener('input', function() {
-      const val = parseInt(this.value) || 0;
-      localStorage.setItem(key, this.value);
-      updateGauge(staff, val);
-    });
+// 月間目標設定UI
+async function loadGoalSettings() {
+  const [namesRes, goalsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/goals')]);
+  const names = await namesRes.json();
+  const goals = await goalsRes.json();
+  const container = document.getElementById('goalSettings');
+  container.innerHTML = '';
+  names.forEach(n => {
+    const g = goals[n] || {};
+    const row = document.createElement('div');
+    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
+    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+      makeGoalInput(n, 'items', '物品販売', g.items||0) +
+      makeGoalInput(n, 'counseling', 'カウンセリング成約', g.counseling||0) +
+      makeGoalInput(n, 'approach', 'ジャブ打ち', g.approach||0) +
+      makeGoalInput(n, 'reviews', '口コミ', g.reviews||0) +
+      '</div>' +
+      '<button onclick="saveGoal(' + JSON.stringify(n) + ', this)" style="margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">保存</button>';
+    container.appendChild(row);
   });
 }
-function updateGauge(staff, goal) {
-  const bar = document.querySelector('.goal-gauge-bar[data-staff="' + staff + '"]');
-  const pct = document.querySelector('.goal-pct[data-staff="' + staff + '"]');
-  if (!bar || !pct) return;
-  const items = parseInt(bar.dataset.items) || 0;
-  if (goal <= 0) { bar.style.width = '0%'; pct.textContent = '-'; return; }
-  const p = Math.min(Math.round(items / goal * 100), 100);
-  bar.style.width = p + '%';
-  bar.style.background = p >= 100 ? '#059669' : '#2aab96';
-  pct.textContent = p + '%';
+function makeGoalInput(staff, key, label, val) {
+  return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#64748b;font-weight:600">' + label +
+    '<input type="number" min="0" value="' + val + '" data-key="' + key + '" style="width:64px;border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:14px;font-family:inherit;text-align:center" /></label>';
 }
-initGoals();
+async function saveGoal(staffName, btn) {
+  const row = btn.closest('div');
+  const inputs = row.querySelectorAll('input[data-key]');
+  const goals = {};
+  inputs.forEach(i => { goals[i.dataset.key] = parseInt(i.value)||0; });
+  const msg = document.getElementById('goalMsg');
+  const res = await fetch('/admin/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, goals }) });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました（ページを更新すると達成率に反映されます）'; setTimeout(()=>msg.textContent='',4000); }
+  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; }
+}
+loadGoalSettings();
 
 // 口コミ表示設定
 async function loadKuchikomiSettings() {
@@ -1063,6 +1105,174 @@ td.label { background: #f9fafb; font-weight: bold; width: 38%; color: #374151; }
   <div><div class="sign-line">確認者</div></div>
   <div><div class="sign-line">院長</div></div>
 </div>
+</body>
+</html>`);
+});
+
+// スタッフ個人実績ページ
+app.get('/my-stats', async (req, res) => {
+  const name = req.query.name || '';
+  const allRecords = await loadDB();
+  const staffNames = await loadStaffNames();
+  const settings = await loadStaffSettings();
+  const goals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
+
+  // 月別集計
+  const byMonth = {};
+  for (const r of allRecords) {
+    if (r.staffName !== name) continue;
+    const month = r.date ? r.date.slice(0, 7) : null;
+    if (!month) continue;
+    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0 };
+    const m = byMonth[month];
+    m.count++;
+    if (r.entryType !== 'behavior') {
+      const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+      if (cat === 'item') m.items++;
+      if (cat === 'item_recommend') m.recommend++;
+      if (cat === 'counseling') m.counseling++;
+      if (cat === 'counseling_approach') m.approach++;
+      if (cat === 'review') m.reviews++;
+      if (cat === 'treatment') m.treatment++;
+    }
+  }
+  const months = Object.keys(byMonth).sort().slice(-6); // 直近6ヶ月
+  const now = new Date();
+  const thisMonth = now.toISOString().slice(0, 7);
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+  const thisM = byMonth[thisMonth] || {};
+  const lastM = byMonth[lastMonth] || {};
+
+  const staffOptions = staffNames.map(n => `<option value="${esc(n)}"${n === name ? ' selected' : ''}>${esc(n)}</option>`).join('');
+
+  function diffBadge(cur, prev) {
+    if (!prev && !cur) return '';
+    const d = (cur||0) - (prev||0);
+    if (d > 0) return `<span style="color:#059669;font-size:11px;font-weight:700">▲${d}</span>`;
+    if (d < 0) return `<span style="color:#ef4444;font-size:11px;font-weight:700">▼${Math.abs(d)}</span>`;
+    return `<span style="color:#94a3b8;font-size:11px">→同じ</span>`;
+  }
+  function goalRow(label, key, cur, prev, goal) {
+    const pct = goal > 0 ? Math.min(Math.round((cur||0)/goal*100),100) : null;
+    const barColor = pct >= 100 ? '#059669' : pct >= 70 ? '#f59e0b' : '#2aab96';
+    return `<tr>
+      <td style="padding:10px 14px;font-weight:600;color:#334155;width:140px">${esc(label)}</td>
+      <td style="padding:10px 14px;text-align:center;font-size:18px;font-weight:700;color:#0f766e">${cur||0}</td>
+      <td style="padding:10px 14px;text-align:center;color:#64748b">${prev||0} ${diffBadge(cur,prev)}</td>
+      <td style="padding:10px 14px">
+        ${goal > 0 ? `
+          <div style="font-size:11px;color:#64748b;margin-bottom:3px">目標${goal}件　${pct}%${pct>=100?' 🎉達成':''}</div>
+          <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px"></div>
+          </div>
+        ` : '<span style="color:#cbd5e1;font-size:12px">目標未設定</span>'}
+      </td>
+    </tr>`;
+  }
+
+  const rows = name ? `
+    ${goalRow('物品販売（購入）', 'items', thisM.items, lastM.items, goals.items)}
+    ${goalRow('物品をすすめた', 'recommend', thisM.recommend, lastM.recommend, 0)}
+    ${goalRow('ジャブ打ち', 'approach', thisM.approach, lastM.approach, goals.approach)}
+    ${goalRow('カウンセリング成約', 'counseling', thisM.counseling, lastM.counseling, goals.counseling)}
+    ${goalRow('口コミ獲得', 'reviews', thisM.reviews, lastM.reviews, goals.reviews)}
+    ${goalRow('処置', 'treatment', thisM.treatment, lastM.treatment, 0)}
+    ${goalRow('書き込み合計', 'count', thisM.count, lastM.count, 0)}
+  ` : '';
+
+  // 月別グラフ用データ
+  const chartData = JSON.stringify({
+    labels: months,
+    datasets: [
+      { label: '物品販売', data: months.map(m=>(byMonth[m]||{}).items||0), backgroundColor:'rgba(245,158,11,0.8)', borderRadius:4, stack:'a' },
+      { label: 'ジャブ打ち', data: months.map(m=>(byMonth[m]||{}).approach||0), backgroundColor:'rgba(139,92,246,0.8)', borderRadius:4, stack:'a' },
+      { label: '成約', data: months.map(m=>(byMonth[m]||{}).counseling||0), backgroundColor:'rgba(59,130,246,0.8)', borderRadius:4, stack:'a' },
+      { label: '口コミ', data: months.map(m=>(byMonth[m]||{}).reviews||0), backgroundColor:'rgba(42,171,150,0.8)', borderRadius:4, stack:'a' },
+    ]
+  });
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>自分の実績 | 自己申告デラックス</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#f0f4f8;color:#1e293b;font-size:14px}
+header{background:linear-gradient(135deg,#0f766e 0%,#2aab96 60%,#34d399 100%);padding:0;box-shadow:0 2px 12px rgba(15,118,110,.3)}
+.header-inner{max-width:640px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;gap:12px}
+.header-icon{width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+header h1{font-size:16px;font-weight:700;color:#fff}
+header p{font-size:11px;color:rgba(255,255,255,.8);margin-top:2px}
+.container{max-width:640px;margin:0 auto;padding:20px 16px 60px}
+.card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);margin-bottom:18px;overflow:hidden}
+.card-header{background:linear-gradient(135deg,#f0fdf4,#ecfdf5);padding:12px 16px;border-bottom:1px solid #a7f3d0;font-size:13px;font-weight:700;color:#065f46;display:flex;align-items:center;gap:6px}
+.select-wrap{padding:16px}
+select{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-size:15px;font-family:inherit;outline:none;background:#f8fafc}
+select:focus{border-color:#2aab96}
+table{width:100%;border-collapse:collapse}
+thead th{background:#f8fafc;padding:8px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #e2e8f0;text-align:left}
+thead th:not(:first-child){text-align:center}
+tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
+tbody tr:hover{background:#f8fffe}
+tbody tr:last-child{border-bottom:none}
+.month-tag{display:inline-block;background:#ecfdf5;color:#065f46;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
+.back-link{display:inline-flex;align-items:center;gap:6px;color:#0f766e;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:16px;background:#fff;padding:8px 14px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="header-icon">📊</div>
+    <div><h1>自分の実績</h1><p>自己申告デラックス | のびのび歯科</p></div>
+  </div>
+</header>
+<div class="container">
+  <a href="/" class="back-link">← 入力フォームへ戻る</a>
+
+  <div class="card">
+    <div class="card-header">👤 スタッフを選択してください</div>
+    <div class="select-wrap">
+      <select onchange="location.href='/my-stats?name='+encodeURIComponent(this.value)">
+        <option value="">選択してください</option>
+        ${staffOptions}
+      </select>
+    </div>
+  </div>
+
+  ${name ? `
+  <div class="card">
+    <div class="card-header">📅 今月の実績 vs 先月 <span class="month-tag">${thisMonth}</span></div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>項目</th><th>今月</th><th>先月</th><th>目標・達成率</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📈 直近6ヶ月の推移</div>
+    <div style="padding:16px"><canvas id="myChart" style="max-height:260px"></canvas></div>
+  </div>
+  ` : ''}
+</div>
+<script>
+${name ? `
+const data = ${chartData};
+new Chart(document.getElementById('myChart').getContext('2d'), {
+  type: 'bar',
+  data: data,
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } }
+  }
+});
+` : ''}
+<\/script>
 </body>
 </html>`);
 });
