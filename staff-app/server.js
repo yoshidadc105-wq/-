@@ -948,8 +948,12 @@ async function loadGoalSettings() {
       makeGoalInput(n, 'counseling', 'カウンセリング成約', g.counseling||0) +
       makeGoalInput(n, 'approach', 'ジャブ打ち', g.approach||0) +
       makeGoalInput(n, 'reviews', '口コミ', g.reviews||0) +
-      '</div>' +
-      '<button onclick="saveGoal(' + JSON.stringify(n) + ', this)" style="margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">保存</button>';
+      '</div>';
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '保存';
+    saveBtn.style.cssText = 'margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+    saveBtn.onclick = function() { saveGoal(n, this); };
+    row.appendChild(saveBtn);
     container.appendChild(row);
   });
 }
@@ -1025,7 +1029,14 @@ async function loadMgmtStaffNames() {
   names.forEach(n => {
     const li = document.createElement('li');
     li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:14px;';
-    li.innerHTML = '<span>' + n + '</span><button onclick="deleteStaffName(' + JSON.stringify(n) + ', this)" class="btn-del">削除</button>';
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = n;
+    const btn = document.createElement('button');
+    btn.textContent = '削除';
+    btn.className = 'btn-del';
+    btn.onclick = function() { deleteStaffName(n, this); };
+    li.appendChild(nameSpan);
+    li.appendChild(btn);
     ul.appendChild(li);
   });
 }
@@ -1067,12 +1078,23 @@ async function loadAccountList() {
   names.forEach(n => {
     const row = document.createElement('div');
     row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
-    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '<input type="email" placeholder="メールアドレス" value="' + (accountMap[n]||'') + '" data-type="email" style="flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none" />' +
-      '<input type="password" placeholder="パスワード（変更する場合のみ）" data-type="pw" style="flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none" />' +
-      '<button onclick="saveAccount(' + JSON.stringify(n) + ', this)" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">保存</button>' +
-      '</div>';
+    const emailInput = document.createElement('input');
+    emailInput.type = 'email'; emailInput.placeholder = 'メールアドレス';
+    emailInput.value = accountMap[n] || ''; emailInput.dataset.type = 'email';
+    emailInput.style.cssText = 'flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none';
+    const pwInput = document.createElement('input');
+    pwInput.type = 'password'; pwInput.placeholder = 'パスワード（変更する場合のみ）';
+    pwInput.dataset.type = 'pw';
+    pwInput.style.cssText = 'flex:2;min-width:160px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none';
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '保存';
+    saveBtn.style.cssText = 'background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+    saveBtn.onclick = function() { saveAccount(n, this); };
+    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>';
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+    inputRow.appendChild(emailInput); inputRow.appendChild(pwInput); inputRow.appendChild(saveBtn);
+    row.appendChild(inputRow);
     container.appendChild(row);
   });
 }
