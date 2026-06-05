@@ -2,19 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
-const PRESET_CATEGORIES = [
-  'グローブ・マスク',
-  '印象材・石膏',
-  'セメント・接着材',
-  '麻酔',
-  '薬剤',
-  '消耗品',
-  'セルフケア',
-  '滅菌・清掃用品',
-  'レントゲン',
-  '器具・器材',
-  '事務用品',
-];
 
 export default function AddProductPage() {
   const [photo, setPhoto] = useState(null);
@@ -33,11 +20,7 @@ export default function AddProductPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.getProducts().then(products => {
-      const custom = products.map(p => p.category).filter(Boolean);
-      const all = [...new Set([...PRESET_CATEGORIES, ...custom])];
-      setCategories(all);
-    });
+    api.getCategories().then(cats => setCategories(cats.map(c => c.name))).catch(() => {});
     api.getSuppliers().then(setSuppliers).catch(() => {});
   }, []);
 

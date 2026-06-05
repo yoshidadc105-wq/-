@@ -2,9 +2,10 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const items = [
-  { path: '/add/product', icon: '📷', title: '商品を登録', desc: '写真を撮って商品を1件登録' },
-  { path: '/import',      icon: '📋', title: 'CSVで一括取込', desc: '複数商品をまとめて登録' },
-  { path: '/suppliers',   icon: '🏪', title: '発注先の管理', desc: '発注先を追加・削除' },
+  { path: '/add/product',  icon: '📷', title: '商品を登録',    desc: '写真を撮って商品を1件登録' },
+  { path: '/import',       icon: '📋', title: 'CSVで一括取込', desc: '複数商品をまとめて登録' },
+  { path: '/categories',   icon: '🏷️', title: 'カテゴリの管理', desc: 'カテゴリを追加・削除' },
+  { path: '/suppliers',    icon: '🏪', title: '発注先の管理',  desc: '発注先を追加・削除' },
 ];
 
 export default function AddMenuPage() {

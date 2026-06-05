@@ -2,19 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
-const PRESET_CATEGORIES = [
-  'グローブ・マスク',
-  '印象材・石膏',
-  'セメント・接着材',
-  '麻酔',
-  '薬剤',
-  '消耗品',
-  'セルフケア',
-  '滅菌・清掃用品',
-  'レントゲン',
-  '器具・器材',
-  '事務用品',
-];
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -42,11 +29,7 @@ export default function ProductDetailPage() {
     Promise.all([api.getProduct(id), api.getLots(id), api.getHistory(id)])
       .then(([p, l, h]) => { setProduct(p); setLots(l); setHistory(h); })
       .finally(() => setLoading(false));
-    api.getProducts().then(ps => {
-      const custom = ps.map(p => p.category).filter(Boolean);
-      const all = [...new Set([...PRESET_CATEGORIES, ...custom])];
-      setCategories(all);
-    });
+    api.getCategories().then(cats => setCategories(cats.map(c => c.name))).catch(() => {});
   }, [id]);
 
   const startEdit = () => {

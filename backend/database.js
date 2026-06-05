@@ -83,6 +83,20 @@ async function initDb() {
   try { await pool.query('ALTER TABLE stock_logs ADD COLUMN IF NOT EXISTS supplier_name TEXT'); } catch (e) {}
   try { await pool.query('ALTER TABLE stock_logs ADD COLUMN IF NOT EXISTS unit_price INTEGER'); } catch (e) {}
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id SERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      sort_order INTEGER DEFAULT 99,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`
+    INSERT INTO categories (name, sort_order) VALUES
+      ('よく使う物', 1), ('受付', 2), ('消耗品', 3), ('器材', 4), ('器具', 5), ('薬・麻酔', 6)
+    ON CONFLICT (name) DO NOTHING;
+  `);
+
   // Create default admin user if not exists
   const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);
   if (rows.length === 0) {
