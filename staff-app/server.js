@@ -752,7 +752,7 @@ app.get('/dashboard', async (req, res) => {
 <html lang="ja">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>スタッフ実績ダッシュボード | のびのび歯科</title>
+<title>自己申告デラックスダッシュボード | のびのび歯科</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
 <style>
@@ -887,7 +887,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="header-title">
       <div class="header-icon">🦷</div>
       <div>
-        <h1>スタッフ実績ダッシュボード</h1>
+        <h1>自己申告デラックスダッシュボード</h1>
         <p>のびのび歯科・矯正歯科</p>
       </div>
     </div>
