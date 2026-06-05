@@ -146,7 +146,9 @@ export default function ChatPage() {
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("画像は5MB以下にしてください"); return; }
+    const isVideo = file.type.startsWith("video/");
+    const limit = isVideo ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > limit) { alert(isVideo ? "動画は30MB以下にしてください" : "画像は5MB以下にしてください"); return; }
     const reader = new FileReader();
     reader.onload = () => setSendImageData(reader.result as string);
     reader.readAsDataURL(file);
@@ -285,8 +287,12 @@ export default function ChatPage() {
                           >
                             {msg.content && <p className="text-sm whitespace-pre-wrap break-words max-w-[200px] md:max-w-xs">{msg.content}</p>}
                             {msg.imageData && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={msg.imageData} alt="画像" className="max-w-[180px] md:max-w-[220px] max-h-48 rounded-xl cursor-pointer mt-1" onClick={e => { e.stopPropagation(); setPreviewImage(msg.imageData!); }} />
+                              msg.imageData.startsWith("data:video/") ? (
+                                <video src={msg.imageData} controls className="max-w-[220px] max-h-52 rounded-xl mt-1" onClick={e => e.stopPropagation()} />
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={msg.imageData} alt="画像" className="max-w-[180px] md:max-w-[220px] max-h-48 rounded-xl cursor-pointer mt-1" onClick={e => { e.stopPropagation(); setPreviewImage(msg.imageData!); }} />
+                              )
                             )}
 
                             {/* 自分のメッセージ：取り消しメニュー */}
@@ -349,12 +355,16 @@ export default function ChatPage() {
               <div ref={bottomRef} />
             </div>
 
-            {/* 画像プレビュー（送信前） */}
+            {/* 画像・動画プレビュー（送信前） */}
             {sendImageData && (
               <div className="px-4 py-2 bg-white border-t border-gray-100 flex items-center gap-3 flex-shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={sendImageData} alt="preview" className="h-14 rounded-lg border border-gray-200" />
-                <span className="text-xs text-gray-500">画像を送信</span>
+                {sendImageData.startsWith("data:video/") ? (
+                  <video src={sendImageData} className="h-14 rounded-lg border border-gray-200" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sendImageData} alt="preview" className="h-14 rounded-lg border border-gray-200" />
+                )}
+                <span className="text-xs text-gray-500">{sendImageData.startsWith("data:video/") ? "動画を送信" : "画像を送信"}</span>
                 <button onClick={() => setSendImageData(null)} className="ml-auto text-red-400 text-sm">✕ 取り消す</button>
               </div>
             )}
@@ -364,7 +374,7 @@ export default function ChatPage() {
               <form onSubmit={sendMessage} className="flex items-center gap-2 px-3 py-2">
                 <button type="button" onClick={() => fileInputRef.current?.click()}
                   className="text-gray-400 hover:text-green-600 text-xl flex-shrink-0">📷</button>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleImageChange} className="hidden" />
                 <input value={newMsg} onChange={e => setNewMsg(e.target.value)}
                   placeholder="メッセージを入力..."
                   className="flex-1 min-w-0 bg-gray-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />

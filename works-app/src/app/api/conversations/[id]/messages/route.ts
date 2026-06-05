@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const otherIds = memberIds.filter(uid => uid !== session.user.id);
   await sendPushToUsers(otherIds, {
     title: `💬 ${message.sender.name}`,
-    body: imageData ? "📷 画像を送信しました" : (content || ""),
+    body: imageData?.startsWith("data:video/") ? "🎥 動画を送信しました" : imageData ? "📷 画像を送信しました" : (content || ""),
     url: "/chat",
   });
 
