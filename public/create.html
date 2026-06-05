@@ -165,7 +165,7 @@
         <canvas id="vanCanvas"></canvas>
       </div>
     </div>
-    <div id="vanSaveBar" style="display:none;padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8f9fa">
+    <div id="vanSaveBar" style="display:none;padding:8px 14px;border-top:1px solid var(--border);align-items:center;gap:8px;flex-wrap:wrap;background:#f8f9fa">
       <span style="font-size:13px">表示時間:</span>
       <input type="number" id="vanDuration" min="1" max="60" value="3" style="width:55px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:13px"> 秒
       <button onclick="saveVAnnotFrame()" class="btn btn-primary btn-sm" id="vanSaveBtn">💾 このメモを保存</button>
@@ -275,58 +275,23 @@ function setForeColor(color){document.execCommand('foreColor',false,color);}
 function clearFmt(){document.execCommand('removeFormat',false,null);document.execCommand('unlink',false,null);}
 
 // ---- Steps ----
-function addStep(){
-  steps.push({id:++stepCounter,title:'',imageName:null,imageType:'image',description:'',videoAnnotations:[]});
-  renderSteps();
-  setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);
-}
+function addStep(){steps.push({id:++stepCounter,title:'',imageName:null,imageType:'image',description:'',videoAnnotations:[]});renderSteps();setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);}
 function removeStep(id){steps=steps.filter(s=>s.id!==id);renderSteps();}
 function updateStepField(id,field,value){const s=steps.find(s=>s.id===id);if(s)s[field]=value;}
 function moveStep(id,dir){
   const idx=steps.findIndex(s=>s.id===id);if(idx<0)return;
-  const newIdx=idx+dir;
-  if(newIdx<0||newIdx>=steps.length)return;
+  const newIdx=idx+dir;if(newIdx<0||newIdx>=steps.length)return;
   [steps[idx],steps[newIdx]]=[steps[newIdx],steps[idx]];
   renderSteps();
 }
 
-async function uploadCoverImage(input){
-  const file=input.files[0];if(!file)return;
-  const form=new FormData();form.append('image',file);
-  const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
-  if(!res.ok){alert('画像のアップロードに失敗しました');return;}
-  const data=await res.json();coverImageName=data.filename;
-  document.getElementById('coverImageDrop').innerHTML=`<img src="/uploads/${data.filename}" style="max-width:100%;max-height:200px;border-radius:4px">`;
-}
+async function uploadCoverImage(input){const file=input.files[0];if(!file)return;const form=new FormData();form.append('image',file);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('画像のアップロードに失敗しました');return;}const data=await res.json();coverImageName=data.filename;document.getElementById('coverImageDrop').innerHTML=`<img src="/uploads/${data.filename}" style="max-width:100%;max-height:200px;border-radius:4px">`;}
 
-async function uploadStepMedia(id,input){
-  const file=input.files[0];if(!file)return;
-  document.getElementById(`stepMediaDrop_${id}`).innerHTML=`<div style="color:var(--text-muted);font-size:13px">アップロード中...</div>`;
-  const form=new FormData();form.append('image',file);
-  const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
-  if(!res.ok){alert('アップロードに失敗しました');return;}
-  const data=await res.json();
-  const step=steps.find(s=>s.id===id);
-  if(step){step.imageName=data.filename;step.imageType=data.type;}
-  refreshStepMediaDrop(id,step);
-}
+async function uploadStepMedia(id,input){const file=input.files[0];if(!file)return;document.getElementById(`stepMediaDrop_${id}`).innerHTML=`<div style="color:var(--text-muted);font-size:13px">アップロード中...</div>`;const form=new FormData();form.append('image',file);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('アップロードに失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===id);if(step){step.imageName=data.filename;step.imageType=data.type;}refreshStepMediaDrop(id,step);}
 
-function refreshStepMediaDrop(id,step){
-  const drop=document.getElementById(`stepMediaDrop_${id}`);if(!drop||!step)return;
-  if(!step.imageName)drop.innerHTML=`<div style="color:var(--text-muted);font-size:13px">📷🎬 クリックして画像または動画を追加（任意）</div>`;
-  else if(step.imageType==='video')drop.innerHTML=`<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%;max-height:300px;border-radius:4px"></video>`;
-  else drop.innerHTML=`<img src="/uploads/${step.imageName}" style="max-width:100%;max-height:300px;border-radius:4px">`;
-  const btns=document.getElementById(`stepMediaBtns_${id}`);
-  if(btns)btns.innerHTML=buildMediaBtns(step);
-}
+function refreshStepMediaDrop(id,step){const drop=document.getElementById(`stepMediaDrop_${id}`);if(!drop||!step)return;if(!step.imageName)drop.innerHTML=`<div style="color:var(--text-muted);font-size:13px">📷🎬 クリックして画像または動画を追加（任意）</div>`;else if(step.imageType==='video')drop.innerHTML=`<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%;max-height:300px;border-radius:4px"></video>`;else drop.innerHTML=`<img src="/uploads/${step.imageName}" style="max-width:100%;max-height:300px;border-radius:4px">`;const btns=document.getElementById(`stepMediaBtns_${id}`);if(btns)btns.innerHTML=buildMediaBtns(step);}
 
-function buildMediaBtns(step){
-  if(!step.imageName)return'';
-  let h=`<button type="button" onclick="clearStepMedia(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✕ 削除</button>`;
-  if(step.imageType!=='video')h+=` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 画像に書き込む</button>`;
-  else{h+=` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✂️ トリミング</button>`;h+=` <button type="button" onclick="openVideoAnnot(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 動画にメモ</button>`;}
-  return h;
-}
+function buildMediaBtns(step){if(!step.imageName)return'';let h=`<button type="button" onclick="clearStepMedia(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✕ 削除</button>`;if(step.imageType!=='video')h+=` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 画像に書き込む</button>`;else{h+=` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✂️ トリミング</button>`;h+=` <button type="button" onclick="openVideoAnnot(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 動画にメモ</button>`;}return h;}
 function clearStepMedia(id){const step=steps.find(s=>s.id===id);if(!step)return;step.imageName=null;step.imageType='image';step.videoAnnotations=[];refreshStepMediaDrop(id,step);}
 
 function renderSteps(){
@@ -373,7 +338,6 @@ function renderSteps(){
 
   steps.forEach(step=>{const el=document.getElementById(`stepDesc_${step.id}`);if(el&&step.description)el.innerHTML=step.description;});
 
-  // Init drag-and-drop
   if(typeof Sortable!=='undefined'){
     if(sortableInstance)sortableInstance.destroy();
     sortableInstance=Sortable.create(container,{
@@ -381,14 +345,9 @@ function renderSteps(){
       handle:'.drag-handle',
       ghostClass:'step-card-ghost',
       onEnd:()=>{
-        // Sync steps array to new DOM order
         const newOrder=Array.from(container.querySelectorAll('.step-card')).map(el=>parseInt(el.dataset.stepId));
         steps=newOrder.map(id=>steps.find(s=>s.id===id)).filter(Boolean);
-        // Update STEP number labels
-        container.querySelectorAll('.step-card').forEach((card,i)=>{
-          const badge=card.querySelector('.step-number-badge');
-          if(badge)badge.textContent=`STEP ${i+1}`;
-        });
+        container.querySelectorAll('.step-card').forEach((card,i)=>{const b=card.querySelector('.step-number-badge');if(b)b.textContent=`STEP ${i+1}`;});
       }
     });
   }
@@ -397,9 +356,7 @@ function renderSteps(){
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 
-// ============================================================
 // Image Annotation
-// ============================================================
 let annotFabric=null,annotStepId=null,annotTool='draw',annotColor='#ef4444';
 function openAnnotation(stepId){const step=steps.find(s=>s.id===stepId);if(!step||!step.imageName||step.imageType==='video'){alert('画像を先にアップロードしてください');return;}annotStepId=stepId;document.getElementById('annotationModal').style.display='flex';const imgObj=new Image();imgObj.crossOrigin='anonymous';imgObj.onload=()=>{const maxW=Math.min(window.innerWidth*.85,840),maxH=Math.floor(window.innerHeight*.55);let w=imgObj.naturalWidth,h=imgObj.naturalHeight;const sc=Math.min(maxW/w,maxH/h,1);w=Math.round(w*sc);h=Math.round(h*sc);if(annotFabric){annotFabric.dispose();annotFabric=null;}annotFabric=new fabric.Canvas('annotCanvas',{width:w,height:h});fabric.Image.fromURL(imgObj.src,(fImg)=>{fImg.scaleToWidth(w);fImg.scaleToHeight(h);fImg.set({selectable:false,evented:false});annotFabric.setBackgroundImage(fImg,annotFabric.renderAll.bind(annotFabric));},{crossOrigin:'anonymous'});setAnnotTool('draw');};imgObj.src=`/uploads/${step.imageName}?t=${Date.now()}`;}
 function closeAnnotation(){document.getElementById('annotationModal').style.display='none';if(annotFabric){annotFabric.dispose();annotFabric=null;}annotStepId=null;}
@@ -410,9 +367,7 @@ function setAnnotBrushSize(s){if(annotFabric&&annotFabric.freeDrawingBrush)annot
 function undoAnnot(){if(!annotFabric)return;const o=annotFabric.getObjects();if(o.length)annotFabric.remove(o[o.length-1]);annotFabric.renderAll();}
 function clearAnnot(){if(!annotFabric)return;annotFabric.getObjects().slice().forEach(o=>annotFabric.remove(o));annotFabric.renderAll();}
 
-// ============================================================
 // Video Annotation
-// ============================================================
 let vanStepId=null,vanFabric=null,vanTool='draw',vanColor='#ef4444',vanVideoElRef=null;
 function openVideoAnnot(stepId){const step=steps.find(s=>s.id===stepId);if(!step||!step.imageName||step.imageType!=='video'){alert('動画を先にアップロードしてください');return;}vanStepId=stepId;vanVideoElRef=document.getElementById('vanVideo');vanVideoElRef.src=`/uploads/${step.imageName}`;vanVideoElRef.load();document.getElementById('vanHeader').style.display='flex';document.getElementById('vanToolbar').style.display='none';document.getElementById('vanVideoPanel').style.display='flex';document.getElementById('vanCanvasPanel').style.display='none';document.getElementById('vanSaveBar').style.display='none';document.getElementById('videoAnnotModal').style.display='flex';renderVanList();}
 function closeVideoAnnot(){document.getElementById('videoAnnotModal').style.display='none';if(vanFabric){vanFabric.dispose();vanFabric=null;}if(vanVideoElRef){vanVideoElRef.pause();vanVideoElRef.src='';}vanStepId=null;vanVideoElRef=null;}
@@ -428,9 +383,7 @@ function renderVanList(){const step=steps.find(s=>s.id===vanStepId);const annots
 function seekVAnnot(t){if(vanVideoElRef){vanVideoElRef.currentTime=t;vanVideoElRef.pause();}backToVideoPlayer();}
 function deleteVAnnot(id){const step=steps.find(s=>s.id===vanStepId);if(!step)return;step.videoAnnotations=(step.videoAnnotations||[]).filter(a=>a.id!==id);renderVanList();}
 
-// ============================================================
 // Video Trim
-// ============================================================
 let trimStepId=null,trimRecorder=null,trimChunks=[];
 function openVideoTrim(stepId){const step=steps.find(s=>s.id===stepId);if(!step||!step.imageName||step.imageType!=='video'){alert('動画を先にアップロードしてください');return;}trimStepId=stepId;const video=document.getElementById('trimVideoEl');video.src=`/uploads/${step.imageName}`;video.load();video.onloadedmetadata=()=>{const d=video.duration;const si=document.getElementById('trimStart');const ei=document.getElementById('trimEnd');si.max=d;si.value=0;ei.max=d;ei.value=d;document.getElementById('trimStartLabel').textContent='0.0';document.getElementById('trimEndLabel').textContent=d.toFixed(1);};document.getElementById('videoTrimModal').style.display='flex';document.getElementById('trimProgress').style.display='none';document.getElementById('trimConfirmBtn').disabled=false;document.getElementById('trimConfirmBtn').textContent='✂️ トリミングして保存';}
 function closeVideoTrim(){document.getElementById('videoTrimModal').style.display='none';if(trimRecorder&&trimRecorder.state==='recording')trimRecorder.stop();trimRecorder=null;trimChunks=[];trimStepId=null;}
@@ -438,14 +391,52 @@ function onTrimStartChange(v){const ev=parseFloat(document.getElementById('trimE
 function onTrimEndChange(v){const sv=parseFloat(document.getElementById('trimStart').value);if(parseFloat(v)<=sv){document.getElementById('trimEnd').value=sv+.1;return;}document.getElementById('trimEndLabel').textContent=parseFloat(v).toFixed(1);}
 async function startVideoTrim(){const video=document.getElementById('trimVideoEl');const st=parseFloat(document.getElementById('trimStart').value);const et=parseFloat(document.getElementById('trimEnd').value);if(et-st<=0){alert('終了時刻は開始時刻より後にしてください');return;}if(!video.captureStream&&!video.mozCaptureStream){alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');return;}document.getElementById('trimConfirmBtn').disabled=true;document.getElementById('trimProgress').style.display='block';trimChunks=[];video.currentTime=st;await new Promise(r=>video.onseeked=r);const stream=video.captureStream?video.captureStream():video.mozCaptureStream();const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';trimRecorder=new MediaRecorder(stream,{mimeType:mime});trimRecorder.ondataavailable=e=>{if(e.data.size>0)trimChunks.push(e.data);};trimRecorder.onstop=async()=>{const blob=new Blob(trimChunks,{type:mime});const ext=mime.includes('mp4')?'.mp4':'.webm';const form=new FormData();form.append('image',blob,`trimmed_${Date.now()}${ext}`);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('保存に失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===trimStepId);if(step){step.imageName=data.filename;step.imageType='video';}refreshStepMediaDrop(trimStepId,step);closeVideoTrim();};trimRecorder.start();video.play();const iv=setInterval(()=>{if(video.currentTime>=et){clearInterval(iv);video.pause();trimRecorder.stop();}},100);}
 
-// ============================================================
 // Save
-// ============================================================
 async function handleSubmit(e){e.preventDefault();const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='保存中...';const title=document.getElementById('title').value.trim();const description=document.getElementById('description').value.trim();const categoryId=document.getElementById('categorySelect').value;if(!title){showAlert('alert','タイトルを入力してください','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';return;}try{if(editId)await updateManual(title,description,categoryId);else await createManual(title,description,categoryId);}catch(err){showAlert('alert','予期せぬエラーが発生しました','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';}}
 function buildStepsContent(){return JSON.stringify({cover_image:coverImageName,steps:steps.map((s,i)=>({order:i+1,title:s.title,image:s.imageName,image_type:s.imageType,description:s.description,video_annotations:s.videoAnnotations||[]}))});}
-async function createManual(title,description,categoryId){let res;if(currentType==='steps'){if(!steps.length){showAlert('alert','少なくとも1つのステップを追加してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}res=await fetch('/api/manuals/steps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null})});}else if(currentType==='rich_text'){const content=quill.root.innerHTML;if(!content||content==='<p><br></p>'){showAlert('alert','本文を入力してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}res=await fetch('/api/manuals/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content,category_id:categoryId||null})});}else{const file=document.getElementById('pdfFile').files[0];if(!file){showAlert('alert','PDFファイルを選択してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}const form=new FormData();form.append('pdf',file);form.append('title',title);form.append('description',description);if(categoryId)form.append('category_id',categoryId);res=await fetch('/api/manuals/pdf',{method:'POST',body:form});}const data=await res.json();if(res.ok)window.location.href=`/view.html?id=${data.id}`;else{showAlert('alert',data.error||'保存に失敗しました','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';}}
-async function updateManual(title,description,categoryId){let res;if(editManual.type==='pdf'&&currentType==='steps'){if(!steps.length){showAlert('alert','少なくとも1つのステップを追加してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';return;}res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null,convert_to_type:'steps'})});}else if(editManual.type==='steps'){res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null})});}else if(editManual.type==='pdf'){const replaceCheck=document.getElementById('replacePdfCheck');if(replaceCheck&&replaceCheck.checked){const file=document.getElementById('pdfFile').files[0];if(!file){showAlert('alert','新しいPDFファイルを選択してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';return;}const form=new FormData();form.append('pdf',file);form.append('title',title);form.append('description',description);if(categoryId)form.append('category_id',categoryId);res=await fetch(`/api/manuals/${editId}/pdf`,{method:'PUT',body:form});}else{res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,category_id:categoryId||null});});}}else{res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:quill.root.innerHTML,category_id:categoryId||null})});}
-const data=await res.json();if(res.ok)window.location.href=`/view.html?id=${editId}`;else{showAlert('alert',data.error||'更新に失敗しました','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';}}
+async function createManual(title,description,categoryId){
+  let res;
+  if(currentType==='steps'){
+    if(!steps.length){showAlert('alert','少なくとも1つのステップを追加してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}
+    res=await fetch('/api/manuals/steps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null})});
+  }else if(currentType==='rich_text'){
+    const content=quill.root.innerHTML;
+    if(!content||content==='<p><br></p>'){showAlert('alert','本文を入力してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保官する';return;}
+    res=await fetch('/api/manuals/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content,category_id:categoryId||null})});
+  }else{
+    const file=document.getElementById('pdfFile').files[0];
+    if(!file){showAlert('alert','PDFファイルを選択してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';return;}
+    const form=new FormData();form.append('pdf',file);form.append('title',title);form.append('description',description);if(categoryId)form.append('category_id',categoryId);
+    res=await fetch('/api/manuals/pdf',{method:'POST',body:form});
+  }
+  const data=await res.json();
+  if(res.ok)window.location.href=`/view.html?id=${data.id}`;
+  else{showAlert('alert',data.error||'保存に失敗しました','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='保存する';}
+}
+async function updateManual(title,description,categoryId){
+  let res;
+  if(editManual.type==='pdf'&&currentType==='steps'){
+    if(!steps.length){showAlert('alert','少なくとも1つのステップを追加してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';return;}
+    res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null,convert_to_type:'steps'})});
+  }else if(editManual.type==='steps'){
+    res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:buildStepsContent(),category_id:categoryId||null})});
+  }else if(editManual.type==='pdf'){
+    const replaceCheck=document.getElementById('replacePdfCheck');
+    if(replaceCheck&&replaceCheck.checked){
+      const file=document.getElementById('pdfFile').files[0];
+      if(!file){showAlert('alert','新しいPDFファイルを選択してください','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';return;}
+      const form=new FormData();form.append('pdf',file);form.append('title',title);form.append('description',description);if(categoryId)form.append('category_id',categoryId);
+      res=await fetch(`/api/manuals/${editId}/pdf`,{method:'PUT',body:form});
+    }else{
+      res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,category_id:categoryId||null})});
+    }
+  }else{
+    res=await fetch(`/api/manuals/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,description,content:quill.root.innerHTML,category_id:categoryId||null})});
+  }
+  const data=await res.json();
+  if(res.ok)window.location.href=`/view.html?id=${editId}`;
+  else{showAlert('alert',data.error||'更新に失敗しました','error');document.getElementById('submitBtn').disabled=false;document.getElementById('submitBtn').textContent='更新する';}
+}
 
 init();
 </script>
