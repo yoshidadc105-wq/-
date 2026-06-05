@@ -15,18 +15,38 @@ app.use(express.static(path.join(__dirname, 'public')));
 // MongoDB接続
 let mongoCol = null;
 let staffNamesCol = null;
+let staffSettingsCol = null;
 if (MONGODB_URI) {
   const client = new MongoClient(MONGODB_URI);
   client.connect()
     .then(() => {
       mongoCol = client.db('nobinobi').collection('staff_records');
       staffNamesCol = client.db('nobinobi').collection('staff_names');
+      staffSettingsCol = client.db('nobinobi').collection('staff_settings');
       console.log('MongoDB接続成功');
     })
     .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
 }
 
 const NAMES_FILE = path.join(__dirname, 'data', 'staff_names.json');
+const SETTINGS_FILE = path.join(__dirname, 'data', 'staff_settings.json');
+
+async function loadStaffSettings() {
+  if (staffSettingsCol) return await staffSettingsCol.find({}).toArray();
+  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); } catch { return []; }
+}
+async function saveStaffSetting(staffName, showKuchikomi) {
+  if (staffSettingsCol) {
+    await staffSettingsCol.updateOne({ staffName }, { $set: { staffName, showKuchikomi } }, { upsert: true });
+    return;
+  }
+  const list = await loadStaffSettings();
+  const idx = list.findIndex(s => s.staffName === staffName);
+  if (idx >= 0) list[idx].showKuchikomi = showKuchikomi;
+  else list.push({ staffName, showKuchikomi });
+  fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(list, null, 2));
+}
 
 async function loadStaffNames() {
   if (staffNamesCol) {
@@ -160,7 +180,9 @@ app.get('/api/check-patient/:patientNo', async (req, res) => {
 
 const ACTION_CATEGORY = {
   '物品販売': 'item',
+  '物品をすすめた': 'item_recommend',
   '口コミ獲得': 'review',
+  'ジャブ打ち': 'counseling_approach',
   'インプラント': 'counseling',
   'マウスピース矯正': 'counseling',
   'ホワイトニング': 'counseling',
@@ -169,6 +191,19 @@ const ACTION_CATEGORY = {
   'フッ素塗布': 'treatment',
   'その他': 'treatment',
 };
+
+// 口コミ表示設定API
+app.get('/api/staff-settings', async (req, res) => {
+  const settings = await loadStaffSettings();
+  res.json(settings);
+});
+app.post('/admin/staff-settings', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, showKuchikomi } = req.body;
+  if (!staffName) return res.status(400).json({ error: 'staffName required' });
+  await saveStaffSetting(staffName, !!showKuchikomi);
+  res.json({ ok: true });
+});
 
 app.post('/submit', async (req, res) => {
   const d = req.body;
@@ -230,7 +265,7 @@ app.get('/dashboard', async (req, res) => {
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
-      byStaff[r.staffName] = { count: 0, itemsMap: {}, counselingMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
+      byStaff[r.staffName] = { count: 0, itemsMap: {}, recommendMap: {}, counselingMap: {}, approachMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
     }
     const s = byStaff[r.staffName];
     s.count++;
@@ -239,10 +274,12 @@ app.get('/dashboard', async (req, res) => {
     } else {
       const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
       const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
-      if (cat === 'item')       s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
-      if (cat === 'counseling') s.counselingMap[r.action] = (s.counselingMap[r.action] || 0) + 1;
-      if (cat === 'review')     s.reviews++;
-      if (cat === 'treatment')  s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
+      if (cat === 'item')              s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
+      if (cat === 'item_recommend')    s.recommendMap = s.recommendMap || {}; if (cat === 'item_recommend') s.recommendMap[label] = (s.recommendMap[label] || 0) + 1;
+      if (cat === 'counseling')        s.counselingMap[r.action] = (s.counselingMap[r.action] || 0) + 1;
+      if (cat === 'counseling_approach') s.approachMap = s.approachMap || {}; if (cat === 'counseling_approach') s.approachMap[r.action] = (s.approachMap[r.action] || 0) + 1;
+      if (cat === 'review')            s.reviews++;
+      if (cat === 'treatment')         s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
       if (r.patientNo) s.patients.add(r.patientNo);
     }
   }
@@ -310,9 +347,14 @@ app.get('/dashboard', async (req, res) => {
   const allStaffNames = [...new Set(allRecords.map(r => r.staffName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
   const staffOptions = allStaffNames.map(n => `<option value="${esc(n)}"${staffFilter === n ? ' selected' : ''}>${esc(n)}</option>`).join('');
 
+  const staffSettings = await loadStaffSettings();
+  const kuchikomiEnabled = new Set(staffSettings.filter(s => s.showKuchikomi).map(s => s.staffName));
+
   const summaryRows = staffList.map(([name, s]) => {
     const itemsTotal = Object.values(s.itemsMap).reduce((x,y)=>x+y,0);
     const itemsDetail = Object.entries(s.itemsMap).map(([k,v])=>`${k}:${v}`).join('、') || '';
+    const recommendTotal = Object.values(s.recommendMap||{}).reduce((x,y)=>x+y,0);
+    const approachTotal = Object.values(s.approachMap||{}).reduce((x,y)=>x+y,0);
     const counselingTotal = Object.values(s.counselingMap).reduce((x,y)=>x+y,0);
     const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
@@ -322,7 +364,8 @@ app.get('/dashboard', async (req, res) => {
         <td><span class="avatar">${esc(initial)}</span><strong>${esc(name)}</strong></td>
         <td class="num"><span class="badge badge-gray">${s.count}</span></td>
         <td class="num">${s.patients.size}</td>
-        <td class="num"><span class="badge badge-orange">${itemsTotal}</span>${itemsDetail ? `<br><small style="color:#94a3b8;font-size:11px">${esc(itemsDetail)}</small>` : ''}</td>
+        <td class="num"><span class="badge badge-orange">${itemsTotal}</span>${itemsDetail ? `<br><small style="color:#94a3b8;font-size:11px">${esc(itemsDetail)}</small>` : ''}<br><small style="color:#94a3b8;font-size:11px">すすめた:${recommendTotal}</small></td>
+        <td class="num"><span class="badge badge-purple">${approachTotal}</span><br><small style="color:#94a3b8;font-size:11px">ジャブ打ち</small></td>
         <td class="num"><span class="badge badge-blue">${counselingTotal}</span><br><small style="color:#94a3b8;font-size:11px">${esc(counselingDetail)}</small></td>
         <td class="num"><span class="badge badge-green">${s.reviews}</span></td>
         <td style="font-size:11px;color:#64748b;max-width:160px">${esc(treatmentDetail)}</td>
@@ -562,8 +605,8 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="table-scroll">
     <table>
       <thead><tr>
-        <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th><th class="num">物品販売</th>
-        <th class="num">カウンセリング</th><th class="num">口コミ</th>
+        <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th><th class="num">物品販売/すすめ</th>
+        <th class="num">ジャブ打ち</th><th class="num">成約</th><th class="num">口コミ</th>
         <th>処置内訳</th><th class="num">月間目標</th><th>出力</th>
       </tr></thead>
       <tbody>${summaryRows || '<tr><td colspan="9" class="empty">まだデータがありません</td></tr>'}</tbody>
@@ -582,6 +625,14 @@ td{padding:11px 14px;vertical-align:middle}
       <tbody>${detailRows || '<tr><td colspan="5" class="empty">まだデータがありません</td></tr>'}</tbody>
     </table>
     </div>
+  </div>
+
+  <!-- 口コミ表示設定 -->
+  <div class="section-header"><h2>口コミ獲得 表示設定</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:520px">
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">ONにしたスタッフの入力フォームにのみ「口コミ獲得」が表示されます</p>
+    <div id="kuchikomiSettings" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="kuchikomiMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
   </div>
 
   <!-- スタッフ名管理 -->
@@ -695,6 +746,44 @@ function updateGauge(staff, goal) {
   pct.textContent = p + '%';
 }
 initGoals();
+
+// 口コミ表示設定
+async function loadKuchikomiSettings() {
+  const [namesRes, settingsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/staff-settings')]);
+  const names = await namesRes.json();
+  const settings = await settingsRes.json();
+  const settingsMap = {};
+  settings.forEach(s => { settingsMap[s.staffName] = s.showKuchikomi; });
+  const container = document.getElementById('kuchikomiSettings');
+  container.innerHTML = '';
+  names.forEach(n => {
+    const enabled = !!settingsMap[n];
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+    row.innerHTML = '<span style="font-size:14px;font-weight:600">' + n + '</span>' +
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#64748b">' +
+      '<span>' + (enabled ? 'ON' : 'OFF') + '</span>' +
+      '<span style="position:relative;display:inline-block;width:44px;height:24px">' +
+      '<input type="checkbox" ' + (enabled ? 'checked' : '') + ' style="opacity:0;width:0;height:0" onchange="toggleKuchikomi(' + JSON.stringify(n) + ', this.checked, this)" />' +
+      '<span class="toggle-track" style="position:absolute;inset:0;background:' + (enabled ? '#2aab96' : '#cbd5e1') + ';border-radius:12px;transition:background .2s"></span>' +
+      '<span style="position:absolute;top:3px;left:' + (enabled ? '23px' : '3px') + ';width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>' +
+      '</span></label>';
+    container.appendChild(row);
+  });
+}
+async function toggleKuchikomi(staffName, checked, inputEl) {
+  const label = inputEl.parentElement;
+  const track = label.querySelector('.toggle-track');
+  const knob = label.querySelectorAll('span')[2];
+  track.style.background = checked ? '#2aab96' : '#cbd5e1';
+  knob.style.left = checked ? '23px' : '3px';
+  label.querySelector('span').textContent = checked ? 'ON' : 'OFF';
+  const msg = document.getElementById('kuchikomiMsg');
+  const res = await fetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
+  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; }
+}
+loadKuchikomiSettings();
 
 // スタッフ名管理
 async function loadMgmtStaffNames() {

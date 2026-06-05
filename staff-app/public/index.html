@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>スタッフ実績入力 | のびのび歯科</title>
+  <title>自己申告デラックス | のびのび歯科</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -88,7 +88,7 @@
   <div class="header-inner">
     <div class="header-icon">🦷</div>
     <div>
-      <h1>スタッフ実績入力</h1>
+      <h1>自己申告デラックス</h1>
       <p>のびのび歯科・矯正歯科</p>
     </div>
   </div>
@@ -115,7 +115,7 @@
         <div class="row2">
           <div class="form-group">
             <label class="required">日付</label>
-            <input type="date" name="date" id="pDate" required />
+            <input type="text" name="date" id="pDate" required readonly style="background:#f1f5f9;cursor:default;color:#475569;" />
           </div>
           <div class="form-group">
             <label class="required">スタッフ名</label>
@@ -137,14 +137,18 @@
           <label class="required">内容を選択</label>
           <select name="action" id="actionSelect" required onchange="onActionChange()">
             <option value="">選択してください</option>
-            <optgroup label="── 実績 ──">
-              <option value="物品販売">物品販売</option>
-              <option value="口コミ獲得">口コミ獲得</option>
+            <optgroup label="── 物品 ──">
+              <option value="物品販売">物品販売（購入）</option>
+              <option value="物品をすすめた">物品をすすめた（未購入）</option>
             </optgroup>
-            <optgroup label="── カウンセリング成約 ──">
-              <option value="インプラント">インプラント</option>
-              <option value="マウスピース矯正">マウスピース矯正</option>
-              <option value="ホワイトニング">ホワイトニング</option>
+            <optgroup label="── カウンセリング ──">
+              <option value="ジャブ打ち">ジャブ打ち（アプローチ）</option>
+              <option value="インプラント">インプラント成約</option>
+              <option value="マウスピース矯正">マウスピース矯正成約</option>
+              <option value="ホワイトニング">ホワイトニング成約</option>
+            </optgroup>
+            <optgroup label="── 口コミ ──" id="kuchikomiGroup" style="display:none">
+              <option value="口コミ獲得">口コミ獲得</option>
             </optgroup>
             <optgroup label="── 処置 ──">
               <option value="シーラント">シーラント</option>
@@ -185,7 +189,7 @@
         <div class="row2">
           <div class="form-group">
             <label class="required">日付</label>
-            <input type="date" name="date" id="bDate" required />
+            <input type="text" name="date" id="bDate" required readonly style="background:#f1f5f9;cursor:default;color:#475569;" />
           </div>
           <div class="form-group">
             <label class="required">スタッフ名</label>
@@ -218,11 +222,14 @@
 <script>
   // スタッフ名プルダウン管理
   let staffNames = [];
+  let staffSettingsMap = {};
 
   async function loadStaffNames() {
     try {
-      const res = await fetch('/api/staff-names');
-      staffNames = await res.json();
+      const [namesRes, settingsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/staff-settings')]);
+      staffNames = await namesRes.json();
+      const settings = await settingsRes.json();
+      settings.forEach(s => { staffSettingsMap[s.staffName] = s.showKuchikomi; });
     } catch { staffNames = []; }
     renderStaffSelects();
   }
@@ -240,6 +247,15 @@
       if (cur) sel.value = cur;
     });
   }
+
+  // スタッフ選択変更時：口コミ表示/非表示
+  document.getElementById('pStaffSelect').addEventListener('change', function() {
+    const show = !!staffSettingsMap[this.value];
+    document.getElementById('kuchikomiGroup').style.display = show ? '' : 'none';
+    if (!show && document.getElementById('actionSelect').value === '口コミ獲得') {
+      document.getElementById('actionSelect').value = '';
+    }
+  });
 
   loadStaffNames();
 
@@ -284,10 +300,21 @@
     phraseContainer.appendChild(chip);
   });
 
-  // 日付初期値
-  const today = new Date().toLocaleDateString('sv-SE');
+  // 日付初期値（今日の日付・変更不可）
+  const todayDate = new Date();
+  const today = todayDate.toLocaleDateString('sv-SE'); // YYYY-MM-DD（サーバーへの送信値）
+  const todayDisplay = todayDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
   document.getElementById('pDate').value = today;
   document.getElementById('bDate').value = today;
+  // 表示用（ラベルに日本語を追加）
+  document.querySelectorAll('#pDate, #bDate').forEach(el => {
+    el.value = today;
+    el.setAttribute('data-display', todayDisplay);
+    el.style.color = '#475569';
+    // ラベルに今日の日付をわかりやすく表示
+    const label = el.closest('.form-group').querySelector('label');
+    if (label) label.textContent = '日付（今日：' + todayDisplay + '）';
+  });
 
   // 実施内容変更時
   function onActionChange() {
