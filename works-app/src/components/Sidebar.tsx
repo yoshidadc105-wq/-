@@ -69,6 +69,21 @@ export default function Sidebar() {
           ))}
         </nav>
 
+        {/* 通知設定ボタン */}
+        <div className="px-3 pb-2">
+          <button
+            onClick={async () => {
+              if (!("Notification" in window)) { alert("このブラウザは通知に対応していません"); return; }
+              if (Notification.permission === "granted") { alert("通知はすでに許可されています"); return; }
+              const perm = await Notification.requestPermission();
+              if (perm === "granted") alert("通知を許可しました！");
+              else alert("通知が拒否されました。ブラウザの設定から許可してください");
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+            🔔 <span>通知を設定</span>
+          </button>
+        </div>
+
         <div className="p-3 border-t border-gray-700">
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="w-8 h-8 bg-indigo-400 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
