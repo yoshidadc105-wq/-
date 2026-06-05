@@ -880,6 +880,12 @@ td{padding:11px 14px;vertical-align:middle}
 <script>
 const STAFF_DATA = ${JSON.stringify(staffDataObj)};
 const MONTH_DATA = ${JSON.stringify(monthData)};
+const ADMIN_AUTH = 'Basic ' + btoa(':' + ${JSON.stringify(ADMIN_PASSWORD)});
+function adminFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({'Authorization': ADMIN_AUTH}, opts.headers || {});
+  return fetch(url, opts);
+}
 
 // Chart.js 月別推移グラフ
 (function() {
@@ -957,9 +963,9 @@ async function saveGoal(staffName, btn) {
   const goals = {};
   inputs.forEach(i => { goals[i.dataset.key] = parseInt(i.value)||0; });
   const msg = document.getElementById('goalMsg');
-  const res = await fetch('/admin/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, goals }) });
+  const res = await adminFetch('/admin/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, goals }) });
   if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました（ページを更新すると達成率に反映されます）'; setTimeout(()=>msg.textContent='',4000); }
-  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; }
+  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; }
 }
 loadGoalSettings();
 
@@ -997,7 +1003,7 @@ async function toggleKuchikomi(staffName, checked, inputEl) {
   label.querySelector('span').textContent = checked ? 'ON' : 'OFF';
   const msg = document.getElementById('kuchikomiMsg');
   try {
-    const res = await fetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
+    const res = await adminFetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
     if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
     else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; }
   } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
@@ -1013,7 +1019,7 @@ async function loadMgmtStaffNames() {
   names.forEach(n => {
     const li = document.createElement('li');
     li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:14px;';
-    li.innerHTML = '<span>' + n + '</span><button onclick="deleteStaffName(' + JSON.stringify(n) + ')" class="btn-del">削除</button>';
+    li.innerHTML = '<span>' + n + '</span><button onclick="deleteStaffName(' + JSON.stringify(n) + ', this)" class="btn-del">削除</button>';
     ul.appendChild(li);
   });
 }
@@ -1022,15 +1028,21 @@ async function addStaffName() {
   const name = input.value.trim();
   if (!name) return;
   const msg = document.getElementById('staffNameMsg');
-  const res = await fetch('/admin/staff-names', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+  const res = await adminFetch('/admin/staff-names', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
   if (res.ok) { input.value=''; msg.style.color='#059669'; msg.textContent='追加しました'; loadMgmtStaffNames(); }
-  else { const e = await res.json(); msg.style.color='#dc2626'; msg.textContent = e.error || 'エラー'; }
+  else { msg.style.color='#dc2626'; msg.textContent='追加に失敗しました ('+res.status+')'; }
 }
-async function deleteStaffName(name) {
-  if (!confirm(name + ' を削除しますか？')) return;
+async function deleteStaffName(name, btn) {
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.textContent = '本当に削除？';
+    btn.style.cssText = 'background:#ef4444;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;';
+    setTimeout(() => { btn.dataset.confirm = ''; btn.textContent = '削除'; btn.style.cssText = ''; btn.className = 'btn-del'; }, 3000);
+    return;
+  }
   const msg = document.getElementById('staffNameMsg');
   try {
-    const res = await fetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
+    const res = await adminFetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
     if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; await loadMgmtStaffNames(); }
     else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました ('+res.status+')'; }
   } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
@@ -1068,7 +1080,7 @@ async function saveAccount(staffName, btn) {
   if (!email) { msg.style.color='#dc2626'; msg.textContent='メールアドレスを入力してください'; return; }
   const body = { staffName, email };
   if (pw) body.password = pw;
-  const res = await fetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const res = await adminFetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   if (res.ok) { pwInput.value=''; msg.style.color='#059669'; msg.textContent=staffName+'のアカウントを保存しました'; setTimeout(()=>msg.textContent='',3000); }
   else { msg.style.color='#dc2626'; msg.textContent='保存失敗 ('+res.status+')'; }
 }
@@ -1077,7 +1089,7 @@ async function resetAllPasswords() {
   const msg = document.getElementById('bulkPwMsg');
   if (!pw || pw.length < 4) { msg.style.color='#dc2626'; msg.textContent='4文字以上のパスワードを入力してください'; return; }
   if (!confirm('全スタッフのパスワードを「' + pw + '」に設定します。よろしいですか？')) return;
-  const res = await fetch('/admin/reset-all-passwords', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
+  const res = await adminFetch('/admin/reset-all-passwords', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
   const data = await res.json();
   if (res.ok) { document.getElementById('bulkPwInput').value=''; msg.style.color='#059669'; msg.textContent=data.count+'名に設定しました'; setTimeout(()=>msg.textContent='',3000); }
   else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
@@ -1087,7 +1099,7 @@ loadAccountList();
 async function deleteAllRecords() {
   if (!confirm('⚠️ 入力されたデータをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
   if (!confirm('最終確認：本当にすべてのデータを削除しますか？')) return;
-  const res = await fetch('/admin/all-records', { method: 'DELETE' });
+  const res = await adminFetch('/admin/all-records', { method: 'DELETE' });
   if (res.ok) { alert('削除しました。ページを更新します。'); location.reload(); }
   else alert('削除に失敗しました。');
 }
