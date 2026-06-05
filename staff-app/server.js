@@ -979,34 +979,40 @@ async function loadKuchikomiSettings() {
   const container = document.getElementById('kuchikomiSettings');
   container.innerHTML = '';
   names.forEach(n => {
-    const enabled = !!settingsMap[n];
+    const on = !!settingsMap[n];
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
-    row.innerHTML = '<span style="font-size:14px;font-weight:600">' + n + '</span>' +
-      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#64748b">' +
-      '<span>' + (enabled ? 'ON' : 'OFF') + '</span>' +
-      '<span style="position:relative;display:inline-block;width:44px;height:24px">' +
-      '<input type="checkbox" ' + (enabled ? 'checked' : '') + ' style="opacity:0;width:0;height:0" onchange="toggleKuchikomi(' + JSON.stringify(n) + ', this.checked, this)" />' +
-      '<span class="toggle-track" style="position:absolute;inset:0;background:' + (enabled ? '#2aab96' : '#cbd5e1') + ';border-radius:12px;transition:background .2s"></span>' +
-      '<span style="position:absolute;top:3px;left:' + (enabled ? '23px' : '3px') + ';width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>' +
-      '</span></label>';
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.staff = n;
+    btn.dataset.on = on ? '1' : '0';
+    btn.onclick = function() { toggleKuchikomi(this); };
+    applyToggleStyle(btn, on);
+    row.innerHTML = '<span style="font-size:14px;font-weight:600">' + n + '</span>';
+    row.appendChild(btn);
     container.appendChild(row);
   });
 }
-async function toggleKuchikomi(staffName, checked, inputEl) {
-  const container = inputEl.parentElement;
-  const label = container.parentElement;
-  const track = container.querySelector('.toggle-track');
-  const knob = container.querySelectorAll('span')[1];
-  track.style.background = checked ? '#2aab96' : '#cbd5e1';
-  knob.style.left = checked ? '23px' : '3px';
-  label.querySelector('span').textContent = checked ? 'ON' : 'OFF';
+function applyToggleStyle(btn, on) {
+  btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px;color:#64748b;padding:4px;-webkit-tap-highlight-color:transparent;';
+  btn.innerHTML =
+    '<span style="font-weight:600;min-width:24px">' + (on ? 'ON' : 'OFF') + '</span>' +
+    '<span style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0">' +
+    '<span style="position:absolute;inset:0;background:' + (on ? '#2aab96' : '#cbd5e1') + ';border-radius:13px;transition:background .2s"></span>' +
+    '<span style="position:absolute;top:4px;left:' + (on ? '22px' : '4px') + ';width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>' +
+    '</span>';
+}
+async function toggleKuchikomi(btn) {
+  const staffName = btn.dataset.staff;
+  const newOn = btn.dataset.on !== '1';
+  btn.dataset.on = newOn ? '1' : '0';
+  applyToggleStyle(btn, newOn);
   const msg = document.getElementById('kuchikomiMsg');
   try {
-    const res = await adminFetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
-    if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
-    else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; }
-  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
+    const res = await adminFetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: newOn }) });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent=staffName+' を ' + (newOn?'ON':'OFF') + ' にしました'; setTimeout(()=>msg.textContent='', 2500); }
+    else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; btn.dataset.on = newOn?'0':'1'; applyToggleStyle(btn, !newOn); }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; btn.dataset.on = newOn?'0':'1'; applyToggleStyle(btn, !newOn); }
 }
 loadKuchikomiSettings();
 
