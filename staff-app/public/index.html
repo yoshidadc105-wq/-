@@ -103,7 +103,7 @@
 
       <!-- 商品名（物品販売のみ） -->
       <div class="form-group hidden" id="itemNameWrap">
-        <label>販売した商品名</label>
+        <label id="itemNameLabel">商品名</label>
         <input type="text" name="itemName" placeholder="例：電動歯ブラシ、ホワイトニングジェルなど" />
       </div>
 
@@ -227,6 +227,9 @@
     document.getElementById('patientNoWrap').classList.toggle('hidden', !needsPatient);
     document.getElementById('freeTextWrap').classList.toggle('hidden', !needsFreeText);
     document.getElementById('itemNameWrap').classList.toggle('hidden', !ITEM_NAME_ACTIONS.has(val));
+    if (ITEM_NAME_ACTIONS.has(val)) {
+      document.getElementById('itemNameLabel').textContent = val.includes('すすめ') ? 'すすめた商品名' : '販売した商品名';
+    }
     if (!needsPatient) { document.getElementById('patientNo').value = ''; document.getElementById('patientCheck').textContent = ''; }
     if (!needsFreeText) document.getElementById('freeText').value = '';
     // 患者番号の必須属性
