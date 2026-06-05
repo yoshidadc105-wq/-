@@ -21,6 +21,7 @@ export default function HomePage() {
   const [submitting, setSubmitting] = useState(false);
   const [flashMessage, setFlashMessage] = useState('');
   const [suppliers, setSuppliers] = useState([]);
+  const [categoryList, setCategoryList] = useState([]);
   const navigate = useNavigate();
 
   const load = useCallback(() => {
@@ -31,8 +32,9 @@ export default function HomePage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.getSuppliers().then(setSuppliers).catch(() => {}); }, []);
+  useEffect(() => { api.getCategories().then(cats => setCategoryList(cats.map(c => c.name))).catch(() => {}); }, []);
 
-  const categories = ['すべて', ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort()];
+  const categories = ['すべて', ...categoryList];
 
   const filtered = products.filter(p => {
     const matchSearch = p.name.includes(search) || (p.maker || '').includes(search);
