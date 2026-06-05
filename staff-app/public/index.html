@@ -203,13 +203,22 @@
     } catch {}
   }
 
-  // 日付セット
-  const todayDate = new Date();
-  const today = todayDate.toLocaleDateString('sv-SE');
-  const todayDisplay = todayDate.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+  // 日付セット（日本時間 9:01〜翌9:00 を1業務日として扱う）
+  const now = new Date();
+  const jstOffset = 9 * 60; // JST = UTC+9
+  const jstNow = new Date(now.getTime() + (jstOffset - now.getTimezoneOffset()) * 60000);
+  // 9:00以前なら前日扱い
+  const businessDate = new Date(jstNow);
+  if (jstNow.getHours() < 9 || (jstNow.getHours() === 9 && jstNow.getMinutes() === 0)) {
+    businessDate.setDate(businessDate.getDate() - 1);
+  }
+  const today = businessDate.toLocaleDateString('sv-SE');
+  const weekdays = ['日','月','火','水','木','金','土'];
+  const wd = weekdays[businessDate.getDay()];
+  const todayDisplay = businessDate.getFullYear() + '年' + (businessDate.getMonth()+1) + '月' + businessDate.getDate() + '日（' + wd + '）';
   document.getElementById('dateInput').value = today;
   const dateLabel = document.getElementById('dateInput').closest('.form-group').querySelector('label');
-  if (dateLabel) dateLabel.textContent = '日付（今日：' + todayDisplay + '）';
+  if (dateLabel) dateLabel.textContent = '日付　今日：' + todayDisplay;
 
   function onActionChange() {
     const val = document.getElementById('actionSelect').value;
