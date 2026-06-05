@@ -1814,16 +1814,18 @@ app.get('/my-stats', async (req, res) => {
     ${goalRow('書き込み合計', 'count', thisM.count, lastM.count, 0)}
   `;
 
-  // 月別グラフ用データ
-  const chartData = JSON.stringify({
-    labels: months,
-    datasets: [
-      { label: '物品販売', data: months.map(m=>(byMonth[m]||{}).items||0), backgroundColor:'rgba(245,158,11,0.8)', borderRadius:4, stack:'a' },
-      { label: 'ジャブ打ち', data: months.map(m=>(byMonth[m]||{}).approach||0), backgroundColor:'rgba(139,92,246,0.8)', borderRadius:4, stack:'a' },
-      { label: '成約', data: months.map(m=>(byMonth[m]||{}).counseling||0), backgroundColor:'rgba(59,130,246,0.8)', borderRadius:4, stack:'a' },
-      { label: '口コミ', data: months.map(m=>(byMonth[m]||{}).reviews||0), backgroundColor:'rgba(42,171,150,0.8)', borderRadius:4, stack:'a' },
-    ]
-  });
+  // 日付別記録（カレンダー用）
+  const byDate = {};
+  for (const r of allRecords) {
+    if (r.staffName !== name || !r.date) continue;
+    if (!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push({
+      action: r.action,
+      patientNo: r.patientNo || '',
+      itemName: r.itemName || '',
+      freeText: r.freeText || ''
+    });
+  }
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -1831,7 +1833,6 @@ app.get('/my-stats', async (req, res) => {
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>自分の実績 | 自己申告デラックス</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans JP',sans-serif;background:#f0f4f8;color:#1e293b;font-size:14px}
@@ -1857,6 +1858,26 @@ tbody tr:hover{background:#f8fffe}
 tbody tr:last-child{border-bottom:none}
 .month-tag{display:inline-block;background:#ecfdf5;color:#065f46;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
 .back-link{display:inline-flex;align-items:center;gap:6px;color:#0f766e;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:16px;background:#fff;padding:8px 14px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e2e8f0}
+.cal-nav button{background:#f1f5f9;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:#0f766e;cursor:pointer;font-family:inherit}
+.cal-nav button:hover{background:#e0f2f1}
+.cal-nav .cal-title{font-size:15px;font-weight:700;color:#0f766e}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:10px 8px 14px}
+.cal-dow{text-align:center;font-size:10px;font-weight:700;color:#94a3b8;padding:4px 0 6px;letter-spacing:.04em}
+.cal-dow.sun{color:#ef4444}.cal-dow.sat{color:#3b82f6}
+.cal-day{min-height:56px;border-radius:8px;padding:4px;margin:2px;cursor:pointer;transition:background .15s;position:relative}
+.cal-day:hover{background:#f0fdf4}
+.cal-day.today{background:#ecfdf5;outline:2px solid #2aab96}
+.cal-day.has-record{cursor:pointer}
+.cal-day.other-month{opacity:.3;pointer-events:none}
+.cal-day-num{font-size:11px;font-weight:700;color:#334155;margin-bottom:2px}
+.cal-day-num.sun{color:#ef4444}.cal-day-num.sat{color:#3b82f6}
+.cal-dot{font-size:10px;line-height:1.4;color:#0f766e;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cal-detail{background:#f0fdf4;border:1px solid #a7f3d0;border-radius:10px;padding:14px 16px;margin:0 8px 14px;font-size:13px}
+.cal-detail-date{font-weight:700;color:#065f46;margin-bottom:8px;font-size:14px}
+.cal-detail-item{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #d1fae5;color:#334155}
+.cal-detail-item:last-child{border-bottom:none}
+.cal-detail-item::before{content:'•';color:#2aab96;font-weight:700;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1884,24 +1905,101 @@ tbody tr:last-child{border-bottom:none}
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">📈 直近6ヶ月の推移</div>
-    <div style="padding:16px"><canvas id="myChart" style="max-height:260px"></canvas></div>
+  <div class="card" id="calCard">
+    <div class="cal-nav">
+      <button onclick="moveMonth(-1)">&#8592; 前月</button>
+      <span class="cal-title" id="calTitle"></span>
+      <button onclick="moveMonth(1)">次月 &#8594;</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="calDetail"></div>
   </div>
 </div>
 <script>
-${name ? `
-const data = ${chartData};
-new Chart(document.getElementById('myChart').getContext('2d'), {
-  type: 'bar',
-  data: data,
-  options: {
-    responsive: true,
-    plugins: { legend: { position: 'top' } },
-    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } }
+const BY_DATE = ${JSON.stringify(byDate)};
+const WEEKDAYS = ['日','月','火','水','木','金','土'];
+let calYear, calMonth;
+
+// JST今日
+const _jst = new Date(Date.now() + 9*60*60*1000);
+const TODAY = _jst.getUTCFullYear() + '-' + String(_jst.getUTCMonth()+1).padStart(2,'0') + '-' + String(_jst.getUTCDate()).padStart(2,'0');
+calYear = _jst.getUTCFullYear();
+calMonth = _jst.getUTCMonth(); // 0-indexed
+
+function moveMonth(d) {
+  calMonth += d;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCal();
+  document.getElementById('calDetail').innerHTML = '';
+}
+
+function renderCal() {
+  const title = calYear + '年' + (calMonth+1) + '月';
+  document.getElementById('calTitle').textContent = title;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['日','月','火','水','木','金','土'].forEach((w,i) => {
+    const d = document.createElement('div');
+    d.className = 'cal-dow' + (i===0?' sun':i===6?' sat':'');
+    d.textContent = w;
+    grid.appendChild(d);
+  });
+  const first = new Date(calYear, calMonth, 1).getDay(); // day of week of 1st
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  // blank cells before 1st
+  for (let i=0; i<first; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-day other-month';
+    grid.appendChild(cell);
   }
-});
-` : ''}
+  for (let day=1; day<=daysInMonth; day++) {
+    const dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    const dow = (first + day - 1) % 7;
+    const records = BY_DATE[dateStr] || [];
+    const cell = document.createElement('div');
+    cell.className = 'cal-day' + (dateStr===TODAY?' today':'') + (records.length?' has-record':'');
+    const numEl = document.createElement('div');
+    numEl.className = 'cal-day-num' + (dow===0?' sun':dow===6?' sat':'');
+    numEl.textContent = day;
+    cell.appendChild(numEl);
+    records.slice(0,3).forEach(r => {
+      const dot = document.createElement('div');
+      dot.className = 'cal-dot';
+      dot.textContent = r.action;
+      cell.appendChild(dot);
+    });
+    if (records.length > 3) {
+      const more = document.createElement('div');
+      more.style.cssText = 'font-size:10px;color:#94a3b8';
+      more.textContent = '+' + (records.length-3) + '件';
+      cell.appendChild(more);
+    }
+    if (records.length) {
+      cell.onclick = () => showDetail(dateStr, records);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function showDetail(dateStr, records) {
+  const det = document.getElementById('calDetail');
+  const [y,m,d] = dateStr.split('-');
+  const dow = WEEKDAYS[new Date(+y,+m-1,+d).getDay()];
+  let html = '<div class="cal-detail"><div class="cal-detail-date">📅 ' + y+'年'+parseInt(m)+'月'+parseInt(d)+'日（'+dow+'）' + ' — ' + records.length + '件</div>';
+  records.forEach(r => {
+    let txt = r.action;
+    if (r.patientNo) txt += '　患者番号：' + r.patientNo;
+    if (r.itemName) txt += '　' + r.itemName;
+    if (r.freeText) txt += '　' + r.freeText;
+    html += '<div class="cal-detail-item">' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
+  });
+  html += '</div>';
+  det.innerHTML = html;
+  det.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+renderCal();
 <\/script>
 </body>
 </html>`);
