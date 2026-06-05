@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ログイン | 自己申告デラックス</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: linear-gradient(135deg, #0f766e 0%, #2aab96 60%, #34d399 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fff; border-radius: 20px; padding: 36px 32px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+    .logo { text-align: center; margin-bottom: 28px; }
+    .logo-icon { width: 64px; height: 64px; background: linear-gradient(135deg, #0f766e, #34d399); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 12px; box-shadow: 0 8px 24px rgba(42,171,150,.4); }
+    .logo h1 { font-size: 18px; font-weight: 700; color: #0f766e; }
+    .logo p { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; }
+    select, input[type="password"] {
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 11px 14px;
+      font-size: 15px; font-family: inherit; outline: none; transition: border .2s, box-shadow .2s; background: #f8fafc;
+    }
+    select:focus, input:focus { border-color: #2aab96; background: #fff; box-shadow: 0 0 0 3px rgba(42,171,150,.12); }
+    .btn { display: block; width: 100%; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity .2s, transform .1s; box-shadow: 0 4px 14px rgba(42,171,150,.4); margin-top: 8px; letter-spacing: .03em; }
+    .btn:hover { opacity: .9; }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+    .error-msg { background: #fee2e2; color: #dc2626; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+    .hint { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🦷</div>
+    <h1>自己申告デラックス</h1>
+    <p>のびのび歯科・矯正歯科</p>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="form-group">
+    <label>スタッフ名</label>
+    <select id="staffSelect">
+      <option value="">選択してください</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>パスワード</label>
+    <input type="password" id="password" placeholder="パスワードを入力" autocomplete="current-password" />
+  </div>
+  <button class="btn" id="loginBtn" onclick="doLogin()">ログイン</button>
+  <p class="hint">パスワードがわからない場合は管理者にお問い合わせください</p>
+</div>
+
+<script>
+  async function loadNames() {
+    const res = await fetch('/api/staff-names');
+    const names = await res.json();
+    const sel = document.getElementById('staffSelect');
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  }
+  loadNames();
+
+  document.getElementById('password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  async function doLogin() {
+    const staffName = document.getElementById('staffSelect').value;
+    const password = document.getElementById('password').value;
+    const errEl = document.getElementById('errorMsg');
+    const btn = document.getElementById('loginBtn');
+    errEl.style.display = 'none';
+    if (!staffName) { errEl.textContent = 'スタッフ名を選択してください'; errEl.style.display = 'block'; return; }
+    if (!password) { errEl.textContent = 'パスワードを入力してください'; errEl.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'ログイン中...';
+    try {
+      const res = await fetch('/staff-login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffName, password })
+      });
+      if (res.ok) {
+        location.href = '/';
+      } else {
+        const data = await res.json();
+        errEl.textContent = data.error || 'ログインに失敗しました';
+        errEl.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'ログイン';
+      }
+    } catch {
+      errEl.textContent = '通信エラーが発生しました';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'ログイン';
+    }
+  }
+</script>
+</body>
+</html>

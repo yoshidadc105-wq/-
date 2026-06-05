@@ -85,12 +85,15 @@
 </head>
 <body>
 <header>
-  <div class="header-inner">
-    <div class="header-icon">🦷</div>
-    <div>
-      <h1>自己申告デラックス</h1>
-      <p>のびのび歯科・矯正歯科</p>
+  <div class="header-inner" style="justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="header-icon">🦷</div>
+      <div>
+        <h1>自己申告デラックス</h1>
+        <p>のびのび歯科・矯正歯科</p>
+      </div>
     </div>
+    <div id="headerUser" style="display:flex;align-items:center;gap:10px;"></div>
   </div>
 </header>
 <div class="container">
@@ -119,9 +122,7 @@
           </div>
           <div class="form-group">
             <label class="required">スタッフ名</label>
-            <select name="staffName" id="pStaffSelect" required>
-              <option value="">選択してください</option>
-            </select>
+            <input type="text" name="staffName" id="pStaffName" readonly style="background:#f1f5f9;cursor:default;color:#0f766e;font-weight:700;" />
           </div>
         </div>
         <div class="form-group">
@@ -193,9 +194,7 @@
           </div>
           <div class="form-group">
             <label class="required">スタッフ名</label>
-            <select name="staffName" id="bStaffSelect" required>
-              <option value="">選択してください</option>
-            </select>
+            <input type="text" name="staffName" id="bStaffName" readonly style="background:#f1f5f9;cursor:default;color:#0f766e;font-weight:700;" />
           </div>
         </div>
       </div>
@@ -224,49 +223,89 @@
     <div id="recentList"><div class="loading">読み込み中...</div></div>
   </div>
 
+<!-- パスワード変更モーダル -->
+<div id="pwModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+  <div style="background:#fff;border-radius:16px;padding:28px 28px;max-width:360px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <h2 style="font-size:17px;font-weight:700;color:#0f766e;margin-bottom:18px">パスワード変更</h2>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px">現在のパスワード</label>
+      <input type="password" id="pwCurrent" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;" />
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px">新しいパスワード（4文字以上）</label>
+      <input type="password" id="pwNew" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;" />
+    </div>
+    <div id="pwMsg" style="font-size:12px;min-height:16px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closePwModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;font-family:inherit">キャンセル</button>
+      <button onclick="changePassword()" style="flex:1;padding:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">変更する</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
-  // スタッフ名プルダウン管理
-  let staffNames = [];
-  let staffSettingsMap = {};
+  let loggedInStaff = null;
 
-  async function loadStaffNames() {
+  async function initAuth() {
     try {
-      const [namesRes, settingsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/staff-settings')]);
-      staffNames = await namesRes.json();
-      const settings = await settingsRes.json();
-      settings.forEach(s => { staffSettingsMap[s.staffName] = s.showKuchikomi; });
-    } catch { staffNames = []; }
-    renderStaffSelects();
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      if (!data.staffName) { location.href = '/staff-login'; return; }
+      loggedInStaff = data.staffName;
+    } catch { location.href = '/staff-login'; return; }
+
+    // ヘッダーにユーザー表示
+    const headerUser = document.getElementById('headerUser');
+    headerUser.innerHTML =
+      '<span style="color:rgba(255,255,255,.9);font-size:13px;font-weight:600">' + loggedInStaff + '</span>' +
+      '<button onclick="document.getElementById(\'pwModal\').style.display=\'flex\'" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔑 パスワード変更</button>' +
+      '<a href="/staff-logout" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;text-decoration:none">ログアウト</a>';
+
+    // スタッフ名を入力欄にセット
+    document.getElementById('pStaffName').value = loggedInStaff;
+    document.getElementById('bStaffName').value = loggedInStaff;
+
+    // 口コミ設定を反映
+    await loadKuchikomiForStaff(loggedInStaff);
+
+    loadRecent();
   }
 
-  function renderStaffSelects() {
-    ['pStaffSelect', 'bStaffSelect'].forEach(id => {
-      const sel = document.getElementById(id);
-      const cur = sel.value;
-      sel.innerHTML = '<option value="">選択してください</option>';
-      staffNames.forEach(n => {
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = n;
-        sel.appendChild(opt);
-      });
-      if (cur) sel.value = cur;
+  async function loadKuchikomiForStaff(staffName) {
+    try {
+      const res = await fetch('/api/staff-settings');
+      const settings = await res.json();
+      const s = settings.find(x => x.staffName === staffName);
+      const show = s && s.showKuchikomi;
+      document.getElementById('kuchikomiGroup').style.display = show ? '' : 'none';
+    } catch {}
+  }
+
+  function closePwModal() {
+    document.getElementById('pwModal').style.display = 'none';
+    document.getElementById('pwCurrent').value = '';
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwMsg').textContent = '';
+  }
+
+  async function changePassword() {
+    const currentPassword = document.getElementById('pwCurrent').value;
+    const newPassword = document.getElementById('pwNew').value;
+    const msg = document.getElementById('pwMsg');
+    if (!currentPassword || !newPassword) { msg.style.color='#dc2626'; msg.textContent='両方入力してください'; return; }
+    const res = await fetch('/staff-change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword })
     });
+    const data = await res.json();
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='変更しました'; setTimeout(closePwModal, 1200); }
+    else { msg.style.color='#dc2626'; msg.textContent = data.error || '変更に失敗しました'; }
   }
 
-  // スタッフ選択変更時：口コミ表示/非表示
-  document.getElementById('pStaffSelect').addEventListener('change', function() {
-    const show = !!staffSettingsMap[this.value];
-    document.getElementById('kuchikomiGroup').style.display = show ? '' : 'none';
-    if (!show && document.getElementById('actionSelect').value === '口コミ獲得') {
-      document.getElementById('actionSelect').value = '';
-    }
-  });
+  initAuth();
 
-  loadStaffNames();
-
-  // タブ切替
   function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach((b, i) => {
       b.classList.toggle('active', (i === 0) === (tab === 'patient'));
@@ -383,7 +422,7 @@
     document.getElementById('patientCheck').textContent = '';
     document.getElementById('itemNameWrap').style.display = 'none';
     document.getElementById('otherWrap').style.display = 'none';
-    renderStaffSelects();
+    document.getElementById('pStaffName').value = loggedInStaff;
     f.style.display = '';
     document.getElementById('success-patient').style.display = 'none';
     document.getElementById('pSubmitBtn').disabled = false;
@@ -458,7 +497,6 @@
     } catch { list.innerHTML = '<div class="loading">読み込みに失敗しました</div>'; }
   }
 
-  loadRecent();
 </script>
 </body>
 </html>

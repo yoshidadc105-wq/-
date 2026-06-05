@@ -7,7 +7,9 @@ const { MongoClient } = require('mongodb');
 const app = express();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MONGODB_URI = process.env.MONGODB_URI;
+const SESSION_SECRET = process.env.SESSION_SECRET || ADMIN_PASSWORD + '_staff_session';
 const DB_FILE = path.join(__dirname, 'data', 'records.json');
+const ACCOUNTS_FILE = path.join(__dirname, 'data', 'staff_accounts.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -16,6 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 let mongoCol = null;
 let staffNamesCol = null;
 let staffSettingsCol = null;
+let staffAccountsCol = null;
 if (MONGODB_URI) {
   const client = new MongoClient(MONGODB_URI);
   client.connect()
@@ -23,9 +26,68 @@ if (MONGODB_URI) {
       mongoCol = client.db('nobinobi').collection('staff_records');
       staffNamesCol = client.db('nobinobi').collection('staff_names');
       staffSettingsCol = client.db('nobinobi').collection('staff_settings');
+      staffAccountsCol = client.db('nobinobi').collection('staff_accounts');
       console.log('MongoDB接続成功');
     })
     .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
+}
+
+// パスワードハッシュ
+function hashPassword(password) {
+  return crypto.pbkdf2Sync(password, 'nobinobi-dental-salt', 1000, 32, 'sha256').toString('hex');
+}
+
+// セッショントークン（スタッフ用）
+function createStaffToken(staffName) {
+  const payload = Buffer.from(staffName).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}.${sig}`;
+}
+function verifyStaffToken(token) {
+  if (!token) return null;
+  const dot = token.lastIndexOf('.');
+  if (dot < 0) return null;
+  const payload = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  if (sig !== expected) return null;
+  try { return Buffer.from(payload, 'base64url').toString('utf8'); } catch { return null; }
+}
+function getStaffFromReq(req) {
+  const cookie = req.headers.cookie || '';
+  const match = cookie.match(/staffSession=([^;]+)/);
+  if (!match) return null;
+  return verifyStaffToken(decodeURIComponent(match[1]));
+}
+
+// スタッフアカウント操作
+async function loadStaffAccounts() {
+  if (staffAccountsCol) return await staffAccountsCol.find({}).toArray();
+  try { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')); } catch { return []; }
+}
+async function getStaffAccount(staffName) {
+  if (staffAccountsCol) return await staffAccountsCol.findOne({ staffName });
+  return (await loadStaffAccounts()).find(a => a.staffName === staffName) || null;
+}
+async function upsertStaffAccount(staffName, passwordHash) {
+  if (staffAccountsCol) {
+    await staffAccountsCol.updateOne({ staffName }, { $set: { staffName, passwordHash } }, { upsert: true });
+    return;
+  }
+  const list = await loadStaffAccounts();
+  const idx = list.findIndex(a => a.staffName === staffName);
+  if (idx >= 0) list[idx].passwordHash = passwordHash;
+  else list.push({ staffName, passwordHash });
+  fs.mkdirSync(path.dirname(ACCOUNTS_FILE), { recursive: true });
+  fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(list, null, 2));
+}
+
+// スタッフ認証ミドルウェア（ログイン必須ルート用）
+function requireStaffAuth(req, res, next) {
+  const staff = getStaffFromReq(req);
+  if (!staff) return res.redirect('/staff-login');
+  req.staffName = staff;
+  next();
 }
 
 const NAMES_FILE = path.join(__dirname, 'data', 'staff_names.json');
@@ -56,6 +118,25 @@ app.get('/api/goals', async (req, res) => {
   res.json(goals);
 });
 // 全データ削除
+// 管理者：個別パスワードリセット
+app.post('/admin/reset-password', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, password } = req.body;
+  if (!staffName || !password) return res.status(400).json({ error: 'invalid' });
+  await upsertStaffAccount(staffName, hashPassword(password));
+  res.json({ ok: true });
+});
+
+// 管理者：全員を共通パスワードに設定
+app.post('/admin/reset-all-passwords', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'invalid' });
+  const names = await loadStaffNames();
+  await Promise.all(names.map(n => upsertStaffAccount(n, hashPassword(password))));
+  res.json({ ok: true, count: names.length });
+});
+
 app.delete('/admin/all-records', async (req, res) => {
   if (!checkAuth(req, res)) return;
   if (mongoCol) {
@@ -151,6 +232,47 @@ function esc(str) {
 }
 
 // スタッフ名一覧（プルダウン用）
+// ===== スタッフログイン =====
+app.get('/staff-login', (req, res) => {
+  const staff = getStaffFromReq(req);
+  if (staff) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/staff-login', async (req, res) => {
+  const { staffName, password } = req.body;
+  if (!staffName || !password) return res.status(400).json({ error: 'invalid' });
+  const account = await getStaffAccount(staffName);
+  if (!account) return res.status(401).json({ error: 'アカウントが設定されていません。管理者にお問い合わせください。' });
+  if (account.passwordHash !== hashPassword(password)) return res.status(401).json({ error: 'パスワードが違います。' });
+  const token = createStaffToken(staffName);
+  res.setHeader('Set-Cookie', `staffSession=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+  res.json({ ok: true });
+});
+
+app.post('/staff-change-password', async (req, res) => {
+  const staffName = getStaffFromReq(req);
+  if (!staffName) return res.status(401).json({ error: 'ログインが必要です' });
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'invalid' });
+  const account = await getStaffAccount(staffName);
+  if (!account || account.passwordHash !== hashPassword(currentPassword)) return res.status(401).json({ error: '現在のパスワードが違います' });
+  if (newPassword.length < 4) return res.status(400).json({ error: 'パスワードは4文字以上にしてください' });
+  await upsertStaffAccount(staffName, hashPassword(newPassword));
+  res.json({ ok: true });
+});
+
+app.get('/staff-logout', (req, res) => {
+  res.setHeader('Set-Cookie', 'staffSession=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.redirect('/staff-login');
+});
+
+// ログイン中スタッフ名を返す
+app.get('/api/me', (req, res) => {
+  const staff = getStaffFromReq(req);
+  res.json({ staffName: staff || null });
+});
+
 app.get('/api/staff-names', async (req, res) => {
   res.json(await loadStaffNames());
 });
@@ -693,6 +815,23 @@ td{padding:11px 14px;vertical-align:middle}
     <ul id="staffNameList" class="mgmt-list" style="list-style:none;padding:0;margin:0;"></ul>
   </div>
 
+  <!-- アカウント管理 -->
+  <div class="section-header"><h2>スタッフアカウント管理（パスワード）</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:560px">
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフのログインパスワードを設定・リセットできます。</p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:8px">全員のパスワードを一括設定</div>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="bulkPwInput" placeholder="共通パスワード（4文字以上）" class="mgmt-input" style="font-size:13px" />
+        <button onclick="resetAllPasswords()" class="btn-add" style="font-size:13px;white-space:nowrap">一括設定</button>
+      </div>
+      <div id="bulkPwMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:8px">スタッフ別パスワードリセット</div>
+    <div id="accountList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="accountMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
+  </div>
+
 </div><!-- /container -->
 
 <!-- ドリルダウンモーダル -->
@@ -830,16 +969,19 @@ async function loadKuchikomiSettings() {
   });
 }
 async function toggleKuchikomi(staffName, checked, inputEl) {
-  const label = inputEl.parentElement;
-  const track = label.querySelector('.toggle-track');
-  const knob = label.querySelectorAll('span')[2];
+  const container = inputEl.parentElement;
+  const label = container.parentElement;
+  const track = container.querySelector('.toggle-track');
+  const knob = container.querySelectorAll('span')[1];
   track.style.background = checked ? '#2aab96' : '#cbd5e1';
   knob.style.left = checked ? '23px' : '3px';
   label.querySelector('span').textContent = checked ? 'ON' : 'OFF';
   const msg = document.getElementById('kuchikomiMsg');
-  const res = await fetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
-  if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
-  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; }
+  try {
+    const res = await fetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: checked }) });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました'; setTimeout(()=>msg.textContent='', 2000); }
+    else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
 }
 loadKuchikomiSettings();
 
@@ -868,11 +1010,49 @@ async function addStaffName() {
 async function deleteStaffName(name) {
   if (!confirm(name + ' を削除しますか？')) return;
   const msg = document.getElementById('staffNameMsg');
-  const res = await fetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
-  if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; loadMgmtStaffNames(); }
-  else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
+  try {
+    const res = await fetch('/admin/staff-names/' + encodeURIComponent(name), { method:'DELETE' });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='削除しました'; await loadMgmtStaffNames(); }
+    else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました ('+res.status+')'; }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; }
 }
 loadMgmtStaffNames();
+
+// アカウント管理
+async function loadAccountList() {
+  const res = await fetch('/api/staff-names');
+  const names = await res.json();
+  const container = document.getElementById('accountList');
+  container.innerHTML = '';
+  names.forEach(n => {
+    const row = document.createElement('div');
+    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    row.innerHTML = '<span style="font-size:14px;font-weight:600;min-width:90px">' + n + '</span>' +
+      '<input type="password" placeholder="新パスワード" style="flex:1;min-width:130px;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none" />' +
+      '<button onclick="resetOnePassword(' + JSON.stringify(n) + ', this)" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">リセット</button>';
+    container.appendChild(row);
+  });
+}
+async function resetOnePassword(staffName, btn) {
+  const input = btn.previousElementSibling;
+  const pw = input.value.trim();
+  const msg = document.getElementById('accountMsg');
+  if (!pw) { msg.style.color='#dc2626'; msg.textContent='パスワードを入力してください'; return; }
+  const res = await fetch('/admin/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, password: pw }) });
+  if (res.ok) { input.value=''; msg.style.color='#059669'; msg.textContent=staffName+'のパスワードをリセットしました'; setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='リセット失敗'; }
+}
+async function resetAllPasswords() {
+  const pw = document.getElementById('bulkPwInput').value.trim();
+  const msg = document.getElementById('bulkPwMsg');
+  if (!pw || pw.length < 4) { msg.style.color='#dc2626'; msg.textContent='4文字以上のパスワードを入力してください'; return; }
+  if (!confirm('全スタッフのパスワードを「' + pw + '」に設定します。よろしいですか？')) return;
+  const res = await fetch('/admin/reset-all-passwords', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: pw }) });
+  const data = await res.json();
+  if (res.ok) { document.getElementById('bulkPwInput').value=''; msg.style.color='#059669'; msg.textContent=data.count+'名に設定しました'; setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
+}
+loadAccountList();
 
 async function deleteAllRecords() {
   if (!confirm('⚠️ 入力されたデータをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
