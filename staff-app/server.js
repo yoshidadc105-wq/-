@@ -224,21 +224,21 @@ app.get('/api/action-items', async (req, res) => {
 });
 app.post('/admin/action-items', async (req, res) => {
   if (!checkAuth(req, res)) return;
-  const { name, group, category, needsPatient, needsFreeText, showItemName } = req.body;
-  if (!name || !group || !category) return res.status(400).json({ error: '必須項目が不足しています' });
+  const { name, group, needsPatient, needsFreeText, showItemName } = req.body;
+  if (!name || !group) return res.status(400).json({ error: '必須項目が不足しています' });
   const id = 'c' + Date.now();
-  const item = { id, name: name.trim(), group: group.trim(), category, needsPatient: !!needsPatient, needsFreeText: !!needsFreeText, showItemName: !!showItemName, builtin: false };
+  const item = { id, name: name.trim(), group: group.trim(), category: 'treatment', needsPatient: !!needsPatient, needsFreeText: !!needsFreeText, showItemName: !!showItemName, builtin: false };
   await saveActionItem(item);
   res.json({ ok: true, item });
 });
 app.put('/admin/action-items/:id', async (req, res) => {
   if (!checkAuth(req, res)) return;
-  const { name, group, category, needsPatient, needsFreeText, showItemName } = req.body;
-  if (!name || !group || !category) return res.status(400).json({ error: '必須項目が不足しています' });
+  const { name, group, needsPatient, needsFreeText, showItemName } = req.body;
+  if (!name || !group) return res.status(400).json({ error: '必須項目が不足しています' });
   const items = await loadActionItems();
   const idx = items.findIndex(i => i.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: 'not found' });
-  items[idx] = { ...items[idx], name: name.trim(), group: group.trim(), category, needsPatient: !!needsPatient, needsFreeText: !!needsFreeText, showItemName: !!showItemName };
+  items[idx] = { ...items[idx], name: name.trim(), group: group.trim(), needsPatient: !!needsPatient, needsFreeText: !!needsFreeText, showItemName: !!showItemName };
   // 全件上書き保存（標準項目をDBに書き込む場合も対応）
   if (actionItemsCol) {
     await actionItemsCol.deleteMany({});
@@ -992,10 +992,10 @@ td{padding:11px 14px;vertical-align:middle}
     <div id="kuchikomiMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
   </div>
 
-  <!-- グループ・カテゴリ管理 -->
-  <div class="section-header"><h2>グループ・カテゴリ管理</h2><div class="section-line"></div></div>
-  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:28px">
-    <div class="mgmt-card" style="flex:1;min-width:220px;max-width:340px">
+  <!-- グループ管理 -->
+  <div class="section-header"><h2>グループ管理</h2><div class="section-line"></div></div>
+  <div style="margin-bottom:28px">
+    <div class="mgmt-card" style="max-width:340px">
       <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:10px">グループ</div>
       <div id="groupList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
@@ -1003,15 +1003,6 @@ td{padding:11px 14px;vertical-align:middle}
         <button onclick="addGroup()" class="btn-add" style="font-size:13px;white-space:nowrap">追加</button>
       </div>
       <div id="groupMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
-    </div>
-    <div class="mgmt-card" style="flex:1;min-width:220px;max-width:340px">
-      <div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:10px">カテゴリ</div>
-      <div id="categoryList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="newCategoryInput" placeholder="新しいカテゴリ名" class="mgmt-input" style="font-size:13px;flex:1" />
-        <button onclick="addCategory()" class="btn-add" style="font-size:13px;white-space:nowrap">追加</button>
-      </div>
-      <div id="categoryMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
     </div>
   </div>
 
@@ -1025,7 +1016,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="table-scroll">
     <table id="itemTable">
       <thead><tr>
-        <th>項目名</th><th>グループ</th><th>カテゴリ</th><th style="text-align:center">患者番号</th><th style="text-align:center">操作</th>
+        <th>項目名</th><th>グループ</th><th style="text-align:center">患者番号</th><th style="text-align:center">操作</th>
       </tr></thead>
       <tbody id="itemTableBody"></tbody>
     </table>
@@ -1068,19 +1059,6 @@ td{padding:11px 14px;vertical-align:middle}
       <datalist id="groupSuggestions">
         <option value="物品"><option value="カウンセリング"><option value="アポ管理"><option value="処置"><option value="チームサポート"><option value="その他">
       </datalist>
-    </div>
-    <div style="margin-bottom:12px">
-      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">カテゴリ</label>
-      <select id="newItemCategory" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#f8fafc">
-        <option value="item">物品販売</option>
-        <option value="item_recommend">物品すすめ</option>
-        <option value="counseling">成約</option>
-        <option value="counseling_approach">ジャブ打ち</option>
-        <option value="appointment">アポ転換</option>
-        <option value="review">口コミ</option>
-        <option value="treatment" selected>処置・その他</option>
-        <option value="team_support">チームサポート</option>
-      </select>
     </div>
     <div style="display:flex;gap:16px;margin-bottom:16px">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
@@ -1401,10 +1379,6 @@ async function resetAllPasswords() {
 loadStaffTable();
 
 // アクション項目管理
-const CATEGORY_LABELS = {
-  item:'物品販売', item_recommend:'物品すすめ', counseling:'成約', counseling_approach:'ジャブ打ち',
-  appointment:'アポ転換', review:'口コミ', treatment:'処置', team_support:'チームサポート'
-};
 async function loadItemTable() {
   const res = await fetch('/api/action-items');
   const items = await res.json();
@@ -1414,19 +1388,18 @@ async function loadItemTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td style="padding:10px 14px;font-weight:600;color:#334155">' + item.name + '</td>' +
       '<td style="padding:10px 14px;color:#64748b">' + item.group + '</td>' +
-      '<td style="padding:10px 14px;color:#64748b">' + (CATEGORY_LABELS[item.category]||item.category) + '</td>' +
       '<td style="padding:10px 14px;text-align:center">' + (item.needsPatient ? '✓' : '') + '</td>' +
       '<td style="padding:10px 14px;text-align:center;display:flex;gap:6px;justify-content:center"></td>';
     const editBtn = document.createElement('button');
     editBtn.textContent = '編集';
     editBtn.style.cssText = 'background:#e0f2fe;color:#0369a1;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
     editBtn.onclick = function() { openItemModal(item); };
-    tr.cells[4].appendChild(editBtn);
+    tr.cells[3].appendChild(editBtn);
     const delBtn = document.createElement('button');
     delBtn.textContent = '削除';
     delBtn.style.cssText = 'background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
     delBtn.onclick = function() { deleteItem(item.id, item.name, delBtn); };
-    tr.cells[4].appendChild(delBtn);
+    tr.cells[3].appendChild(delBtn);
     tbody.appendChild(tr);
   });
 }
@@ -1449,7 +1422,6 @@ function openItemModal(item) {
   document.getElementById('itemModalMsg').textContent = '';
   document.getElementById('newItemName').value = item ? item.name : '';
   document.getElementById('newItemGroup').value = item ? item.group : '';
-  document.getElementById('newItemCategory').value = item ? item.category : 'treatment';
   document.getElementById('newItemNeedsPatient').checked = item ? !!item.needsPatient : true;
   document.getElementById('newItemNeedsFreeText').checked = item ? !!item.needsFreeText : false;
   document.getElementById('itemModalOverlay').style.display = 'flex';
@@ -1457,12 +1429,11 @@ function openItemModal(item) {
 async function saveNewItem() {
   const name = document.getElementById('newItemName').value.trim();
   const group = document.getElementById('newItemGroup').value.trim();
-  const category = document.getElementById('newItemCategory').value;
   const needsPatient = document.getElementById('newItemNeedsPatient').checked;
   const needsFreeText = document.getElementById('newItemNeedsFreeText').checked;
   const msg = document.getElementById('itemModalMsg');
   if (!name || !group) { msg.style.color='#dc2626'; msg.textContent='項目名とグループを入力してください'; return; }
-  const body = JSON.stringify({ name, group, category, needsPatient, needsFreeText });
+  const body = JSON.stringify({ name, group, needsPatient, needsFreeText });
   const url = editingItemId ? '/admin/action-items/' + encodeURIComponent(editingItemId) : '/admin/action-items';
   const method = editingItemId ? 'PUT' : 'POST';
   const res = await adminFetch(url, { method, headers:{'Content-Type':'application/json'}, body });
@@ -1481,13 +1452,6 @@ async function loadConfig() {
   const res = await fetch('/api/action-config');
   currentConfig = await res.json();
   renderGroupList();
-  renderCategoryList();
-  const catSel = document.getElementById('newItemCategory');
-  if (catSel) {
-    const cur = catSel.value;
-    catSel.innerHTML = currentConfig.categories.map(c => '<option value="'+c.id+'">'+(c.label||c.id)+'</option>').join('');
-    if (cur) catSel.value = cur;
-  }
   const dl = document.getElementById('groupSuggestions');
   if (dl) dl.innerHTML = currentConfig.groups.map(g => '<option value="'+g+'">').join('');
 }
@@ -1510,28 +1474,6 @@ function renderGroupList() {
     el.appendChild(row);
   });
 }
-function renderCategoryList() {
-  const el = document.getElementById('categoryList');
-  if (!el) return;
-  el.innerHTML = '';
-  currentConfig.categories.forEach(c => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:5px 10px;font-size:13px;color:#334155';
-    row.textContent = c.label || c.id;
-    const isDefault = ['item','item_recommend','counseling','counseling_approach','appointment','review','treatment','team_support'].includes(c.id);
-    if (!isDefault) {
-      const btn = document.createElement('button');
-      btn.textContent = '×';
-      btn.style.cssText = 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;margin-left:8px';
-      btn.onclick = async () => {
-        await adminFetch('/admin/action-config/categories/'+encodeURIComponent(c.id), { method:'DELETE' });
-        loadConfig();
-      };
-      row.appendChild(btn);
-    }
-    el.appendChild(row);
-  });
-}
 async function addGroup() {
   const name = document.getElementById('newGroupInput').value.trim();
   const msg = document.getElementById('groupMsg');
@@ -1539,15 +1481,6 @@ async function addGroup() {
   await adminFetch('/admin/action-config/groups', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
   document.getElementById('newGroupInput').value = '';
   msg.style.color='#059669'; msg.textContent=name+'を追加しました';
-  loadConfig(); setTimeout(()=>msg.textContent='',3000);
-}
-async function addCategory() {
-  const label = document.getElementById('newCategoryInput').value.trim();
-  const msg = document.getElementById('categoryMsg');
-  if (!label) { msg.style.color='#dc2626'; msg.textContent='カテゴリ名を入力してください'; return; }
-  await adminFetch('/admin/action-config/categories', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ label }) });
-  document.getElementById('newCategoryInput').value = '';
-  msg.style.color='#059669'; msg.textContent=label+'を追加しました';
   loadConfig(); setTimeout(()=>msg.textContent='',3000);
 }
 loadConfig();
