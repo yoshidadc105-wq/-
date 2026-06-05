@@ -122,8 +122,8 @@ export default function HomePage() {
         style={{ background: 'white' }}
       />
 
-      {categories.length > 1 && (
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', flex: 1 }}>
           {categories.map(cat => (
             <button key={cat} onClick={() => { setSelectedCategory(cat); sessionStorage.setItem('homeCategory', cat); }} style={{
               flexShrink: 0, padding: '6px 14px', borderRadius: 20, fontSize: 13,
@@ -136,7 +136,12 @@ export default function HomePage() {
             </button>
           ))}
         </div>
-      )}
+        <button onClick={() => navigate('/categories')} style={{
+          flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
+          background: '#f1f5f9', color: '#475569', fontSize: 20, fontWeight: 700,
+          border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>＋</button>
+      </div>
 
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
