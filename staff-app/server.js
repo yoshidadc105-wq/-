@@ -367,6 +367,9 @@ const ACTION_CATEGORY = {
   '物品をすすめた': 'item_recommend',
   '口コミ獲得': 'review',
   'ジャブ打ち': 'counseling_approach',
+  'インプラントジャブ打ち': 'counseling_approach',
+  'マウスピース矯正ジャブ打ち': 'counseling_approach',
+  'ホワイトニングジャブ打ち': 'counseling_approach',
   'インプラント': 'counseling',
   'マウスピース矯正': 'counseling',
   'ホワイトニング': 'counseling',
@@ -1430,7 +1433,8 @@ td.label { background: #f9fafb; font-weight: bold; width: 38%; color: #374151; }
 
 // スタッフ個人実績ページ
 app.get('/my-stats', async (req, res) => {
-  const name = req.query.name || '';
+  const name = getStaffFromReq(req);
+  if (!name) return res.redirect('/staff-login');
   const allRecords = await loadDB();
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
@@ -1462,8 +1466,6 @@ app.get('/my-stats', async (req, res) => {
   const thisM = byMonth[thisMonth] || {};
   const lastM = byMonth[lastMonth] || {};
 
-  const staffOptions = staffNames.map(n => `<option value="${esc(n)}"${n === name ? ' selected' : ''}>${esc(n)}</option>`).join('');
-
   function diffBadge(cur, prev) {
     if (!prev && !cur) return '';
     const d = (cur||0) - (prev||0);
@@ -1489,7 +1491,7 @@ app.get('/my-stats', async (req, res) => {
     </tr>`;
   }
 
-  const rows = name ? `
+  const rows = `
     ${goalRow('物品販売（購入）', 'items', thisM.items, lastM.items, goals.items)}
     ${goalRow('物品をすすめた', 'recommend', thisM.recommend, lastM.recommend, 0)}
     ${goalRow('ジャブ打ち', 'approach', thisM.approach, lastM.approach, goals.approach)}
@@ -1497,7 +1499,7 @@ app.get('/my-stats', async (req, res) => {
     ${goalRow('口コミ獲得', 'reviews', thisM.reviews, lastM.reviews, goals.reviews)}
     ${goalRow('処置', 'treatment', thisM.treatment, lastM.treatment, 0)}
     ${goalRow('書き込み合計', 'count', thisM.count, lastM.count, 0)}
-  ` : '';
+  `;
 
   // 月別グラフ用データ
   const chartData = JSON.stringify({
@@ -1552,16 +1554,9 @@ tbody tr:last-child{border-bottom:none}
   <a href="/" class="back-link">← 入力フォームへ戻る</a>
 
   <div class="card">
-    <div class="card-header">👤 スタッフを選択してください</div>
-    <div class="select-wrap">
-      <select onchange="location.href='/my-stats?name='+encodeURIComponent(this.value)">
-        <option value="">選択してください</option>
-        ${staffOptions}
-      </select>
-    </div>
+    <div class="card-header">👤 ${esc(name)} さんの実績</div>
   </div>
 
-  ${name ? `
   <div class="card">
     <div class="card-header">📅 今月の実績 vs 先月 <span class="month-tag">${thisMonth}</span></div>
     <div style="overflow-x:auto">
@@ -1576,7 +1571,6 @@ tbody tr:last-child{border-bottom:none}
     <div class="card-header">📈 直近6ヶ月の推移</div>
     <div style="padding:16px"><canvas id="myChart" style="max-height:260px"></canvas></div>
   </div>
-  ` : ''}
 </div>
 <script>
 ${name ? `
