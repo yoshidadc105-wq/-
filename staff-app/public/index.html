@@ -91,35 +91,6 @@
         <label class="required">内容を選択</label>
         <select name="action" id="actionSelect" required onchange="onActionChange()">
           <option value="">選択してください</option>
-          <optgroup label="── 物品 ──">
-            <option value="物品販売">物品販売（購入）</option>
-            <option value="物品をすすめた">物品をすすめた（未購入）</option>
-          </optgroup>
-          <optgroup label="── カウンセリング ──">
-            <option value="インプラントジャブ打ち">インプラント ジャブ打ち</option>
-            <option value="マウスピース矯正ジャブ打ち">マウスピース矯正 ジャブ打ち</option>
-            <option value="ホワイトニングジャブ打ち">ホワイトニング ジャブ打ち</option>
-            <option value="インプラント">インプラント成約</option>
-            <option value="マウスピース矯正">マウスピース矯正成約</option>
-            <option value="ホワイトニング">ホワイトニング成約</option>
-          </optgroup>
-          <optgroup label="── アポ管理 ──">
-            <option value="アポ転換">土曜・平日夕方患者を平日午前/日中にアポ転換</option>
-          </optgroup>
-          <optgroup label="── 口コミ ──" id="kuchikomiGroup" style="display:none">
-            <option value="口コミ獲得">口コミ獲得</option>
-          </optgroup>
-          <optgroup label="── 処置 ──">
-            <option value="シーラント">シーラント</option>
-            <option value="レントゲン">レントゲン</option>
-            <option value="フッ素塗布">フッ素塗布</option>
-          </optgroup>
-          <optgroup label="── チームサポート ──">
-            <option value="ポジティブ声掛け">他のスタッフにポジティブな声掛けをした</option>
-          </optgroup>
-          <optgroup label="── その他 ──">
-            <option value="その他">その他（自由記述）</option>
-          </optgroup>
         </select>
       </div>
 
@@ -178,11 +149,9 @@
 
 <script>
   let loggedInStaff = null;
-
-  // 患者番号が必要なアクション
-  const PATIENT_ACTIONS = new Set(['物品販売','物品をすすめた','インプラントジャブ打ち','マウスピース矯正ジャブ打ち','ホワイトニングジャブ打ち','インプラント','マウスピース矯正','ホワイトニング','アポ転換','口コミ獲得','シーラント','レントゲン','フッ素塗布','その他']);
-  // 自由記述が出るアクション
-  const FREE_TEXT_ACTIONS = new Set(['ポジティブ声掛け','その他']);
+  let PATIENT_ACTIONS = new Set();
+  let FREE_TEXT_ACTIONS = new Set();
+  let ITEM_NAME_ACTIONS = new Set();
 
   async function initAuth() {
     try {
@@ -199,12 +168,38 @@
 
     document.getElementById('staffNameInput').value = loggedInStaff;
 
-    // 口コミ設定を反映
+    // 口コミ設定とアクション項目を取得してドロップダウン構築
     try {
-      const settingsRes = await fetch('/api/staff-settings');
+      const [settingsRes, itemsRes] = await Promise.all([fetch('/api/staff-settings'), fetch('/api/action-items')]);
       const settings = await settingsRes.json();
+      const allItems = await itemsRes.json();
       const s = settings.find(x => x.staffName === loggedInStaff);
-      if (s && s.showKuchikomi) document.getElementById('kuchikomiGroup').style.display = '';
+      const showKuchikomi = !!(s && s.showKuchikomi);
+
+      // 動的セットを構築
+      PATIENT_ACTIONS = new Set(allItems.filter(i => i.needsPatient).map(i => i.name));
+      FREE_TEXT_ACTIONS = new Set(allItems.filter(i => i.needsFreeText).map(i => i.name));
+      ITEM_NAME_ACTIONS = new Set(allItems.filter(i => i.showItemName).map(i => i.name));
+
+      // ドロップダウン構築
+      const sel = document.getElementById('actionSelect');
+      const groups = {};
+      allItems.forEach(item => {
+        if (item.isKuchikomi && !showKuchikomi) return;
+        if (!groups[item.group]) groups[item.group] = [];
+        groups[item.group].push(item);
+      });
+      Object.entries(groups).forEach(([grp, items]) => {
+        const og = document.createElement('optgroup');
+        og.label = '── ' + grp + ' ──';
+        items.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.name;
+          opt.textContent = item.name;
+          og.appendChild(opt);
+        });
+        sel.appendChild(og);
+      });
     } catch {}
   }
 
@@ -221,7 +216,7 @@
     const needsFreeText = FREE_TEXT_ACTIONS.has(val);
     document.getElementById('patientNoWrap').classList.toggle('hidden', !needsPatient);
     document.getElementById('freeTextWrap').classList.toggle('hidden', !needsFreeText);
-    document.getElementById('itemNameWrap').classList.toggle('hidden', val !== '物品販売');
+    document.getElementById('itemNameWrap').classList.toggle('hidden', !ITEM_NAME_ACTIONS.has(val));
     if (!needsPatient) { document.getElementById('patientNo').value = ''; document.getElementById('patientCheck').textContent = ''; }
     if (!needsFreeText) document.getElementById('freeText').value = '';
     // 患者番号の必須属性

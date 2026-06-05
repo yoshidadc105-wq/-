@@ -19,6 +19,7 @@ let mongoCol = null;
 let staffNamesCol = null;
 let staffSettingsCol = null;
 let staffAccountsCol = null;
+let actionItemsCol = null;
 if (MONGODB_URI) {
   const client = new MongoClient(MONGODB_URI);
   client.connect()
@@ -27,6 +28,7 @@ if (MONGODB_URI) {
       staffNamesCol = client.db('nobinobi').collection('staff_names');
       staffSettingsCol = client.db('nobinobi').collection('staff_settings');
       staffAccountsCol = client.db('nobinobi').collection('staff_accounts');
+      actionItemsCol = client.db('nobinobi').collection('action_items');
       console.log('MongoDB接続成功');
     })
     .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
@@ -98,6 +100,48 @@ function requireStaffAuth(req, res, next) {
 
 const NAMES_FILE = path.join(__dirname, 'data', 'staff_names.json');
 const SETTINGS_FILE = path.join(__dirname, 'data', 'staff_settings.json');
+const ITEMS_FILE = path.join(__dirname, 'data', 'action_items.json');
+
+const DEFAULT_ACTION_ITEMS = [
+  { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true },
+  { id: 'i02', name: '物品をすすめた（未購入）', group: '物品', category: 'item_recommend', needsPatient: true, builtin: true },
+  { id: 'i03', name: 'インプラントジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true },
+  { id: 'i04', name: 'マウスピース矯正ジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true },
+  { id: 'i05', name: 'ホワイトニングジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true },
+  { id: 'i06', name: 'インプラント成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true },
+  { id: 'i07', name: 'マウスピース矯正成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true },
+  { id: 'i08', name: 'ホワイトニング成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true },
+  { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true },
+  { id: 'i10', name: '口コミ獲得', group: '口コミ', category: 'review', needsPatient: true, isKuchikomi: true, builtin: true },
+  { id: 'i11', name: 'シーラント', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
+  { id: 'i12', name: 'レントゲン', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
+  { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
+  { id: 'i14', name: 'ポジティブ声掛け', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true },
+  { id: 'i15', name: 'その他', group: 'その他', category: 'treatment', needsPatient: true, needsFreeText: true, builtin: true },
+];
+
+async function loadActionItems() {
+  if (actionItemsCol) {
+    const items = await actionItemsCol.find({}).sort({ order: 1, _id: 1 }).toArray();
+    return items.length ? items : DEFAULT_ACTION_ITEMS;
+  }
+  try {
+    const items = JSON.parse(fs.readFileSync(ITEMS_FILE, 'utf8'));
+    return items.length ? items : DEFAULT_ACTION_ITEMS;
+  } catch { return DEFAULT_ACTION_ITEMS; }
+}
+async function saveActionItem(item) {
+  if (actionItemsCol) { await actionItemsCol.insertOne(item); return; }
+  const list = await loadActionItems();
+  list.push(item);
+  fs.mkdirSync(path.dirname(ITEMS_FILE), { recursive: true });
+  fs.writeFileSync(ITEMS_FILE, JSON.stringify(list, null, 2));
+}
+async function deleteActionItem(id) {
+  if (actionItemsCol) { await actionItemsCol.deleteOne({ id }); return; }
+  const list = await loadActionItems();
+  fs.writeFileSync(ITEMS_FILE, JSON.stringify(list.filter(i => i.id !== id), null, 2));
+}
 
 async function loadStaffSettings() {
   if (staffSettingsCol) return await staffSettingsCol.find({}).toArray();
@@ -115,6 +159,25 @@ async function saveStaffSetting(staffName, fields) {
   fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(list, null, 2));
 }
+
+// アクション項目API
+app.get('/api/action-items', async (req, res) => {
+  res.json(await loadActionItems());
+});
+app.post('/admin/action-items', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { name, group, category, needsPatient, needsFreeText, showItemName } = req.body;
+  if (!name || !group || !category) return res.status(400).json({ error: '必須項目が不足しています' });
+  const id = 'c' + Date.now();
+  const item = { id, name: name.trim(), group: group.trim(), category, needsPatient: !!needsPatient, needsFreeText: !!needsFreeText, showItemName: !!showItemName, builtin: false };
+  await saveActionItem(item);
+  res.json({ ok: true, item });
+});
+app.delete('/admin/action-items/:id', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  await deleteActionItem(req.params.id);
+  res.json({ ok: true });
+});
 
 // 目標設定API（管理者用）
 app.get('/api/goals', async (req, res) => {
@@ -843,6 +906,23 @@ td{padding:11px 14px;vertical-align:middle}
     <div id="kuchikomiMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
   </div>
 
+  <!-- アクション項目管理 -->
+  <div class="section-header">
+    <h2>アクション項目管理</h2><div class="section-line"></div>
+    <button onclick="openItemModal()" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">＋ 項目追加</button>
+  </div>
+  <div id="itemMsg" style="font-size:12px;margin-bottom:8px;min-height:16px;"></div>
+  <div class="table-card" style="margin-bottom:28px">
+    <div class="table-scroll">
+    <table id="itemTable">
+      <thead><tr>
+        <th>項目名</th><th>グループ</th><th>カテゴリ</th><th style="text-align:center">患者番号</th><th style="text-align:center">操作</th>
+      </tr></thead>
+      <tbody id="itemTableBody"></tbody>
+    </table>
+    </div>
+  </div>
+
   <!-- スタッフ管理 -->
   <div class="section-header">
     <h2>スタッフ管理</h2><div class="section-line"></div>
@@ -869,6 +949,53 @@ td{padding:11px 14px;vertical-align:middle}
   </div>
 
 </div><!-- /container -->
+
+<!-- アクション項目追加モーダル -->
+<div id="itemModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#fff;border-radius:16px;padding:28px 28px 24px;max-width:420px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:17px;font-weight:700;color:#0f766e">項目を追加</h2>
+      <button onclick="document.getElementById('itemModalOverlay').style.display='none'" style="background:#f1f5f9;border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;color:#64748b">×</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">項目名 <span style="color:#ef4444">*</span></label>
+      <input type="text" id="newItemName" placeholder="例：TCイベント" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" />
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">グループ <span style="color:#ef4444">*</span></label>
+      <input type="text" id="newItemGroup" placeholder="例：カウンセリング" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" list="groupSuggestions" />
+      <datalist id="groupSuggestions">
+        <option value="物品"><option value="カウンセリング"><option value="アポ管理"><option value="処置"><option value="チームサポート"><option value="その他">
+      </datalist>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px">カテゴリ</label>
+      <select id="newItemCategory" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#f8fafc">
+        <option value="item">物品販売</option>
+        <option value="item_recommend">物品すすめ</option>
+        <option value="counseling">成約</option>
+        <option value="counseling_approach">ジャブ打ち</option>
+        <option value="appointment">アポ転換</option>
+        <option value="review">口コミ</option>
+        <option value="treatment" selected>処置・その他</option>
+        <option value="team_support">チームサポート</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
+        <input type="checkbox" id="newItemNeedsPatient" checked style="width:16px;height:16px;accent-color:#0f766e" /> 患者番号が必要
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
+        <input type="checkbox" id="newItemNeedsFreeText" style="width:16px;height:16px;accent-color:#0f766e" /> 自由記述あり
+      </label>
+    </div>
+    <div id="itemModalMsg" style="font-size:12px;min-height:16px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('itemModalOverlay').style.display='none'" style="flex:1;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;font-family:inherit">キャンセル</button>
+      <button onclick="saveNewItem()" style="flex:2;padding:11px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">追加する</button>
+    </div>
+  </div>
+</div>
 
 <!-- スタッフ追加・編集モーダル -->
 <div id="staffModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="closeStaffModal(event)">
@@ -1171,6 +1298,73 @@ async function resetAllPasswords() {
   else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
 }
 loadStaffTable();
+
+// アクション項目管理
+const CATEGORY_LABELS = {
+  item:'物品販売', item_recommend:'物品すすめ', counseling:'成約', counseling_approach:'ジャブ打ち',
+  appointment:'アポ転換', review:'口コミ', treatment:'処置', team_support:'チームサポート'
+};
+async function loadItemTable() {
+  const res = await fetch('/api/action-items');
+  const items = await res.json();
+  const tbody = document.getElementById('itemTableBody');
+  tbody.innerHTML = '';
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td style="padding:10px 14px;font-weight:600;color:#334155">' + item.name + '</td>' +
+      '<td style="padding:10px 14px;color:#64748b">' + item.group + '</td>' +
+      '<td style="padding:10px 14px;color:#64748b">' + (CATEGORY_LABELS[item.category]||item.category) + '</td>' +
+      '<td style="padding:10px 14px;text-align:center">' + (item.needsPatient ? '✓' : '') + '</td>' +
+      '<td style="padding:10px 14px;text-align:center"></td>';
+    if (!item.builtin) {
+      const btn = document.createElement('button');
+      btn.textContent = '削除';
+      btn.style.cssText = 'background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+      btn.onclick = function() { deleteItem(item.id, item.name, btn); };
+      tr.cells[4].appendChild(btn);
+    } else {
+      tr.cells[4].innerHTML = '<span style="font-size:11px;color:#94a3b8">標準</span>';
+    }
+    tbody.appendChild(tr);
+  });
+}
+async function deleteItem(id, name, btn) {
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1'; btn.textContent = '本当に削除？'; btn.style.background = '#dc2626'; btn.style.color = '#fff';
+    setTimeout(() => { btn.dataset.confirm = ''; btn.textContent = '削除'; btn.style.background = '#fee2e2'; btn.style.color = '#dc2626'; }, 3000);
+    return;
+  }
+  const res = await adminFetch('/admin/action-items/' + encodeURIComponent(id), { method: 'DELETE' });
+  const msg = document.getElementById('itemMsg');
+  if (res.ok) { msg.style.color='#059669'; msg.textContent=name+'を削除しました'; loadItemTable(); setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='削除に失敗しました'; }
+}
+function openItemModal() {
+  document.getElementById('itemModalOverlay').style.display = 'flex';
+  document.getElementById('itemModalMsg').textContent = '';
+  document.getElementById('newItemName').value = '';
+  document.getElementById('newItemGroup').value = '';
+  document.getElementById('newItemCategory').value = 'treatment';
+  document.getElementById('newItemNeedsPatient').checked = true;
+  document.getElementById('newItemNeedsFreeText').checked = false;
+}
+async function saveNewItem() {
+  const name = document.getElementById('newItemName').value.trim();
+  const group = document.getElementById('newItemGroup').value.trim();
+  const category = document.getElementById('newItemCategory').value;
+  const needsPatient = document.getElementById('newItemNeedsPatient').checked;
+  const needsFreeText = document.getElementById('newItemNeedsFreeText').checked;
+  const msg = document.getElementById('itemModalMsg');
+  if (!name || !group) { msg.style.color='#dc2626'; msg.textContent='項目名とグループを入力してください'; return; }
+  const res = await adminFetch('/admin/action-items', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, group, category, needsPatient, needsFreeText }) });
+  if (res.ok) {
+    document.getElementById('itemModalOverlay').style.display = 'none';
+    const imsg = document.getElementById('itemMsg');
+    imsg.style.color='#059669'; imsg.textContent=name+'を追加しました';
+    loadItemTable(); setTimeout(()=>imsg.textContent='',3000);
+  } else { msg.style.color='#dc2626'; msg.textContent='追加に失敗しました'; }
+}
+loadItemTable();
 
 async function deleteAllRecords() {
   if (!confirm('⚠️ 入力されたデータをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
