@@ -530,7 +530,7 @@ const ACTION_CATEGORY = {
   'その他': 'treatment',
 };
 
-// 口コミ表示設定API
+// スタッフ設定API
 app.get('/api/staff-settings', async (req, res) => {
   const settings = await loadStaffSettings();
   res.json(settings);
@@ -540,6 +540,22 @@ app.post('/admin/staff-settings', async (req, res) => {
   const { staffName, showKuchikomi } = req.body;
   if (!staffName) return res.status(400).json({ error: 'staffName required' });
   await saveStaffSetting(staffName, { showKuchikomi: !!showKuchikomi });
+  res.json({ ok: true });
+});
+// 項目ON/OFF切り替えAPI
+app.post('/admin/staff-item-visible', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, itemName, visible } = req.body;
+  if (!staffName || !itemName) return res.status(400).json({ error: 'required' });
+  const settings = await loadStaffSettings();
+  const s = settings.find(x => x.staffName === staffName) || {};
+  let disabled = s.disabledItems || [];
+  if (visible) {
+    disabled = disabled.filter(i => i !== itemName);
+  } else {
+    if (!disabled.includes(itemName)) disabled.push(itemName);
+  }
+  await saveStaffSetting(staffName, { disabledItems: disabled });
   res.json({ ok: true });
 });
 
@@ -984,13 +1000,11 @@ td{padding:11px 14px;vertical-align:middle}
     <div id="goalMsg" style="font-size:12px;margin-top:10px;min-height:16px;"></div>
   </div>
 
-  <!-- 口コミ表示設定 -->
-  <div class="section-header"><h2>口コミ獲得 表示設定</h2><div class="section-line"></div></div>
-  <div class="mgmt-card" style="max-width:520px">
-    <p style="font-size:12px;color:#64748b;margin-bottom:14px">ONにしたスタッフの入力フォームにのみ「口コミ獲得」が表示されます</p>
-    <div id="kuchikomiSettings" style="display:flex;flex-direction:column;gap:8px;"></div>
-    <div id="kuchikomiMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
-  </div>
+  <!-- 項目表示設定 -->
+  <div class="section-header"><h2>項目表示設定（スタッフ別）</h2><div class="section-line"></div></div>
+  <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとに入力フォームに表示する項目をON/OFFできます</p>
+  <div id="itemVisibilitySettings"></div>
+  <div id="itemVisibilityMsg" style="font-size:12px;margin-bottom:20px;min-height:16px;"></div>
 
   <!-- グループ管理 -->
   <div class="section-header"><h2>グループ管理</h2><div class="section-line"></div></div>
@@ -1063,9 +1077,6 @@ td{padding:11px 14px;vertical-align:middle}
     <div style="display:flex;gap:16px;margin-bottom:16px">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
         <input type="checkbox" id="newItemNeedsPatient" checked style="width:16px;height:16px;accent-color:#0f766e" /> 患者番号が必要
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
-        <input type="checkbox" id="newItemNeedsFreeText" style="width:16px;height:16px;accent-color:#0f766e" /> 自由記述あり
       </label>
     </div>
     <div id="itemModalMsg" style="font-size:12px;min-height:16px;margin-bottom:12px;"></div>
@@ -1223,52 +1234,66 @@ async function saveGoal(staffName, btn) {
 }
 loadGoalSettings();
 
-// 口コミ表示設定
-async function loadKuchikomiSettings() {
-  const [namesRes, settingsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/staff-settings')]);
+// 項目表示設定（スタッフ別ON/OFF）
+function makeToggle(on) {
+  return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:' + (on?'#0f766e':'#94a3b8') + '">' +
+    (on?'ON':'OFF') +
+    '<span style="position:relative;display:inline-block;width:36px;height:20px">' +
+    '<span style="position:absolute;inset:0;background:' + (on?'#2aab96':'#cbd5e1') + ';border-radius:10px"></span>' +
+    '<span style="position:absolute;top:3px;left:' + (on?'19px':'3px') + ';width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span>' +
+    '</span></span>';
+}
+async function loadItemVisibilitySettings() {
+  const [namesRes, settingsRes, itemsRes] = await Promise.all([
+    fetch('/api/staff-names'), fetch('/api/staff-settings'), fetch('/api/action-items')
+  ]);
   const names = await namesRes.json();
   const settings = await settingsRes.json();
-  const settingsMap = {};
-  settings.forEach(s => { settingsMap[s.staffName] = s.showKuchikomi; });
-  const container = document.getElementById('kuchikomiSettings');
+  const items = await itemsRes.json();
+  const container = document.getElementById('itemVisibilitySettings');
   container.innerHTML = '';
-  names.forEach(n => {
-    const on = !!settingsMap[n];
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.staff = n;
-    btn.dataset.on = on ? '1' : '0';
-    btn.onclick = function() { toggleKuchikomi(this); };
-    applyToggleStyle(btn, on);
-    row.innerHTML = '<span style="font-size:14px;font-weight:600">' + n + '</span>';
-    row.appendChild(btn);
-    container.appendChild(row);
+  names.forEach(staffName => {
+    const s = settings.find(x => x.staffName === staffName) || {};
+    const disabled = s.disabledItems || [];
+    const card = document.createElement('div');
+    card.className = 'mgmt-card';
+    card.style.cssText = 'margin-bottom:14px;max-width:640px';
+    card.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:12px">' + staffName + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px" id="vis_' + staffName.replace(/\s/g,'_') + '"></div>';
+    container.appendChild(card);
+    const wrap = card.querySelector('[id^="vis_"]');
+    items.forEach(item => {
+      const on = !disabled.includes(item.name);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.dataset.staff = staffName;
+      chip.dataset.item = item.name;
+      chip.dataset.on = on ? '1' : '0';
+      chip.style.cssText = 'display:flex;align-items:center;gap:6px;border:1.5px solid ' + (on?'#2aab96':'#e2e8f0') + ';border-radius:20px;padding:5px 12px;background:' + (on?'#f0fdf4':'#f8fafc') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:' + (on?'#065f46':'#94a3b8') + ';transition:all .15s';
+      chip.innerHTML = item.name + ' ' + makeToggle(on);
+      chip.onclick = function() { toggleItemVisibility(this); };
+      wrap.appendChild(chip);
+    });
   });
 }
-function applyToggleStyle(btn, on) {
-  btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px;color:#64748b;padding:4px;-webkit-tap-highlight-color:transparent;';
-  btn.innerHTML =
-    '<span style="font-weight:600;min-width:24px">' + (on ? 'ON' : 'OFF') + '</span>' +
-    '<span style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0">' +
-    '<span style="position:absolute;inset:0;background:' + (on ? '#2aab96' : '#cbd5e1') + ';border-radius:13px;transition:background .2s"></span>' +
-    '<span style="position:absolute;top:4px;left:' + (on ? '22px' : '4px') + ';width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>' +
-    '</span>';
-}
-async function toggleKuchikomi(btn) {
-  const staffName = btn.dataset.staff;
-  const newOn = btn.dataset.on !== '1';
-  btn.dataset.on = newOn ? '1' : '0';
-  applyToggleStyle(btn, newOn);
-  const msg = document.getElementById('kuchikomiMsg');
+async function toggleItemVisibility(chip) {
+  const staffName = chip.dataset.staff;
+  const itemName = chip.dataset.item;
+  const newOn = chip.dataset.on !== '1';
+  chip.dataset.on = newOn ? '1' : '0';
+  chip.style.borderColor = newOn ? '#2aab96' : '#e2e8f0';
+  chip.style.background = newOn ? '#f0fdf4' : '#f8fafc';
+  chip.style.color = newOn ? '#065f46' : '#94a3b8';
+  chip.innerHTML = itemName + ' ' + makeToggle(newOn);
+  chip.onclick = function() { toggleItemVisibility(this); };
+  const msg = document.getElementById('itemVisibilityMsg');
   try {
-    const res = await adminFetch('/admin/staff-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, showKuchikomi: newOn }) });
-    if (res.ok) { msg.style.color='#059669'; msg.textContent=staffName+' を ' + (newOn?'ON':'OFF') + ' にしました'; setTimeout(()=>msg.textContent='', 2500); }
-    else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; btn.dataset.on = newOn?'0':'1'; applyToggleStyle(btn, !newOn); }
-  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー: '+e.message; btn.dataset.on = newOn?'0':'1'; applyToggleStyle(btn, !newOn); }
+    const res = await adminFetch('/admin/staff-item-visible', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, itemName, visible: newOn }) });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent=staffName+' の「'+itemName+'」を'+(newOn?'ON':'OFF')+'にしました'; setTimeout(()=>msg.textContent='',2500); }
+    else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; chip.dataset.on=newOn?'0':'1'; }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー'; chip.dataset.on=newOn?'0':'1'; }
 }
-loadKuchikomiSettings();
+loadItemVisibilitySettings();
 
 // ===== スタッフ管理テーブル =====
 async function loadStaffTable() {
@@ -1423,17 +1448,15 @@ function openItemModal(item) {
   document.getElementById('newItemName').value = item ? item.name : '';
   document.getElementById('newItemGroup').value = item ? item.group : '';
   document.getElementById('newItemNeedsPatient').checked = item ? !!item.needsPatient : true;
-  document.getElementById('newItemNeedsFreeText').checked = item ? !!item.needsFreeText : false;
   document.getElementById('itemModalOverlay').style.display = 'flex';
 }
 async function saveNewItem() {
   const name = document.getElementById('newItemName').value.trim();
   const group = document.getElementById('newItemGroup').value.trim();
   const needsPatient = document.getElementById('newItemNeedsPatient').checked;
-  const needsFreeText = document.getElementById('newItemNeedsFreeText').checked;
   const msg = document.getElementById('itemModalMsg');
   if (!name || !group) { msg.style.color='#dc2626'; msg.textContent='項目名とグループを入力してください'; return; }
-  const body = JSON.stringify({ name, group, needsPatient, needsFreeText });
+  const body = JSON.stringify({ name, group, needsPatient });
   const url = editingItemId ? '/admin/action-items/' + encodeURIComponent(editingItemId) : '/admin/action-items';
   const method = editingItemId ? 'PUT' : 'POST';
   const res = await adminFetch(url, { method, headers:{'Content-Type':'application/json'}, body });

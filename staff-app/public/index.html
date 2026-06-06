@@ -107,12 +107,6 @@
         <input type="text" name="itemName" placeholder="例：電動歯ブラシ、ホワイトニングジェルなど" />
       </div>
 
-      <!-- 自由記述（行動系・その他） -->
-      <div class="form-group hidden" id="freeTextWrap">
-        <label>内容を記入</label>
-        <textarea name="freeText" id="freeText" placeholder="自由に記入してください"></textarea>
-        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;" id="phraseButtons"></div>
-      </div>
     </div>
 
     <button type="submit" class="submit-btn" id="submitBtn">登録する</button>
@@ -150,7 +144,6 @@
 <script>
   let loggedInStaff = null;
   let PATIENT_ACTIONS = new Set();
-  let FREE_TEXT_ACTIONS = new Set();
   let ITEM_NAME_ACTIONS = new Set();
 
   async function initAuth() {
@@ -168,24 +161,25 @@
 
     document.getElementById('staffNameInput').value = loggedInStaff;
 
-    // 口コミ設定とアクション項目を取得してドロップダウン構築
+    // アクション項目を取得してドロップダウン構築
     try {
       const [settingsRes, itemsRes] = await Promise.all([fetch('/api/staff-settings'), fetch('/api/action-items')]);
       const settings = await settingsRes.json();
       const allItems = await itemsRes.json();
       const s = settings.find(x => x.staffName === loggedInStaff);
-      const showKuchikomi = !!(s && s.showKuchikomi);
+      const disabled = (s && s.disabledItems) || [];
+
+      // 表示する項目（OFFになっていないもの）
+      const visibleItems = allItems.filter(item => !disabled.includes(item.name));
 
       // 動的セットを構築
-      PATIENT_ACTIONS = new Set(allItems.filter(i => i.needsPatient).map(i => i.name));
-      FREE_TEXT_ACTIONS = new Set(allItems.filter(i => i.needsFreeText).map(i => i.name));
-      ITEM_NAME_ACTIONS = new Set(allItems.filter(i => i.showItemName).map(i => i.name));
+      PATIENT_ACTIONS = new Set(visibleItems.filter(i => i.needsPatient).map(i => i.name));
+      ITEM_NAME_ACTIONS = new Set(visibleItems.filter(i => i.showItemName).map(i => i.name));
 
       // ドロップダウン構築
       const sel = document.getElementById('actionSelect');
       const groups = {};
-      allItems.forEach(item => {
-        if (item.isKuchikomi && !showKuchikomi) return;
+      visibleItems.forEach(item => {
         if (!groups[item.group]) groups[item.group] = [];
         groups[item.group].push(item);
       });
@@ -223,16 +217,12 @@
   function onActionChange() {
     const val = document.getElementById('actionSelect').value;
     const needsPatient = PATIENT_ACTIONS.has(val);
-    const needsFreeText = FREE_TEXT_ACTIONS.has(val);
     document.getElementById('patientNoWrap').classList.toggle('hidden', !needsPatient);
-    document.getElementById('freeTextWrap').classList.toggle('hidden', !needsFreeText);
     document.getElementById('itemNameWrap').classList.toggle('hidden', !ITEM_NAME_ACTIONS.has(val));
     if (ITEM_NAME_ACTIONS.has(val)) {
       document.getElementById('itemNameLabel').textContent = val.includes('すすめ') ? 'すすめた商品名' : '販売した商品名';
     }
     if (!needsPatient) { document.getElementById('patientNo').value = ''; document.getElementById('patientCheck').textContent = ''; }
-    if (!needsFreeText) document.getElementById('freeText').value = '';
-    // 患者番号の必須属性
     document.getElementById('patientNo').required = needsPatient;
   }
 
@@ -257,12 +247,7 @@
     for (const [k, v] of fd.entries()) data[k] = v;
     data.staffName = loggedInStaff;
 
-    const val = data.action;
-    if (FREE_TEXT_ACTIONS.has(val) && !PATIENT_ACTIONS.has(val)) {
-      data.entryType = 'behavior';
-    } else {
-      data.entryType = 'patient';
-    }
+    data.entryType = 'patient';
 
     try {
       const res = await fetch('/submit', {
@@ -292,7 +277,6 @@
     document.getElementById('dateInput').value = today;
     document.getElementById('staffNameInput').value = loggedInStaff;
     document.getElementById('patientNoWrap').classList.add('hidden');
-    document.getElementById('freeTextWrap').classList.add('hidden');
     document.getElementById('itemNameWrap').classList.add('hidden');
     document.getElementById('patientCheck').textContent = '';
     f.style.display = '';
@@ -301,30 +285,6 @@
     document.getElementById('submitBtn').textContent = '登録する';
     window.scrollTo(0, 0);
   }
-
-  // 記入例（クリックで入力）
-  const PHRASES = [
-    '1ヶ月休まず出勤した',
-    '受付で患者さんを名前で呼んで笑顔でお迎えした',
-    '予防の重要性を患者さんにわかりやすく説明し定期検診につなげた',
-    '患者さんからの質問に自信を持って分かりやすく答えた',
-    '急な予約変更や問い合わせに冷静・丁寧に対応した',
-    '在庫が少ない材料にいち早く気づき補充・報告した',
-    '院内清掃をだれよりも丁寧に毎日欠かさず行った',
-    '勉強会や研修の内容を自分なりにまとめチームに共有した',
-    '遅刻なく毎日時間通りに出勤した',
-  ];
-  const phraseContainer = document.getElementById('phraseButtons');
-  const exLabel = document.createElement('div');
-  exLabel.style.cssText = 'font-size:12px;color:#9ca3af;margin-bottom:6px;width:100%;';
-  exLabel.textContent = '▼ 記入例';
-  phraseContainer.appendChild(exLabel);
-  PHRASES.forEach(p => {
-    const item = document.createElement('div');
-    item.textContent = '・' + p;
-    item.style.cssText = 'font-size:12px;color:#64748b;padding:2px 0;width:100%;';
-    phraseContainer.appendChild(item);
-  });
 
   function closePwModal() {
     document.getElementById('pwModal').style.display = 'none';
