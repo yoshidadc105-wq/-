@@ -175,7 +175,6 @@ const DEFAULT_ACTION_ITEMS = [
   { id: 'i12', name: 'レントゲン', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
   { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
   { id: 'i14', name: 'ポジティブ声掛け', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true },
-  { id: 'i15', name: 'その他', group: 'その他', category: 'treatment', needsPatient: true, needsFreeText: true, builtin: true },
 ];
 
 async function loadActionItems() {
