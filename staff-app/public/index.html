@@ -246,8 +246,8 @@
     const data = {};
     for (const [k, v] of fd.entries()) data[k] = v;
     data.staffName = loggedInStaff;
-
     data.entryType = 'patient';
+    const actionName = data.action;
 
     try {
       const res = await fetch('/submit', {
@@ -261,12 +261,17 @@
       }
       if (res.ok) {
         document.getElementById('mainForm').style.display = 'none';
-        document.getElementById('successText').textContent = '「' + val + '」を記録しました。';
+        document.getElementById('successText').textContent = '「' + actionName + '」を記録しました。';
         document.getElementById('successMsg').style.display = 'block';
         window.scrollTo(0, 0);
-      } else throw new Error();
-    } catch {
-      alert('登録に失敗しました。');
+      } else {
+        let msg = '登録に失敗しました（' + res.status + '）';
+        try { const e = await res.json(); if (e.error) msg += '：' + e.error; } catch {}
+        alert(msg);
+        btn.disabled = false; btn.textContent = '登録する';
+      }
+    } catch(err) {
+      alert('通信エラー：' + err.message);
       btn.disabled = false; btn.textContent = '登録する';
     }
   });

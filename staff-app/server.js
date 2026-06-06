@@ -560,7 +560,10 @@ app.post('/admin/staff-item-visible', async (req, res) => {
 
 app.post('/submit', async (req, res) => {
   const d = req.body;
-  if (!d || !d.staffName || !d.date) return res.status(400).json({ error: 'invalid data' });
+  // セッションからスタッフ名を取得（フロントが送るstaffNameより優先）
+  const sessionStaff = getStaffFromReq(req);
+  if (sessionStaff) d.staffName = sessionStaff;
+  if (!d || !d.staffName || !d.date) return res.status(400).json({ error: 'staffName/date missing' });
 
   if (d.entryType === 'behavior') {
     if (!d.freeText) return res.status(400).json({ error: 'invalid data' });
