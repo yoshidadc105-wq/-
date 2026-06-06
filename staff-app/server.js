@@ -577,15 +577,16 @@ app.post('/submit', async (req, res) => {
   }
 
   // 患者実績記録
-  if (!d.patientNo || !d.action) return res.status(400).json({ error: 'invalid data' });
+  if (!d.action) return res.status(400).json({ error: 'invalid data' });
+  const patientNo = (d.patientNo || '').trim();
   const records = await loadDB();
-  if (records.some(r =>
+  if (patientNo && records.some(r =>
     r.entryType !== 'behavior' &&
-    r.patientNo === d.patientNo.trim() &&
+    r.patientNo === patientNo &&
     r.action === d.action &&
     r.staffName === d.staffName.trim()
   )) {
-    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${d.patientNo} の「${d.action}」はあなたがすでに登録しています` });
+    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${patientNo} の「${d.action}」はあなたがすでに登録しています` });
   }
 
   await saveRecord({
@@ -594,7 +595,7 @@ app.post('/submit', async (req, res) => {
     entryType: 'patient',
     date: d.date,
     staffName: d.staffName.trim(),
-    patientNo: d.patientNo.trim(),
+    patientNo,
     action: d.action,
     actionCategory: ACTION_CATEGORY[d.action] || 'treatment',
     itemName: d.itemName ? d.itemName.trim() : '',
