@@ -586,10 +586,9 @@ app.post('/submit', async (req, res) => {
   if (patientNo && records.some(r =>
     r.entryType !== 'behavior' &&
     r.patientNo === patientNo &&
-    r.action === d.action &&
-    r.staffName === d.staffName.trim()
+    r.action === d.action
   )) {
-    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${patientNo} の「${d.action}」はあなたがすでに登録しています` });
+    return res.status(409).json({ error: 'duplicate', message: `患者番号 ${patientNo} の「${d.action}」はすでに誰かが登録しています` });
   }
 
   await saveRecord({
