@@ -167,28 +167,44 @@ export default function HomePage() {
             if (!p.category) return;
             if (!seen.has(p.category)) { seen.add(p.category); groups.push(p.category); }
           });
-          return groups.map(cat => (
-            <div key={cat}>
-              <div style={{
-                fontSize: 13, fontWeight: 700, color: '#475569',
-                padding: '6px 4px 4px',
-                borderBottom: '2px solid #e2e8f0',
-                marginBottom: 8,
-                letterSpacing: '0.05em',
-              }}>
-                ─ {cat}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {filtered.filter(p => p.category === cat).map(p => (
-                  <ProductCard key={p.id} product={p}
-                    onUse={() => openSheet(p, 'use')}
-                    onReceive={() => openSheet(p, 'receive')}
-                    onDetail={() => navigate(`/product/${p.id}`)}
-                  />
-                ))}
-              </div>
-            </div>
-          ));
+          const uncategorized = filtered.filter(p => !p.category);
+          return (
+            <>
+              {groups.map(cat => (
+                <div key={cat}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 700, color: '#475569',
+                    padding: '6px 4px 4px',
+                    borderBottom: '2px solid #e2e8f0',
+                    marginBottom: 8,
+                    letterSpacing: '0.05em',
+                  }}>
+                    ─ {cat}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {filtered.filter(p => p.category === cat).map(p => (
+                      <ProductCard key={p.id} product={p}
+                        onUse={() => openSheet(p, 'use')}
+                        onReceive={() => openSheet(p, 'receive')}
+                        onDetail={() => navigate(`/product/${p.id}`)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {uncategorized.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {uncategorized.map(p => (
+                    <ProductCard key={p.id} product={p}
+                      onUse={() => openSheet(p, 'use')}
+                      onReceive={() => openSheet(p, 'receive')}
+                      onDetail={() => navigate(`/product/${p.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          );
         })()
       )}
 
