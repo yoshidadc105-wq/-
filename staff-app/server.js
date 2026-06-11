@@ -1222,16 +1222,13 @@ async function loadGoalSettings() {
     const g = goals[n] || {};
     const row = document.createElement('div');
     row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
-    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>' +
-      '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
-      makeGoalInput(n, 'items', '物品販売', g.items||0) +
-      makeGoalInput(n, 'recommend', 'すすめた', g.recommend||0) +
-      makeGoalInput(n, 'approach', 'ジャブ打ち', g.approach||0) +
-      makeGoalInput(n, 'counseling', '成約', g.counseling||0) +
-      makeGoalInput(n, 'reviews', '口コミ', g.reviews||0) +
-      makeGoalInput(n, 'appointment', 'アポ転換', g.appointment||0) +
-      makeGoalInput(n, 'treatment', '処置', g.treatment||0) +
-      '</div>';
+    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:10px">' + n + '</div>' +
+      makeGoalGroup('物品', [makeGoalInput(n,'items','物品販売',g.items||0), makeGoalInput(n,'recommend','すすめた',g.recommend||0)]) +
+      makeGoalGroup('カウンセリング', [makeGoalInput(n,'approach','ジャブ打ち',g.approach||0), makeGoalInput(n,'counseling','成約',g.counseling||0)]) +
+      makeGoalGroup('アポ管理', [makeGoalInput(n,'appointment','アポ転換',g.appointment||0)]) +
+      makeGoalGroup('口コミ', [makeGoalInput(n,'reviews','口コミ獲得',g.reviews||0)]) +
+      makeGoalGroup('処置', [makeGoalInput(n,'treatment','処置',g.treatment||0)]) +
+      makeGoalGroup('チームサポート', [makeGoalInput(n,'team_support','声掛け',g.team_support||0)]);
     const saveBtn = document.createElement('button');
     saveBtn.textContent = '保存';
     saveBtn.style.cssText = 'margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
@@ -1242,7 +1239,11 @@ async function loadGoalSettings() {
 }
 function makeGoalInput(staff, key, label, val) {
   return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#64748b;font-weight:600">' + label +
-    '<input type="number" min="0" value="' + val + '" data-key="' + key + '" style="width:64px;border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:14px;font-family:inherit;text-align:center" /></label>';
+    '<input type="number" min="0" value="' + val + '" data-key="' + key + '" style="width:60px;border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:14px;font-family:inherit;text-align:center" /></label>';
+}
+function makeGoalGroup(groupLabel, inputs) {
+  return '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;padding-left:2px">' + groupLabel + '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px;background:#f1f5f9;border-radius:8px">' + inputs.join('') + '</div></div>';
 }
 async function saveGoal(staffName, btn) {
   const row = btn.closest('div');
@@ -1804,7 +1805,7 @@ app.get('/my-stats', async (req, res) => {
     if (r.staffName !== name) continue;
     const month = r.date ? r.date.slice(0, 7) : null;
     if (!month) continue;
-    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0 };
+    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0, team_support: 0 };
     const m = byMonth[month];
     m.count++;
     if (r.entryType !== 'behavior') {
@@ -1816,6 +1817,7 @@ app.get('/my-stats', async (req, res) => {
       if (cat === 'review') m.reviews++;
       if (cat === 'treatment') m.treatment++;
       if (cat === 'appointment') m.appointment++;
+      if (cat === 'team_support') m.team_support++;
     }
   }
   const months = Object.keys(byMonth).sort().slice(-6); // 直近6ヶ月
@@ -1882,6 +1884,7 @@ app.get('/my-stats', async (req, res) => {
     { label: '口コミ', cur: thisM.reviews||0, goal: goals.reviews||0 },
     { label: 'アポ転換', cur: thisM.appointment||0, goal: goals.appointment||0 },
     { label: '処置', cur: thisM.treatment||0, goal: goals.treatment||0 },
+    { label: '声掛け', cur: thisM.team_support||0, goal: goals.team_support||0 },
   ].filter(g => g.goal > 0);
   const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
   const totalGoals = goalItems.length;
@@ -1929,6 +1932,7 @@ app.get('/my-stats', async (req, res) => {
     { label: '口コミ', cur: thisM.reviews||0, prev: lastM.reviews||0, goal: goals.reviews||0 },
     { label: 'アポ転換', cur: thisM.appointment||0, prev: lastM.appointment||0, goal: goals.appointment||0 },
     { label: '処置', cur: thisM.treatment||0, prev: lastM.treatment||0, goal: goals.treatment||0 },
+    { label: '声掛け', cur: thisM.team_support||0, prev: lastM.team_support||0, goal: goals.team_support||0 },
     { label: '合計', cur: thisM.count||0, prev: lastM.count||0, goal: 0 },
   ];
   const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
