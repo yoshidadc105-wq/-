@@ -603,7 +603,7 @@ app.post('/submit', async (req, res) => {
     staffName: d.staffName.trim(),
     patientNo,
     action: d.action,
-    actionCategory: ACTION_CATEGORY[d.action] || (await loadActionItems()).find(i => i.name === d.action)?.category || 'treatment',
+    actionCategory: ACTION_CATEGORY[d.action] || 'treatment',
     itemName: d.itemName ? d.itemName.trim() : '',
     otherText: d.otherText ? d.otherText.trim() : '',
   });
@@ -1211,9 +1211,9 @@ async function debugActions() {
   const res = await adminFetch('/admin/debug-actions');
   if (res.ok) {
     const d = await res.json();
-    let txt = '合計 ' + d.total + ' 件\n\n';
-    Object.entries(d.counts).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => { txt += v + '件　' + k + '\n'; });
-    el.textContent = txt;
+    let lines = ['合計 ' + d.total + ' 件', ''];
+    Object.entries(d.counts).sort((a,b) => b[1]-a[1]).forEach(function(e){ lines.push(e[1] + '件　' + e[0]); });
+    el.textContent = lines.join('\\n');
   } else { el.textContent = '失敗'; }
 }
 
