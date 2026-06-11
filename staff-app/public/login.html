@@ -4,31 +4,99 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ログイン | 自己申告デラックス</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Noto Sans JP', sans-serif; background: linear-gradient(135deg, #0f766e 0%, #2aab96 60%, #34d399 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .card { background: #fff; border-radius: 20px; padding: 36px 32px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
-    .logo { text-align: center; margin-bottom: 28px; }
-    .logo-icon { width: 64px; height: 64px; background: linear-gradient(135deg, #0f766e, #34d399); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 12px; box-shadow: 0 8px 24px rgba(42,171,150,.4); }
-    .logo h1 { font-size: 18px; font-weight: 700; color: #0f766e; }
-    .logo p { font-size: 12px; color: #94a3b8; margin-top: 3px; }
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; }
-    input[type="email"], input[type="password"] {
-      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 11px 14px;
-      font-size: 15px; font-family: inherit; outline: none; transition: border .2s, box-shadow .2s; background: #f8fafc;
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: linear-gradient(160deg, #071020 0%, #0d1f35 50%, #071020 100%);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+      position: relative; overflow: hidden;
     }
-    input:focus { border-color: #2aab96; background: #fff; box-shadow: 0 0 0 3px rgba(42,171,150,.12); }
-    .btn { display: block; width: 100%; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity .2s, transform .1s; box-shadow: 0 4px 14px rgba(42,171,150,.4); margin-top: 8px; letter-spacing: .03em; }
+    /* 背景の光 */
+    body::before {
+      content: ''; position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(42,171,150,.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 24px;
+      padding: 40px 32px 36px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.5);
+      backdrop-filter: blur(12px);
+      position: relative;
+    }
+
+    .logo { text-align: center; margin-bottom: 32px; }
+    .logo-icon {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #0f766e, #2aab96);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; margin: 0 auto 14px;
+      box-shadow: 0 0 30px rgba(42,171,150,.5);
+      animation: icon-glow 3s ease-in-out infinite;
+    }
+    @keyframes icon-glow {
+      0%,100% { box-shadow: 0 0 20px rgba(42,171,150,.4); }
+      50% { box-shadow: 0 0 40px rgba(52,211,153,.7); }
+    }
+    .logo h1 { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: .03em; }
+    .logo p { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 4px; }
+
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.5); margin-bottom: 6px; letter-spacing: .04em; }
+    input[type="email"], input[type="password"] {
+      width: 100%;
+      border: 1.5px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-size: 15px; font-family: inherit; outline: none;
+      transition: border .2s, box-shadow .2s, background .2s;
+      background: rgba(255,255,255,.06);
+      color: #e2e8f0;
+    }
+    input::placeholder { color: rgba(255,255,255,.25); }
+    input:focus {
+      border-color: #2aab96;
+      background: rgba(42,171,150,.08);
+      box-shadow: 0 0 0 3px rgba(42,171,150,.2);
+    }
+
+    .btn {
+      display: block; width: 100%;
+      background: linear-gradient(135deg, #0f766e, #2aab96);
+      color: #fff; border: none; border-radius: 14px;
+      padding: 15px; font-size: 16px; font-weight: 700;
+      font-family: inherit; cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      box-shadow: 0 4px 20px rgba(42,171,150,.5);
+      margin-top: 8px; letter-spacing: .05em;
+    }
     .btn:hover { opacity: .9; }
     .btn:active { transform: scale(.98); }
-    .btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
-    .error-msg { background: #fee2e2; color: #dc2626; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
-    .hint { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 20px; }
+    .btn:disabled { background: rgba(255,255,255,.1); color: rgba(255,255,255,.3); box-shadow: none; cursor: not-allowed; }
+
+    .error-msg {
+      background: rgba(239,68,68,.12);
+      border: 1px solid rgba(239,68,68,.3);
+      color: #f87171;
+      border-radius: 10px; padding: 10px 14px;
+      font-size: 13px; margin-bottom: 16px; display: none;
+    }
+    .hint { text-align: center; font-size: 12px; color: rgba(255,255,255,.25); margin-top: 20px; line-height: 1.6; }
+
+    /* 星 */
+    .star { position: absolute; border-radius: 50%; background: white; pointer-events: none; }
   </style>
 </head>
 <body>
+
 <div class="card">
   <div class="logo">
     <div class="logo-icon">🦷</div>
@@ -40,42 +108,51 @@
 
   <div class="form-group">
     <label>メールアドレス</label>
-    <input type="email" id="emailInput" placeholder="例：yamada@example.com" autocomplete="email" />
+    <input type="email" id="emailInput" placeholder="yamada@example.com" autocomplete="email" />
   </div>
   <div class="form-group">
     <label>パスワード</label>
     <input type="password" id="password" placeholder="パスワードを入力" autocomplete="current-password" />
   </div>
   <button class="btn" id="loginBtn" onclick="doLogin()">ログイン</button>
-  <p class="hint">パスワードがわからない場合は管理者にお問い合わせください</p>
+  <p class="hint">パスワードがわからない場合は<br>管理者にお問い合わせください</p>
 </div>
 
 <script>
-  document.getElementById('emailInput').addEventListener('keydown', e => {
+  // 星を散らす
+  for (var i = 0; i < 20; i++) {
+    var s = document.createElement('div');
+    s.className = 'star';
+    var size = Math.random() * 2 + 0.5;
+    s.style.cssText = 'width:' + size + 'px;height:' + size + 'px;top:' + (Math.random()*100) + '%;left:' + (Math.random()*100) + '%;opacity:' + (Math.random()*0.5+0.1);
+    document.body.appendChild(s);
+  }
+
+  document.getElementById('emailInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') document.getElementById('password').focus();
   });
-  document.getElementById('password').addEventListener('keydown', e => {
+  document.getElementById('password').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doLogin();
   });
 
   async function doLogin() {
-    const email = document.getElementById('emailInput').value.trim();
-    const password = document.getElementById('password').value;
-    const errEl = document.getElementById('errorMsg');
-    const btn = document.getElementById('loginBtn');
+    var email = document.getElementById('emailInput').value.trim();
+    var password = document.getElementById('password').value;
+    var errEl = document.getElementById('errorMsg');
+    var btn = document.getElementById('loginBtn');
     errEl.style.display = 'none';
     if (!email) { errEl.textContent = 'メールアドレスを入力してください'; errEl.style.display = 'block'; return; }
     if (!password) { errEl.textContent = 'パスワードを入力してください'; errEl.style.display = 'block'; return; }
     btn.disabled = true; btn.textContent = 'ログイン中...';
     try {
-      const res = await fetch('/staff-login', {
+      var res = await fetch('/staff-login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       if (res.ok) {
         location.href = '/';
       } else {
-        const data = await res.json();
+        var data = await res.json();
         errEl.textContent = data.error || 'ログインに失敗しました';
         errEl.style.display = 'block';
         btn.disabled = false; btn.textContent = 'ログイン';

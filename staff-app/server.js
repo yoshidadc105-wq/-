@@ -178,13 +178,18 @@ const DEFAULT_ACTION_ITEMS = [
 ];
 
 async function loadActionItems() {
+  // ビルトイン項目は常にデフォルト定義をマージして最新プロパティを保証する
+  function mergeWithDefaults(items) {
+    const defMap = Object.fromEntries(DEFAULT_ACTION_ITEMS.map(d => [d.id, d]));
+    return items.map(item => item.builtin && defMap[item.id] ? { ...defMap[item.id], ...item, showItemName: defMap[item.id].showItemName, needsPatient: defMap[item.id].needsPatient, category: defMap[item.id].category } : item);
+  }
   if (actionItemsCol) {
     const items = await actionItemsCol.find({}).sort({ order: 1, _id: 1 }).toArray();
-    return items.length ? items : DEFAULT_ACTION_ITEMS;
+    return items.length ? mergeWithDefaults(items) : DEFAULT_ACTION_ITEMS;
   }
   try {
     const items = JSON.parse(fs.readFileSync(ITEMS_FILE, 'utf8'));
-    return items.length ? items : DEFAULT_ACTION_ITEMS;
+    return items.length ? mergeWithDefaults(items) : DEFAULT_ACTION_ITEMS;
   } catch { return DEFAULT_ACTION_ITEMS; }
 }
 async function saveActionItem(item) {
