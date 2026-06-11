@@ -632,7 +632,7 @@ app.get('/dashboard', async (req, res) => {
     if (r.entryType === 'behavior') {
       if (r.freeText) s.freePhrases.push(r.freeText);
     } else {
-      const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+      const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
       const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
       if (cat === 'item')              s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
       if (cat === 'item_recommend')    s.recommendMap = s.recommendMap || {}; if (cat === 'item_recommend') s.recommendMap[label] = (s.recommendMap[label] || 0) + 1;
@@ -658,7 +658,7 @@ app.get('/dashboard', async (req, res) => {
     const sm = byStaffMonth[r.staffName][month];
     sm.total++;
     if (r.entryType !== 'behavior') {
-      const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+      const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
       if (cat === 'item') sm.items++;
       if (cat === 'counseling') sm.counseling++;
       if (cat === 'review') sm.reviews++;
@@ -1569,7 +1569,7 @@ app.get('/certificate', async (req, res) => {
   const patients = new Set();
   for (const r of staffRecords) {
     if (r.entryType === 'behavior') { if (r.freeText) behaviors.push(r.freeText); continue; }
-    const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+    const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
     if (cat === 'item') { itemsTotal++; if (r.itemName) itemNames.add(r.itemName); }
     if (cat === 'counseling') { counselingTotal++; counselingTypes.add(r.action); }
     if (cat === 'review') reviewsTotal++;
@@ -1703,7 +1703,7 @@ app.get('/evaluation', async (req, res) => {
       if (r.freeText) freePhrases2.push({ date: r.date, text: r.freeText });
       continue;
     }
-    const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+    const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
     const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
     if (cat === 'item')       itemsMap2[label] = (itemsMap2[label] || 0) + 1;
     if (cat === 'counseling') counselingMap2[r.action] = (counselingMap2[r.action] || 0) + 1;
@@ -1814,7 +1814,7 @@ app.get('/my-stats', async (req, res) => {
     const m = byMonth[month];
     m.count++;
     if (r.entryType !== 'behavior') {
-      const cat = r.actionCategory || ACTION_CATEGORY[r.action] || 'treatment';
+      const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
       if (cat === 'item') m.items++;
       if (cat === 'item_recommend') m.recommend++;
       if (cat === 'counseling') m.counseling++;
