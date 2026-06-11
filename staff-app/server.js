@@ -1205,7 +1205,7 @@ async function fixCategories() {
   if (res.ok) {
     const d = await res.json();
     msg.style.color = '#065f46';
-    msg.textContent = `完了：${d.fixed}件を修正しました（合計${d.total}件）`;
+    msg.textContent = '完了：' + d.fixed + '件を修正しました（合計' + d.total + '件）';
   } else {
     msg.style.color = '#dc2626'; msg.textContent = '失敗しました';
   }
