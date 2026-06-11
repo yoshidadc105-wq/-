@@ -603,7 +603,7 @@ app.post('/submit', async (req, res) => {
     staffName: d.staffName.trim(),
     patientNo,
     action: d.action,
-    actionCategory: ACTION_CATEGORY[d.action] || 'treatment',
+    actionCategory: ACTION_CATEGORY[d.action] || (await loadActionItems()).find(i => i.name === d.action)?.category || 'treatment',
     itemName: d.itemName ? d.itemName.trim() : '',
     otherText: d.otherText ? d.otherText.trim() : '',
   });
@@ -1817,6 +1817,8 @@ app.get('/my-stats', async (req, res) => {
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
   const goals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
+  const actionItems = await loadActionItems();
+  const itemCatMap = Object.fromEntries(actionItems.map(i => [i.name, i.category]));
 
   // 月別集計
   const byMonth = {};
@@ -1828,7 +1830,7 @@ app.get('/my-stats', async (req, res) => {
     const m = byMonth[month];
     m.count++;
     if (r.entryType !== 'behavior') {
-      const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
+      const cat = ACTION_CATEGORY[r.action] || itemCatMap[r.action] || r.actionCategory || 'treatment';
       if (cat === 'item') m.items++;
       if (cat === 'item_recommend') m.recommend++;
       if (cat === 'counseling') m.counseling++;
@@ -2217,10 +2219,12 @@ renderCal();
 app.post('/admin/fix-categories', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const records = await loadDB();
+  const actionItems = await loadActionItems();
+  const itemCatMap = Object.fromEntries(actionItems.map(i => [i.name, i.category]));
   let fixed = 0;
   const updated = records.map(r => {
     if (r.entryType === 'behavior' || !r.action) return r;
-    const correct = ACTION_CATEGORY[r.action] || 'treatment';
+    const correct = ACTION_CATEGORY[r.action] || itemCatMap[r.action] || 'treatment';
     if (r.actionCategory !== correct) {
       fixed++;
       return { ...r, actionCategory: correct };
@@ -2241,10 +2245,13 @@ app.post('/admin/fix-categories', async (req, res) => {
 app.get('/admin/debug-actions', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const records = await loadDB();
+  const actionItems = await loadActionItems();
+  const itemCatMap = Object.fromEntries(actionItems.map(i => [i.name, i.category]));
   const counts = {};
   for (const r of records) {
     if (r.entryType === 'behavior') { counts['[behavior]'] = (counts['[behavior]'] || 0) + 1; continue; }
-    const key = (r.action || '[no-action]') + ' → ' + (ACTION_CATEGORY[r.action] || r.actionCategory || '?');
+    const cat = ACTION_CATEGORY[r.action] || itemCatMap[r.action] || r.actionCategory || '?';
+    const key = (r.action || '[no-action]') + ' → ' + cat;
     counts[key] = (counts[key] || 0) + 1;
   }
   res.json({ total: records.length, counts });
