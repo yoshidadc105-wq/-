@@ -511,22 +511,20 @@ app.get('/api/check-patient/:patientNo', async (req, res) => {
 });
 
 const ACTION_CATEGORY = {
-  '物品販売': 'item',
-  '物品をすすめた': 'item_recommend',
+  '物品を販売した（購入）': 'item',
+  '物品をすすめた（未購入）': 'item_recommend',
   '口コミ獲得': 'review',
-  'ジャブ打ち': 'counseling_approach',
   'インプラントジャブ打ち': 'counseling_approach',
   'マウスピース矯正ジャブ打ち': 'counseling_approach',
   'ホワイトニングジャブ打ち': 'counseling_approach',
-  'インプラント': 'counseling',
-  'マウスピース矯正': 'counseling',
-  'ホワイトニング': 'counseling',
+  'インプラント成約': 'counseling',
+  'マウスピース矯正成約': 'counseling',
+  'ホワイトニング成約': 'counseling',
   'アポ転換': 'appointment',
   'シーラント': 'treatment',
   'レントゲン': 'treatment',
   'フッ素塗布': 'treatment',
   'ポジティブ声掛け': 'team_support',
-  'その他': 'treatment',
 };
 
 // スタッフ設定API
@@ -1209,9 +1207,12 @@ async function loadGoalSettings() {
     row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:8px">' + n + '</div>' +
       '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
       makeGoalInput(n, 'items', '物品販売', g.items||0) +
-      makeGoalInput(n, 'counseling', 'カウンセリング成約', g.counseling||0) +
+      makeGoalInput(n, 'recommend', 'すすめた', g.recommend||0) +
       makeGoalInput(n, 'approach', 'ジャブ打ち', g.approach||0) +
+      makeGoalInput(n, 'counseling', '成約', g.counseling||0) +
       makeGoalInput(n, 'reviews', '口コミ', g.reviews||0) +
+      makeGoalInput(n, 'appointment', 'アポ転換', g.appointment||0) +
+      makeGoalInput(n, 'treatment', '処置', g.treatment||0) +
       '</div>';
     const saveBtn = document.createElement('button');
     saveBtn.textContent = '保存';
@@ -1785,7 +1786,7 @@ app.get('/my-stats', async (req, res) => {
     if (r.staffName !== name) continue;
     const month = r.date ? r.date.slice(0, 7) : null;
     if (!month) continue;
-    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0 };
+    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0 };
     const m = byMonth[month];
     m.count++;
     if (r.entryType !== 'behavior') {
@@ -1796,6 +1797,7 @@ app.get('/my-stats', async (req, res) => {
       if (cat === 'counseling_approach') m.approach++;
       if (cat === 'review') m.reviews++;
       if (cat === 'treatment') m.treatment++;
+      if (cat === 'appointment') m.appointment++;
     }
   }
   const months = Object.keys(byMonth).sort().slice(-6); // 直近6ヶ月
@@ -1855,10 +1857,13 @@ app.get('/my-stats', async (req, res) => {
 
   // 目標達成カウント
   const goalItems = [
-    { label: '物品販売', key: 'items', cur: thisM.items||0, goal: goals.items||0 },
-    { label: 'ジャブ打ち', key: 'approach', cur: thisM.approach||0, goal: goals.approach||0 },
-    { label: '成約', key: 'counseling', cur: thisM.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', key: 'reviews', cur: thisM.reviews||0, goal: goals.reviews||0 },
+    { label: '物品販売', cur: thisM.items||0, goal: goals.items||0 },
+    { label: 'すすめた', cur: thisM.recommend||0, goal: goals.recommend||0 },
+    { label: 'ジャブ打ち', cur: thisM.approach||0, goal: goals.approach||0 },
+    { label: '成約', cur: thisM.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', cur: thisM.reviews||0, goal: goals.reviews||0 },
+    { label: 'アポ転換', cur: thisM.appointment||0, goal: goals.appointment||0 },
+    { label: '処置', cur: thisM.treatment||0, goal: goals.treatment||0 },
   ].filter(g => g.goal > 0);
   const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
   const totalGoals = goalItems.length;
@@ -1897,11 +1902,12 @@ app.get('/my-stats', async (req, res) => {
 
   const allGoalItems = [
     { label: '物品販売', cur: thisM.items||0, prev: lastM.items||0, goal: goals.items||0 },
-    { label: 'すすめた', cur: thisM.recommend||0, prev: lastM.recommend||0, goal: 0 },
+    { label: 'すすめた', cur: thisM.recommend||0, prev: lastM.recommend||0, goal: goals.recommend||0 },
     { label: 'ジャブ打ち', cur: thisM.approach||0, prev: lastM.approach||0, goal: goals.approach||0 },
     { label: '成約', cur: thisM.counseling||0, prev: lastM.counseling||0, goal: goals.counseling||0 },
     { label: '口コミ', cur: thisM.reviews||0, prev: lastM.reviews||0, goal: goals.reviews||0 },
-    { label: '処置', cur: thisM.treatment||0, prev: lastM.treatment||0, goal: 0 },
+    { label: 'アポ転換', cur: thisM.appointment||0, prev: lastM.appointment||0, goal: goals.appointment||0 },
+    { label: '処置', cur: thisM.treatment||0, prev: lastM.treatment||0, goal: goals.treatment||0 },
     { label: '合計', cur: thisM.count||0, prev: lastM.count||0, goal: 0 },
   ];
   const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
