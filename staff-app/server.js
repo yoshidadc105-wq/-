@@ -1005,8 +1005,10 @@ td{padding:11px 14px;vertical-align:middle}
     <div style="margin-bottom:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
       <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
+      <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
       <span id="fixCatMsg" style="font-size:12px"></span>
     </div>
+    <div id="debugActionsResult" style="display:none;font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all"></div>
     <div id="goalSettings" style="display:flex;flex-direction:column;gap:10px;"></div>
     <div id="goalMsg" style="font-size:12px;margin-top:10px;min-height:16px;"></div>
   </div>
@@ -1201,6 +1203,18 @@ function closeModal() {
 }
 function closeModalOnBg(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+async function debugActions() {
+  const el = document.getElementById('debugActionsResult');
+  el.style.display = 'block'; el.textContent = '取得中...';
+  const res = await adminFetch('/admin/debug-actions');
+  if (res.ok) {
+    const d = await res.json();
+    let txt = '合計 ' + d.total + ' 件\n\n';
+    Object.entries(d.counts).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => { txt += v + '件　' + k + '\n'; });
+    el.textContent = txt;
+  } else { el.textContent = '失敗'; }
 }
 
 async function fixCategories() {
@@ -2221,6 +2235,19 @@ app.post('/admin/fix-categories', async (req, res) => {
     }
   }
   res.json({ ok: true, fixed, total: records.length });
+});
+
+// デバッグ：アクション別件数確認
+app.get('/admin/debug-actions', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const records = await loadDB();
+  const counts = {};
+  for (const r of records) {
+    if (r.entryType === 'behavior') { counts['[behavior]'] = (counts['[behavior]'] || 0) + 1; continue; }
+    const key = (r.action || '[no-action]') + ' → ' + (ACTION_CATEGORY[r.action] || r.actionCategory || '?');
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  res.json({ total: records.length, counts });
 });
 
 app.get('/health', (_req, res) => res.send('OK'));
