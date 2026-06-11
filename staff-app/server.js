@@ -2150,8 +2150,8 @@ app.post('/admin/fix-categories', async (req, res) => {
     return r;
   });
   if (fixed > 0) {
-    if (recordsCol) {
-      await Promise.all(updated.map(r => recordsCol.replaceOne({ id: r.id }, r, { upsert: true })));
+    if (mongoCol) {
+      await Promise.all(updated.map(r => mongoCol.replaceOne({ id: r.id }, r, { upsert: true })));
     } else {
       fs.writeFileSync(DB_FILE, JSON.stringify(updated, null, 2));
     }
