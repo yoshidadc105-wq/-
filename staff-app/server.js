@@ -1886,6 +1886,9 @@ app.get('/my-stats', async (req, res) => {
   const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
   const totalGoals = goalItems.length;
   const allAchieved = totalGoals > 0 && achievedCount === totalGoals;
+  const avgPct = totalGoals > 0
+    ? Math.min(Math.round(goalItems.reduce((s,g) => s + Math.min(g.cur/g.goal*100, 100), 0) / totalGoals), 100)
+    : 0;
 
   function ringCard(label, cur, prev, goal) {
     const pct = goal > 0 ? Math.min(Math.round(cur/goal*100), 100) : null;
@@ -1938,48 +1941,36 @@ app.get('/my-stats', async (req, res) => {
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans JP',sans-serif;background:#0a1628;color:#e2e8f0;font-size:14px;min-height:100vh}
-
-/* ヘッダー */
-.hero{background:linear-gradient(160deg,#0a1628 0%,#0f2d3d 50%,#0a1628 100%);padding:24px 20px 0;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(42,171,150,0.15) 0%,transparent 70%);pointer-events:none}
-.hero-top{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.hero-name{font-size:13px;color:rgba(255,255,255,0.6);font-weight:500}
-.hero-name strong{color:#fff;font-size:16px;display:block;margin-top:2px}
-.logout-btn{background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;backdrop-filter:blur(4px)}
-
-/* 達成バナー */
-.achieve-banner{max-width:640px;margin:0 auto 20px;text-align:center}
-.achieve-all{background:linear-gradient(135deg,#065f46,#047857);border:1px solid #34d399;border-radius:16px;padding:18px 20px;animation:glow-pulse 2s ease-in-out infinite}
-.achieve-all .achieve-title{font-size:28px;font-weight:900;color:#34d399;letter-spacing:2px;text-shadow:0 0 20px rgba(52,211,153,0.6)}
-.achieve-all .achieve-sub{font-size:13px;color:rgba(255,255,255,.7);margin-top:4px}
-.achieve-partial{font-size:13px;color:rgba(255,255,255,.5);padding:4px 0}
-.achieve-partial strong{color:#f59e0b}
-@keyframes glow-pulse{0%,100%{box-shadow:0 0 20px rgba(52,211,153,.3)}50%{box-shadow:0 0 40px rgba(52,211,153,.6)}}
-
-/* リングカード */
-.rings-section{max-width:640px;margin:0 auto;padding-bottom:8px}
-.rings-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
-.rings-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font-size:14px;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;max-width:640px;margin:0 auto}
+.hero-name{font-size:12px;color:rgba(255,255,255,0.5)}
+.hero-name strong{color:#fff;font-size:15px;display:block;margin-top:1px}
+.logout-btn{background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.mountain-wrap{position:relative;max-width:640px;margin:0 auto}
+.mtn-overlay{position:absolute;top:10px;left:0;right:0;text-align:center;pointer-events:none;z-index:2}
+.mtn-pct{font-size:38px;font-weight:900;color:#fff;line-height:1;text-shadow:0 2px 20px rgba(0,0,0,.7)}
+.mtn-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:3px;font-weight:600;letter-spacing:.05em}
+.mtn-status{margin-top:5px;font-size:13px;font-weight:700}
+.mtn-status.all{color:#34d399;text-shadow:0 0 12px rgba(52,211,153,.8)}
+.mtn-status.part{color:#f59e0b}
+.mtn-status.none{color:rgba(255,255,255,.35)}
+.mountain-svg{display:block;width:100%;height:auto}
+.rings-section{max-width:640px;margin:0 auto;padding:12px 16px 4px}
+.rings-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.rings-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media(max-width:400px){.rings-grid{grid-template-columns:repeat(3,1fr)}}
-.ring-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 8px 10px;text-align:center;transition:all .2s;position:relative}
+.ring-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 8px 10px;text-align:center;position:relative}
 .ring-card.ring-achieved{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);box-shadow:0 0 16px rgba(52,211,153,.15)}
-.ring-wrap{position:relative;display:inline-block;margin-bottom:6px}
-.ring-badge{position:absolute;top:-4px;right:-8px;background:#34d399;color:#022c22;font-size:9px;font-weight:900;padding:2px 6px;border-radius:10px;letter-spacing:.05em;animation:badge-pop .4s cubic-bezier(.34,1.56,.64,1)}
+.ring-wrap{position:relative;display:inline-block;margin-bottom:4px}
+.ring-badge{position:absolute;top:-4px;right:-8px;background:#34d399;color:#022c22;font-size:9px;font-weight:900;padding:2px 6px;border-radius:10px}
 @keyframes badge-pop{0%{transform:scale(0)}100%{transform:scale(1)}}
 .ring-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
-.ring-diff{font-size:10px;color:rgba(255,255,255,.4)}
+.ring-diff{font-size:10px;color:rgba(255,255,255,.35)}
 .ring-over{font-size:10px;font-weight:700;color:#34d399;margin-top:2px}
-
-/* 月ラベル */
-.month-label{font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-align:center;padding:10px 0 16px}
+.month-label{font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:8px 0 14px}
 .month-label strong{color:#2aab96}
-
-/* コンテナ（下半分） */
-.container{max-width:640px;margin:0 auto;padding:20px 16px 60px}
+.container{max-width:640px;margin:0 auto;padding:16px 16px 60px}
 .back-link{display:inline-flex;align-items:center;gap:6px;color:#2aab96;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:16px;background:rgba(255,255,255,.05);padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08)}
-
-/* カレンダーカード */
 .card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;margin-bottom:18px;overflow:hidden}
 .card-header{background:rgba(255,255,255,.04);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;font-weight:700;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:6px}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
@@ -1989,7 +1980,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#0a1628;color:#e2e8f0;font
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:10px 8px 14px}
 .cal-dow{text-align:center;font-size:10px;font-weight:700;color:rgba(255,255,255,.3);padding:4px 0 6px}
 .cal-dow.sun{color:rgba(239,68,68,.7)}.cal-dow.sat{color:rgba(96,165,250,.7)}
-.cal-day{min-height:52px;border-radius:8px;padding:4px;margin:2px;transition:background .15s;position:relative}
+.cal-day{min-height:52px;border-radius:8px;padding:4px;margin:2px;transition:background .15s}
 .cal-day.has-record{cursor:pointer}
 .cal-day.has-record:hover{background:rgba(42,171,150,.15)}
 .cal-day.today{background:rgba(42,171,150,.15);outline:2px solid #2aab96}
@@ -2003,34 +1994,73 @@ body{font-family:'Noto Sans JP',sans-serif;background:#0a1628;color:#e2e8f0;font
 .cal-detail-item{display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid rgba(42,171,150,.15);color:rgba(255,255,255,.8)}
 .cal-detail-item:last-child{border-bottom:none}
 .cal-detail-item::before{content:'•';color:#2aab96;font-weight:700;flex-shrink:0}
+@keyframes glow-pulse{0%,100%{opacity:.8}50%{opacity:1}}
 </style>
 </head>
-<body>
-<div class="hero">
-  <div class="hero-top">
-    <div class="hero-name">
-      <span>自分の実績</span>
-      <strong>${esc(name)}</strong>
-    </div>
-    <a href="/staff-logout" class="logout-btn">ログアウト</a>
-  </div>
+<body style="background:linear-gradient(180deg,#071020 0%,#0d1f35 100%)">
 
-  ${allAchieved ? `
-  <div class="achieve-banner">
-    <div class="achieve-all">
-      <div class="achieve-title">🏆 目標達成</div>
-      <div class="achieve-sub">全ての目標を達成しました！すばらしい！</div>
-    </div>
-  </div>` : totalGoals > 0 ? `
-  <div class="achieve-banner">
-    <div class="achieve-partial"><strong>${achievedCount}/${totalGoals}</strong> 項目の目標を達成中</div>
-  </div>` : ''}
+<div class="topbar">
+  <div class="hero-name"><span>自分の実績</span><strong>${esc(name)}</strong></div>
+  <a href="/staff-logout" class="logout-btn">ログアウト</a>
+</div>
 
-  <div class="rings-section">
-    <div class="rings-title">今月の実績</div>
-    <div class="rings-grid">${ringCards}</div>
-    <div class="month-label"><strong>${thisMonth}</strong> 先月比較</div>
+<div class="mountain-wrap">
+  <div class="mtn-overlay">
+    <div class="mtn-pct" id="mtnPct">0%</div>
+    <div class="mtn-sub">今月の総合達成率</div>
+    <div class="mtn-status ${allAchieved ? 'all' : totalGoals > 0 ? 'part' : 'none'}">
+      ${allAchieved ? '🏆 全目標達成！' : totalGoals > 0 ? achievedCount + '/' + totalGoals + ' 項目達成中' : '目標を設定しよう'}
+    </div>
   </div>
+  <svg class="mountain-svg" viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#071020"/>
+        <stop offset="100%" stop-color="#122b3a"/>
+      </linearGradient>
+      <linearGradient id="mtnG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1a3a50"/>
+        <stop offset="100%" stop-color="#0d2233"/>
+      </linearGradient>
+      <linearGradient id="mtnG2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0f2535"/>
+        <stop offset="100%" stop-color="#081828"/>
+      </linearGradient>
+      <linearGradient id="pathG" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#0f766e"/>
+        <stop offset="100%" stop-color="#34d399"/>
+      </linearGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect width="360" height="200" fill="url(#skyG)"/>
+    <circle cx="30" cy="22" r="1.2" fill="white" opacity=".7"/>
+    <circle cx="88" cy="12" r="1" fill="white" opacity=".6"/>
+    <circle cx="155" cy="9" r=".8" fill="white" opacity=".5"/>
+    <circle cx="210" cy="18" r="1.2" fill="white" opacity=".7"/>
+    <circle cx="275" cy="11" r="1" fill="white" opacity=".6"/>
+    <circle cx="325" cy="24" r=".8" fill="white" opacity=".5"/>
+    <circle cx="60" cy="35" r=".7" fill="white" opacity=".4"/>
+    <circle cx="305" cy="38" r=".7" fill="white" opacity=".4"/>
+    <polygon points="55,180 145,62 235,180" fill="url(#mtnG2)" opacity=".55"/>
+    <polygon points="175,180 268,58 360,180" fill="url(#mtnG2)" opacity=".45"/>
+    <polygon points="145,62 157,86 133,86" fill="rgba(255,255,255,.1)"/>
+    <polygon points="268,58 280,82 256,82" fill="rgba(255,255,255,.08)"/>
+    <polygon points="0,200 180,18 360,200" fill="url(#mtnG)"/>
+    <polygon points="180,18 360,200 295,200" fill="rgba(0,0,0,.18)"/>
+    <polygon points="180,18 196,50 164,50" fill="rgba(255,255,255,.15)"/>
+    <path id="guidePath" d="M 48,194 C 60,178 74,163 90,150 C 106,137 115,127 122,116 C 130,104 134,94 140,82 C 147,70 154,58 163,44 C 170,33 175,26 180,18" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="2.5" stroke-dasharray="4,5" stroke-linecap="round"/>
+    <path id="climbPath" d="M 48,194 C 60,178 74,163 90,150 C 106,137 115,127 122,116 C 130,104 134,94 140,82 C 147,70 154,58 163,44 C 170,33 175,26 180,18" fill="none" stroke="url(#pathG)" stroke-width="3.5" stroke-linecap="round" filter="url(#glow)"/>
+    ${allAchieved ? '<line x1="180" y1="18" x2="180" y2="4" stroke="#34d399" stroke-width="1.5" filter="url(#glow)"/><polygon points="180,4 192,10 180,16" fill="#34d399" filter="url(#glow)"/>' : ''}
+    <circle id="climberDot" cx="48" cy="194" r="5.5" fill="#34d399" filter="url(#glow)"/>
+    <circle id="climberCore" cx="48" cy="194" r="2.5" fill="#fff"/>
+    <rect x="0" y="196" width="360" height="4" fill="#071020"/>
+  </svg>
+</div>
+
+<div class="rings-section">
+  <div class="rings-title">今月の実績 — ${thisMonth}</div>
+  <div class="rings-grid">${ringCards}</div>
+  <div class="month-label">先月比 <strong>▲▼</strong> で確認</div>
 </div>
 
 <div class="container">
@@ -2048,6 +2078,31 @@ body{font-family:'Noto Sans JP',sans-serif;background:#0a1628;color:#e2e8f0;font
   </div>
 </div>
 <script>
+// 山アニメーション
+(function(){
+  var pct = ${avgPct};
+  document.getElementById('mtnPct').textContent = pct + '%';
+  var path = document.getElementById('climbPath');
+  var dot = document.getElementById('climberDot');
+  var core = document.getElementById('climberCore');
+  var total = path.getTotalLength();
+  path.style.strokeDasharray = '0 ' + total;
+  path.style.transition = 'stroke-dasharray 2s cubic-bezier(.4,0,.2,1)';
+  setTimeout(function(){
+    var traveled = total * pct / 100;
+    path.style.strokeDasharray = traveled + ' ' + total;
+    var pt = path.getPointAtLength(traveled);
+    dot.style.transition = 'cx 2s cubic-bezier(.4,0,.2,1), cy 2s cubic-bezier(.4,0,.2,1)';
+    core.style.transition = 'cx 2s cubic-bezier(.4,0,.2,1), cy 2s cubic-bezier(.4,0,.2,1)';
+    dot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y);
+    core.setAttribute('cx', pt.x); core.setAttribute('cy', pt.y);
+    // カウントアップ
+    var start = 0, end = pct, dur = 1800, startTime = null;
+    function step(ts){ if(!startTime) startTime=ts; var p=Math.min((ts-startTime)/dur,1); document.getElementById('mtnPct').textContent = Math.round(p*end)+'%'; if(p<1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  }, 200);
+})();
+
 const BY_DATE = ${JSON.stringify(byDate)};
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
 let calYear, calMonth;
