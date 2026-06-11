@@ -1853,85 +1853,167 @@ app.get('/my-stats', async (req, res) => {
     });
   }
 
+  // 目標達成カウント
+  const goalItems = [
+    { label: '物品販売', key: 'items', cur: thisM.items||0, goal: goals.items||0 },
+    { label: 'ジャブ打ち', key: 'approach', cur: thisM.approach||0, goal: goals.approach||0 },
+    { label: '成約', key: 'counseling', cur: thisM.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', key: 'reviews', cur: thisM.reviews||0, goal: goals.reviews||0 },
+  ].filter(g => g.goal > 0);
+  const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
+  const totalGoals = goalItems.length;
+  const allAchieved = totalGoals > 0 && achievedCount === totalGoals;
+
+  function ringCard(label, cur, prev, goal) {
+    const pct = goal > 0 ? Math.min(Math.round(cur/goal*100), 100) : null;
+    const over = goal > 0 ? Math.round(cur/goal*100) : 0;
+    const achieved = pct !== null && pct >= 100;
+    const r = 36, circ = Math.round(2 * Math.PI * r);
+    const dash = pct !== null ? Math.round(circ * Math.min(pct,100) / 100) : 0;
+    const ringColor = achieved ? '#34d399' : pct >= 70 ? '#f59e0b' : '#2aab96';
+    const glowColor = achieved ? 'rgba(52,211,153,0.5)' : 'none';
+    const diff = cur - (prev||0);
+    const diffHtml = diff > 0 ? `<span style="color:#34d399;font-size:11px;font-weight:700">▲${diff}</span>`
+                   : diff < 0 ? `<span style="color:#f87171;font-size:11px;font-weight:700">▼${Math.abs(diff)}</span>`
+                   : `<span style="color:#64748b;font-size:11px">→</span>`;
+    return `<div class="ring-card${achieved?' ring-achieved':''}">
+      <div class="ring-wrap">
+        <svg width="88" height="88" viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+          ${pct !== null ? `<circle cx="44" cy="44" r="${r}" fill="none" stroke="${ringColor}" stroke-width="8"
+            stroke-dasharray="${dash} ${circ}" stroke-dashoffset="0"
+            stroke-linecap="round" transform="rotate(-90 44 44)"
+            style="filter:${achieved?`drop-shadow(0 0 6px ${glowColor})`:'none'};transition:stroke-dasharray 1s ease"/>` : ''}
+          <text x="44" y="40" text-anchor="middle" fill="white" font-size="18" font-weight="700" font-family="'Noto Sans JP',sans-serif">${cur}</text>
+          ${goal > 0 ? `<text x="44" y="54" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="10" font-family="'Noto Sans JP',sans-serif">/${goal}</text>` : ''}
+        </svg>
+        ${achieved ? '<div class="ring-badge">達成</div>' : ''}
+      </div>
+      <div class="ring-label">${label}</div>
+      <div class="ring-diff">${diffHtml} 先月比</div>
+      ${pct !== null && over > 100 ? `<div class="ring-over">${over}% 達成！</div>` : ''}
+    </div>`;
+  }
+
+  const allGoalItems = [
+    { label: '物品販売', cur: thisM.items||0, prev: lastM.items||0, goal: goals.items||0 },
+    { label: 'すすめた', cur: thisM.recommend||0, prev: lastM.recommend||0, goal: 0 },
+    { label: 'ジャブ打ち', cur: thisM.approach||0, prev: lastM.approach||0, goal: goals.approach||0 },
+    { label: '成約', cur: thisM.counseling||0, prev: lastM.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', cur: thisM.reviews||0, prev: lastM.reviews||0, goal: goals.reviews||0 },
+    { label: '処置', cur: thisM.treatment||0, prev: lastM.treatment||0, goal: 0 },
+    { label: '合計', cur: thisM.count||0, prev: lastM.count||0, goal: 0 },
+  ];
+  const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
+
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>自分の実績 | 自己申告デラックス</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans JP',sans-serif;background:#f0f4f8;color:#1e293b;font-size:14px}
-header{background:linear-gradient(135deg,#0f766e 0%,#2aab96 60%,#34d399 100%);padding:0;box-shadow:0 2px 12px rgba(15,118,110,.3)}
-.header-inner{max-width:640px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.header-left{display:flex;align-items:center;gap:12px}
-.header-icon{width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-header h1{font-size:16px;font-weight:700;color:#fff}
-header p{font-size:11px;color:rgba(255,255,255,.8);margin-top:2px}
-.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.logout-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+body{font-family:'Noto Sans JP',sans-serif;background:#0a1628;color:#e2e8f0;font-size:14px;min-height:100vh}
+
+/* ヘッダー */
+.hero{background:linear-gradient(160deg,#0a1628 0%,#0f2d3d 50%,#0a1628 100%);padding:24px 20px 0;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(42,171,150,0.15) 0%,transparent 70%);pointer-events:none}
+.hero-top{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.hero-name{font-size:13px;color:rgba(255,255,255,0.6);font-weight:500}
+.hero-name strong{color:#fff;font-size:16px;display:block;margin-top:2px}
+.logout-btn{background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;backdrop-filter:blur(4px)}
+
+/* 達成バナー */
+.achieve-banner{max-width:640px;margin:0 auto 20px;text-align:center}
+.achieve-all{background:linear-gradient(135deg,#065f46,#047857);border:1px solid #34d399;border-radius:16px;padding:18px 20px;animation:glow-pulse 2s ease-in-out infinite}
+.achieve-all .achieve-title{font-size:28px;font-weight:900;color:#34d399;letter-spacing:2px;text-shadow:0 0 20px rgba(52,211,153,0.6)}
+.achieve-all .achieve-sub{font-size:13px;color:rgba(255,255,255,.7);margin-top:4px}
+.achieve-partial{font-size:13px;color:rgba(255,255,255,.5);padding:4px 0}
+.achieve-partial strong{color:#f59e0b}
+@keyframes glow-pulse{0%,100%{box-shadow:0 0 20px rgba(52,211,153,.3)}50%{box-shadow:0 0 40px rgba(52,211,153,.6)}}
+
+/* リングカード */
+.rings-section{max-width:640px;margin:0 auto;padding-bottom:8px}
+.rings-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.rings-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+@media(max-width:400px){.rings-grid{grid-template-columns:repeat(3,1fr)}}
+.ring-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 8px 10px;text-align:center;transition:all .2s;position:relative}
+.ring-card.ring-achieved{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);box-shadow:0 0 16px rgba(52,211,153,.15)}
+.ring-wrap{position:relative;display:inline-block;margin-bottom:6px}
+.ring-badge{position:absolute;top:-4px;right:-8px;background:#34d399;color:#022c22;font-size:9px;font-weight:900;padding:2px 6px;border-radius:10px;letter-spacing:.05em;animation:badge-pop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes badge-pop{0%{transform:scale(0)}100%{transform:scale(1)}}
+.ring-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
+.ring-diff{font-size:10px;color:rgba(255,255,255,.4)}
+.ring-over{font-size:10px;font-weight:700;color:#34d399;margin-top:2px}
+
+/* 月ラベル */
+.month-label{font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-align:center;padding:10px 0 16px}
+.month-label strong{color:#2aab96}
+
+/* コンテナ（下半分） */
 .container{max-width:640px;margin:0 auto;padding:20px 16px 60px}
-.card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);margin-bottom:18px;overflow:hidden}
-.card-header{background:linear-gradient(135deg,#f0fdf4,#ecfdf5);padding:12px 16px;border-bottom:1px solid #a7f3d0;font-size:13px;font-weight:700;color:#065f46;display:flex;align-items:center;gap:6px}
-.select-wrap{padding:16px}
-select{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-size:15px;font-family:inherit;outline:none;background:#f8fafc}
-select:focus{border-color:#2aab96}
-table{width:100%;border-collapse:collapse}
-thead th{background:#f8fafc;padding:8px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #e2e8f0;text-align:left}
-thead th:not(:first-child){text-align:center}
-tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
-tbody tr:hover{background:#f8fffe}
-tbody tr:last-child{border-bottom:none}
-.month-tag{display:inline-block;background:#ecfdf5;color:#065f46;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
-.back-link{display:inline-flex;align-items:center;gap:6px;color:#0f766e;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:16px;background:#fff;padding:8px 14px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.cal-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e2e8f0}
-.cal-nav button{background:#f1f5f9;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:#0f766e;cursor:pointer;font-family:inherit}
-.cal-nav button:hover{background:#e0f2f1}
-.cal-nav .cal-title{font-size:15px;font-weight:700;color:#0f766e}
+.back-link{display:inline-flex;align-items:center;gap:6px;color:#2aab96;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:16px;background:rgba(255,255,255,.05);padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08)}
+
+/* カレンダーカード */
+.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;margin-bottom:18px;overflow:hidden}
+.card-header{background:rgba(255,255,255,.04);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;font-weight:700;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:6px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.cal-nav button{background:rgba(255,255,255,.08);border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:#2aab96;cursor:pointer;font-family:inherit}
+.cal-nav button:hover{background:rgba(42,171,150,.2)}
+.cal-nav .cal-title{font-size:15px;font-weight:700;color:#fff}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:10px 8px 14px}
-.cal-dow{text-align:center;font-size:10px;font-weight:700;color:#94a3b8;padding:4px 0 6px;letter-spacing:.04em}
-.cal-dow.sun{color:#ef4444}.cal-dow.sat{color:#3b82f6}
-.cal-day{min-height:56px;border-radius:8px;padding:4px;margin:2px;cursor:pointer;transition:background .15s;position:relative}
-.cal-day:hover{background:#f0fdf4}
-.cal-day.today{background:#ecfdf5;outline:2px solid #2aab96}
+.cal-dow{text-align:center;font-size:10px;font-weight:700;color:rgba(255,255,255,.3);padding:4px 0 6px}
+.cal-dow.sun{color:rgba(239,68,68,.7)}.cal-dow.sat{color:rgba(96,165,250,.7)}
+.cal-day{min-height:52px;border-radius:8px;padding:4px;margin:2px;transition:background .15s;position:relative}
 .cal-day.has-record{cursor:pointer}
-.cal-day.other-month{opacity:.3;pointer-events:none}
-.cal-day-num{font-size:11px;font-weight:700;color:#334155;margin-bottom:2px}
-.cal-day-num.sun{color:#ef4444}.cal-day-num.sat{color:#3b82f6}
-.cal-dot{font-size:10px;line-height:1.4;color:#0f766e;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.cal-detail{background:#f0fdf4;border:1px solid #a7f3d0;border-radius:10px;padding:14px 16px;margin:0 8px 14px;font-size:13px}
-.cal-detail-date{font-weight:700;color:#065f46;margin-bottom:8px;font-size:14px}
-.cal-detail-item{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #d1fae5;color:#334155}
+.cal-day.has-record:hover{background:rgba(42,171,150,.15)}
+.cal-day.today{background:rgba(42,171,150,.15);outline:2px solid #2aab96}
+.cal-day.other-month{opacity:.2;pointer-events:none}
+.cal-day-num{font-size:11px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:2px}
+.cal-day-num.sun{color:rgba(239,68,68,.8)}.cal-day-num.sat{color:rgba(96,165,250,.8)}
+.cal-dot{width:6px;height:6px;background:#2aab96;border-radius:50%;display:inline-block;margin:1px}
+.cal-count{font-size:9px;color:#2aab96;font-weight:700}
+.cal-detail{background:rgba(42,171,150,.06);border:1px solid rgba(42,171,150,.2);border-radius:10px;padding:14px 16px;margin:0 8px 14px;font-size:13px}
+.cal-detail-date{font-weight:700;color:#34d399;margin-bottom:8px;font-size:14px}
+.cal-detail-item{display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid rgba(42,171,150,.15);color:rgba(255,255,255,.8)}
 .cal-detail-item:last-child{border-bottom:none}
 .cal-detail-item::before{content:'•';color:#2aab96;font-weight:700;flex-shrink:0}
 </style>
 </head>
 <body>
-<header>
-  <div class="header-inner">
-    <div class="header-left">
-      <div class="header-icon">📊</div>
-      <div><h1>自分の実績</h1><p>${esc(name)} さん</p></div>
+<div class="hero">
+  <div class="hero-top">
+    <div class="hero-name">
+      <span>自分の実績</span>
+      <strong>${esc(name)}</strong>
     </div>
-    <div class="header-right">
-      <a href="/staff-logout" class="logout-btn">ログアウト</a>
-    </div>
+    <a href="/staff-logout" class="logout-btn">ログアウト</a>
   </div>
-</header>
+
+  ${allAchieved ? `
+  <div class="achieve-banner">
+    <div class="achieve-all">
+      <div class="achieve-title">🏆 目標達成</div>
+      <div class="achieve-sub">全ての目標を達成しました！すばらしい！</div>
+    </div>
+  </div>` : totalGoals > 0 ? `
+  <div class="achieve-banner">
+    <div class="achieve-partial"><strong>${achievedCount}/${totalGoals}</strong> 項目の目標を達成中</div>
+  </div>` : ''}
+
+  <div class="rings-section">
+    <div class="rings-title">今月の実績</div>
+    <div class="rings-grid">${ringCards}</div>
+    <div class="month-label"><strong>${thisMonth}</strong> 先月比較</div>
+  </div>
+</div>
+
 <div class="container">
   <a href="/" class="back-link">← 入力フォームへ戻る</a>
 
-  <div class="card">
-    <div class="card-header">📅 今月の実績 vs 先月 <span class="month-tag">${thisMonth}</span></div>
-    <div style="overflow-x:auto">
-    <table>
-      <thead><tr><th>項目</th><th>今月</th><th>先月</th><th>目標・達成率</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    </div>
-  </div>
-
   <div class="card" id="calCard">
+    <div class="card-header">📅 記録カレンダー</div>
     <div class="cal-nav">
       <button onclick="moveMonth(-1)">&#8592; 前月</button>
       <span class="cal-title" id="calTitle"></span>
@@ -1946,11 +2028,10 @@ const BY_DATE = ${JSON.stringify(byDate)};
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
 let calYear, calMonth;
 
-// JST今日
 const _jst = new Date(Date.now() + 9*60*60*1000);
 const TODAY = _jst.getUTCFullYear() + '-' + String(_jst.getUTCMonth()+1).padStart(2,'0') + '-' + String(_jst.getUTCDate()).padStart(2,'0');
 calYear = _jst.getUTCFullYear();
-calMonth = _jst.getUTCMonth(); // 0-indexed
+calMonth = _jst.getUTCMonth();
 
 function moveMonth(d) {
   calMonth += d;
@@ -1961,8 +2042,7 @@ function moveMonth(d) {
 }
 
 function renderCal() {
-  const title = calYear + '年' + (calMonth+1) + '月';
-  document.getElementById('calTitle').textContent = title;
+  document.getElementById('calTitle').textContent = calYear + '年' + (calMonth+1) + '月';
   const grid = document.getElementById('calGrid');
   grid.innerHTML = '';
   ['日','月','火','水','木','金','土'].forEach((w,i) => {
@@ -1971,9 +2051,8 @@ function renderCal() {
     d.textContent = w;
     grid.appendChild(d);
   });
-  const first = new Date(calYear, calMonth, 1).getDay(); // day of week of 1st
+  const first = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  // blank cells before 1st
   for (let i=0; i<first; i++) {
     const cell = document.createElement('div');
     cell.className = 'cal-day other-month';
@@ -1989,19 +2068,21 @@ function renderCal() {
     numEl.className = 'cal-day-num' + (dow===0?' sun':dow===6?' sat':'');
     numEl.textContent = day;
     cell.appendChild(numEl);
-    records.slice(0,3).forEach(r => {
-      const dot = document.createElement('div');
-      dot.className = 'cal-dot';
-      dot.textContent = r.action;
-      cell.appendChild(dot);
-    });
-    if (records.length > 3) {
-      const more = document.createElement('div');
-      more.style.cssText = 'font-size:10px;color:#94a3b8';
-      more.textContent = '+' + (records.length-3) + '件';
-      cell.appendChild(more);
-    }
     if (records.length) {
+      const dotsWrap = document.createElement('div');
+      const showDots = Math.min(records.length, 4);
+      for (let i=0; i<showDots; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'cal-dot';
+        dotsWrap.appendChild(dot);
+      }
+      cell.appendChild(dotsWrap);
+      if (records.length > 0) {
+        const cnt = document.createElement('div');
+        cnt.className = 'cal-count';
+        cnt.textContent = records.length + '件';
+        cell.appendChild(cnt);
+      }
       cell.onclick = () => showDetail(dateStr, records);
     }
     grid.appendChild(cell);
@@ -2012,12 +2093,11 @@ function showDetail(dateStr, records) {
   const det = document.getElementById('calDetail');
   const [y,m,d] = dateStr.split('-');
   const dow = WEEKDAYS[new Date(+y,+m-1,+d).getDay()];
-  let html = '<div class="cal-detail"><div class="cal-detail-date">📅 ' + y+'年'+parseInt(m)+'月'+parseInt(d)+'日（'+dow+'）' + ' — ' + records.length + '件</div>';
+  let html = '<div class="cal-detail"><div class="cal-detail-date">📅 ' + y+'年'+parseInt(m)+'月'+parseInt(d)+'日（'+dow+'）— ' + records.length + '件</div>';
   records.forEach(r => {
     let txt = r.action;
     if (r.patientNo) txt += '　患者番号：' + r.patientNo;
     if (r.itemName) txt += '　' + r.itemName;
-    if (r.freeText) txt += '　' + r.freeText;
     html += '<div class="cal-detail-item">' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
   });
   html += '</div>';
