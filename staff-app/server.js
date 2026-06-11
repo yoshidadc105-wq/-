@@ -997,6 +997,11 @@ td{padding:11px 14px;vertical-align:middle}
   <div class="section-header"><h2>月間目標設定</h2><div class="section-line"></div></div>
   <div class="mgmt-card" style="max-width:560px">
     <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとの月間目標件数を設定します。ダッシュボードの達成率ゲージに反映されます。</p>
+    <div style="margin-bottom:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
+      <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
+      <span id="fixCatMsg" style="font-size:12px"></span>
+    </div>
     <div id="goalSettings" style="display:flex;flex-direction:column;gap:10px;"></div>
     <div id="goalMsg" style="font-size:12px;margin-top:10px;min-height:16px;"></div>
   </div>
@@ -1191,6 +1196,19 @@ function closeModal() {
 }
 function closeModalOnBg(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+async function fixCategories() {
+  const msg = document.getElementById('fixCatMsg');
+  msg.style.color = '#92400e'; msg.textContent = '処理中...';
+  const res = await adminFetch('/admin/fix-categories', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    msg.style.color = '#065f46';
+    msg.textContent = `完了：${d.fixed}件を修正しました（合計${d.total}件）`;
+  } else {
+    msg.style.color = '#dc2626'; msg.textContent = '失敗しました';
+  }
 }
 
 // 月間目標設定UI
@@ -2115,6 +2133,30 @@ renderCal();
 <\/script>
 </body>
 </html>`);
+});
+
+// 過去レコードのactionCategory一括修正
+app.post('/admin/fix-categories', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const records = await loadDB();
+  let fixed = 0;
+  const updated = records.map(r => {
+    if (r.entryType === 'behavior' || !r.action) return r;
+    const correct = ACTION_CATEGORY[r.action] || 'treatment';
+    if (r.actionCategory !== correct) {
+      fixed++;
+      return { ...r, actionCategory: correct };
+    }
+    return r;
+  });
+  if (fixed > 0) {
+    if (recordsCol) {
+      await Promise.all(updated.map(r => recordsCol.replaceOne({ id: r.id }, r, { upsert: true })));
+    } else {
+      fs.writeFileSync(DB_FILE, JSON.stringify(updated, null, 2));
+    }
+  }
+  res.json({ ok: true, fixed, total: records.length });
 });
 
 app.get('/health', (_req, res) => res.send('OK'));
