@@ -262,7 +262,12 @@ async function openRedirect(url) {
 async function loadPDF() {
   const body = document.getElementById('pdfBody');
   try {
-    const pdf = await pdfjsLib.getDocument(fileUrl).promise;
+    const pdf = await pdfjsLib.getDocument({
+      url: fileUrl,
+      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+      cMapPacked: true,
+      standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/'
+    }).promise;
     body.innerHTML = '';
     const containerWidth = body.clientWidth || (window.innerWidth - 24);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
