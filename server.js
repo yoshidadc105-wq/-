@@ -786,6 +786,37 @@ app.put('/api/respondents/reorder', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ===== 行動基準評価 回答者管理 =====
+app.get('/api/self-respondents', ah(async (req, res) => {
+  const list = await (await getDb()).collection('selfRespondents').find({}).sort({ order: 1, createdAt: 1 }).toArray();
+  res.json(list.map(({ id, name }) => ({ id, name })));
+}));
+app.post('/api/self-respondents', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: '名前が必要です' });
+  const db = await getDb();
+  if (await db.collection('selfRespondents').findOne({ name })) return res.status(409).json({ error: 'すでに登録されています' });
+  const maxDoc = await db.collection('selfRespondents').find({}).sort({ order: -1 }).limit(1).toArray();
+  const order = maxDoc.length ? (maxDoc[0].order ?? 0) + 1 : 0;
+  const doc = { id: crypto.randomUUID(), name, order, createdAt: new Date().toISOString() };
+  await db.collection('selfRespondents').insertOne(doc);
+  res.json(doc);
+}));
+app.delete('/api/self-respondents/:id', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  await (await getDb()).collection('selfRespondents').deleteOne({ id: req.params.id });
+  res.json({ ok: true });
+}));
+app.put('/api/self-respondents/reorder', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids required' });
+  const db = await getDb();
+  await Promise.all(ids.map((id, i) => db.collection('selfRespondents').updateOne({ id }, { $set: { order: i } })));
+  res.json({ ok: true });
+}));
+
 // ===== 360度評価システム =====
 
 const FEEDBACK_ADMIN_PASSWORD = process.env.FEEDBACK_ADMIN_PASSWORD || ADMIN_PASSWORD;
@@ -1823,12 +1854,13 @@ app.get('/staff-admin', async (req, res) => {
     ? { submittedAt: { $gte: selectedPeriod.start, $lte: selectedPeriod.end } }
     : {};
 
-  const [feedbacks, selfRecs, targets, compFBArr, respondentDocs] = await Promise.all([
+  const [feedbacks, selfRecs, targets, compFBArr, respondentDocs, selfRespondentDocs] = await Promise.all([
     db.collection('feedback').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('selfAssessments').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('targets').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
     db.collection('compFeedback').find({}).toArray(),
     db.collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
+    db.collection('selfRespondents').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
   ]);
   // Convert compFeedback array to object keyed by name
   const compFB = {};
@@ -2358,7 +2390,9 @@ function initDragSort(listId, reorderUrl) {
 }
 document.addEventListener('DOMContentLoaded', () => {
   initDragSort('target-sort-list', '/api/targets/reorder');
+  initDragSort('target-sort-list-2', '/api/targets/reorder');
   initDragSort('resp-sort-list', '/api/respondents/reorder');
+  initDragSort('self-resp-sort-list', '/api/self-respondents/reorder');
 });
 async function addRespondent() {
   const inp = document.getElementById('nr'); const msg = document.getElementById('rmsg');
@@ -2373,6 +2407,30 @@ async function addRespondent() {
 async function delRespondent(id) {
   if (!confirm('削除しますか？')) return;
   await fetch('/api/respondents/' + id, {method:'DELETE'}); location.reload();
+}
+async function addSelfRespondent() {
+  const inp = document.getElementById('nsr'); const msg = document.getElementById('srmsg');
+  const name = inp.value.trim();
+  if (!name) { msg.style.color='#c62828'; msg.textContent='名前を入力'; return; }
+  const r = await fetch('/api/self-respondents', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if (r.status===409) { msg.style.color='#c62828'; msg.textContent='すでに登録済み'; return; }
+  if (!r.ok) { msg.style.color='#c62828'; msg.textContent='エラー'; return; }
+  msg.style.color='#2e7d32'; msg.textContent='追加しました'; inp.value='';
+  setTimeout(() => location.reload(), 800);
+}
+async function delSelfRespondent(id) {
+  if (!confirm('削除しますか？')) return;
+  await fetch('/api/self-respondents/' + id, {method:'DELETE'}); location.reload();
+}
+async function addTarget2() {
+  const inp = document.getElementById('nt2'); const msg = document.getElementById('tmsg2');
+  const name = inp.value.trim();
+  if (!name) { msg.style.color='#c62828'; msg.textContent='名前を入力'; return; }
+  const r = await fetch('/api/targets', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if (r.status===409) { msg.style.color='#c62828'; msg.textContent='すでに登録済み'; return; }
+  if (!r.ok) { msg.style.color='#c62828'; msg.textContent='エラー'; return; }
+  msg.style.color='#2e7d32'; msg.textContent='追加しました'; inp.value='';
+  setTimeout(() => location.reload(), 800);
 }
 async function addTarget() {
   const inp = document.getElementById('nt'); const msg = document.getElementById('tmsg');
@@ -2507,11 +2565,39 @@ async function saveQuestions() {
   </div>
   <div class="tab-panel" id="panel-settings">
     <div class="set-card">
-      <div class="set-hd">回答者管理（フォームに回答するスタッフ）</div>
+      <div class="set-hd">行動基準評価 — 回答者（自己評価するスタッフ）</div>
       <div class="set-bd">
-        <p style="font-size:12px;color:#555;margin-bottom:12px">行動基準評価・360度評価フォームの「回答者（あなたの名前）」プルダウンに表示される名前リストです。</p>
+        <p style="font-size:12px;color:#555;margin-bottom:12px">行動基準評価フォームの「回答者（あなたの名前）」プルダウンに表示される名前リストです。</p>
+        <div class="sort-list" id="self-resp-sort-list">
+          ${selfRespondentDocs.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delSelfRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
+        </div>
+        <div class="add-row">
+          <input type="text" id="nsr" class="add-input" placeholder="名前を入力" />
+          <button class="add-btn" onclick="addSelfRespondent()">＋ 追加</button>
+          <span id="srmsg" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="set-hd">360度評価 — 評価対象者（評価される人）</div>
+      <div class="set-bd">
+        <p style="font-size:12px;color:#555;margin-bottom:12px">360度評価フォームの「評価する相手」プルダウンに表示される名前リストです。</p>
+        <div class="sort-list" id="target-sort-list-2">
+          ${targets.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delTarget('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
+        </div>
+        <div class="add-row">
+          <input type="text" id="nt2" class="add-input" placeholder="名前を入力" />
+          <button class="add-btn" onclick="addTarget2()">＋ 追加</button>
+          <span id="tmsg2" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="set-hd">360度評価 — 回答者（評価する人）</div>
+      <div class="set-bd">
+        <p style="font-size:12px;color:#555;margin-bottom:12px">360度評価フォームの「回答者（あなたの名前）」プルダウンに表示される名前リストです。</p>
         <div class="sort-list" id="resp-sort-list">
-          ${(await (await getDb()).collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray()).map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
+          ${respondentDocs.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
         </div>
         <div class="add-row">
           <input type="text" id="nr" class="add-input" placeholder="名前を入力" />

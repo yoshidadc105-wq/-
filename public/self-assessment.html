@@ -189,6 +189,9 @@
 </head>
 <body>
 <div class="top-bar"></div>
+<div style="max-width:700px;margin:0 auto;padding:8px 16px 0">
+  <a href="/" style="font-size:13px;color:#673ab7;text-decoration:none">← ホームへ戻る</a>
+</div>
 <div class="container">
 
   <!-- Deadline banner -->
@@ -480,7 +483,7 @@
   // 回答者プルダウンにrespondentsを読み込む
   (async () => {
     try {
-      const respondents = await fetch('/api/respondents').then(r => r.json());
+      const respondents = await fetch('/api/self-respondents').then(r => r.json());
       const sel = document.getElementById('respondent');
       respondents.forEach(t => {
         const opt = document.createElement('option');
