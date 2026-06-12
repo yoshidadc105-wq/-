@@ -107,6 +107,23 @@ router.get('/', requireLogin, (req, res) => {
   res.json({ manuals, total, page: parseInt(page), limit: parseInt(limit) });
 });
 
+// 最近閲覧したマニュアル（/:id より前に定義しないとルートが衝突する）
+router.get('/history/recent', requireLogin, (req, res) => {
+  const db = getDb();
+  const history = db.prepare(`
+    SELECT DISTINCT m.id, m.title, m.type, m.category_id, c.name as category_name,
+           MAX(vh.viewed_at) as last_viewed
+    FROM view_history vh
+    JOIN manuals m ON m.id = vh.manual_id AND m.is_deleted = 0
+    LEFT JOIN categories c ON c.id = m.category_id
+    WHERE vh.user_id = ?
+    GROUP BY m.id
+    ORDER BY last_viewed DESC
+    LIMIT 10
+  `).all(req.session.userId);
+  res.json(history);
+});
+
 // マニュアル詳細取得
 router.get('/:id', requireLogin, (req, res) => {
   const db = getDb();
@@ -238,23 +255,6 @@ router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res)
     results.push({ id: result.lastInsertRowid, title });
   }
   res.status(201).json({ message: `${results.length}件のPDFを登録しました`, results });
-});
-
-// 最近閲覧したマニュアル
-router.get('/history/recent', requireLogin, (req, res) => {
-  const db = getDb();
-  const history = db.prepare(`
-    SELECT DISTINCT m.id, m.title, m.type, m.category_id, c.name as category_name,
-           MAX(vh.viewed_at) as last_viewed
-    FROM view_history vh
-    JOIN manuals m ON m.id = vh.manual_id AND m.is_deleted = 0
-    LEFT JOIN categories c ON c.id = m.category_id
-    WHERE vh.user_id = ?
-    GROUP BY m.id
-    ORDER BY last_viewed DESC
-    LIMIT 10
-  `).all(req.session.userId);
-  res.json(history);
 });
 
 module.exports = router;

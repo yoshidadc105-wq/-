@@ -160,18 +160,22 @@ function toggleCategory(id, name, el) {
 }
 
 async function loadRecent() {
-  const res = await fetch('/api/manuals/history/recent');
-  const list = await res.json();
-  const nav = document.getElementById('recentNav');
-  if (list.length === 0) {
-    nav.innerHTML = '<li style="padding: 4px 12px; font-size: 12px; color: var(--text-muted);">まだ閲覧履歴がありません</li>';
-    return;
-  }
-  nav.innerHTML = list.slice(0, 5).map(m => `
-    <li><a href="/view.html?id=${m.id}" style="font-size: 13px;">
-      ${m.type === 'pdf' ? '📄' : '📝'} ${m.title.length > 20 ? m.title.slice(0, 20) + '…' : m.title}
-    </a></li>
-  `).join('');
+  try {
+    const res = await fetch('/api/manuals/history/recent');
+    if (!res.ok) return;
+    const list = await res.json();
+    if (!Array.isArray(list)) return;
+    const nav = document.getElementById('recentNav');
+    if (list.length === 0) {
+      nav.innerHTML = '<li style="padding: 4px 12px; font-size: 12px; color: var(--text-muted);">まだ閲覧履歴がありません</li>';
+      return;
+    }
+    nav.innerHTML = list.slice(0, 5).map(m => `
+      <li><a href="/view.html?id=${m.id}" style="font-size: 13px;">
+        ${m.type === 'pdf' ? '📄' : '📝'} ${m.title.length > 20 ? m.title.slice(0, 20) + '…' : m.title}
+      </a></li>
+    `).join('');
+  } catch (e) { /* サイドバーの履歴は非重要のためエラーを無視 */ }
 }
 
 function filterByCategory(id, name, el, hasChildren) {
