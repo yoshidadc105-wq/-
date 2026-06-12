@@ -483,7 +483,7 @@
   // 回答者プルダウンにrespondentsを読み込む
   (async () => {
     try {
-      const respondents = await fetch('/api/self-respondents').then(r => r.json());
+      const respondents = await fetch('/api/targets').then(r => r.json());
       const sel = document.getElementById('respondent');
       respondents.forEach(t => {
         const opt = document.createElement('option');
