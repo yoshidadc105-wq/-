@@ -118,6 +118,23 @@ router.post('/bulk', requireAdmin, (req, res) => {
   });
 });
 
+// 更新（管理者のみ）
+router.put('/:id', requireAdmin, (req, res) => {
+  const { old_url, manual_id } = req.body;
+  if (!old_url || !manual_id) return res.status(400).json({ error: 'old_url と manual_id は必須です' });
+  const db = getDb();
+  const existing = db.prepare('SELECT id FROM url_redirects WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: '見つかりません' });
+  try {
+    db.prepare('UPDATE url_redirects SET old_url = ?, manual_id = ? WHERE id = ?')
+      .run(old_url.trim(), parseInt(manual_id), req.params.id);
+    res.json({ message: '更新しました' });
+  } catch (e) {
+    if (e.message.includes('UNIQUE')) return res.status(400).json({ error: 'このURLはすでに別のエントリに登録されています' });
+    throw e;
+  }
+});
+
 // 削除（管理者のみ）
 router.delete('/:id', requireAdmin, (req, res) => {
   const db = getDb();

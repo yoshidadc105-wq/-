@@ -179,10 +179,14 @@
       </div>
     </div>
 
-    <!-- 手動追加 -->
+    <!-- 手動追加 / 変更 -->
     <div class="card mb-2">
-      <div class="card-header"><span class="card-title">URLリンクを追加</span></div>
+      <div class="card-header">
+        <span class="card-title" id="urlFormTitle">URLリンクを追加</span>
+        <button onclick="cancelEditUrl()" id="urlCancelBtn" class="btn btn-secondary btn-sm hidden">キャンセル</button>
+      </div>
       <div class="card-body">
+        <input type="hidden" id="urlEditId">
         <div class="form-group">
           <label class="form-label">旧システムのURL <span class="required">*</span></label>
           <input type="url" id="urlOld" class="form-control" placeholder="https://teachme.jp/...">
@@ -192,7 +196,7 @@
           <input type="text" id="urlSearch" class="form-control" placeholder="マニュアル名で検索..." oninput="filterUrlManuals()" style="margin-bottom:6px;">
           <select id="urlManualId" class="form-control" size="6" style="height:auto;"></select>
         </div>
-        <button onclick="addUrlRedirect()" class="btn btn-primary">登録する</button>
+        <button onclick="saveUrlRedirect()" class="btn btn-primary" id="urlSaveBtn">登録する</button>
       </div>
     </div>
 
@@ -800,9 +804,12 @@ async function loadUrlRedirects() {
   }
   tbody.innerHTML = redirects.map(r => `
     <tr>
-      <td class="text-sm" style="word-break:break-all; max-width:280px;">${r.old_url}</td>
-      <td><a href="/view.html?id=${r.manual_id}" style="color:var(--primary);">${r.manual_title}</a></td>
-      <td><button onclick="deleteUrlRedirect(${r.id})" class="btn btn-danger btn-sm">削除</button></td>
+      <td class="text-sm" style="word-break:break-all; max-width:280px;">${htmlEsc(r.old_url)}</td>
+      <td><a href="/view.html?id=${r.manual_id}" style="color:var(--primary);">${htmlEsc(r.manual_title)}</a></td>
+      <td style="white-space:nowrap">
+        <button onclick="startEditUrl(${r.id},'${htmlEsc(r.old_url).replace(/'/g,'&#39;')}',${r.manual_id})" class="btn btn-secondary btn-sm">変更</button>
+        <button onclick="deleteUrlRedirect(${r.id})" class="btn btn-danger btn-sm">削除</button>
+      </td>
     </tr>
   `).join('');
 }
@@ -818,7 +825,34 @@ function filterUrlManuals() {
   renderUrlManualSelect(filtered);
 }
 
-async function addUrlRedirect() {
+function startEditUrl(id, oldUrl, manualId) {
+  document.getElementById('urlEditId').value = id;
+  document.getElementById('urlOld').value = oldUrl;
+  document.getElementById('urlFormTitle').textContent = 'URLリンクを変更';
+  document.getElementById('urlSaveBtn').textContent = '変更を保存';
+  document.getElementById('urlCancelBtn').classList.remove('hidden');
+  // マニュアル選択を該当IDに合わせる
+  document.getElementById('urlSearch').value = '';
+  renderUrlManualSelect(allManualsList);
+  const sel = document.getElementById('urlManualId');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (parseInt(sel.options[i].value) === manualId) { sel.selectedIndex = i; break; }
+  }
+  document.getElementById('urlOld').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEditUrl() {
+  document.getElementById('urlEditId').value = '';
+  document.getElementById('urlOld').value = '';
+  document.getElementById('urlSearch').value = '';
+  document.getElementById('urlFormTitle').textContent = 'URLリンクを追加';
+  document.getElementById('urlSaveBtn').textContent = '登録する';
+  document.getElementById('urlCancelBtn').classList.add('hidden');
+  renderUrlManualSelect(allManualsList);
+}
+
+async function saveUrlRedirect() {
+  const editId = document.getElementById('urlEditId').value;
   const old_url = document.getElementById('urlOld').value.trim();
   const sel = document.getElementById('urlManualId');
   const manual_id = sel.value;
@@ -826,19 +860,19 @@ async function addUrlRedirect() {
     showAlert('alert', 'URLとマニュアルを選択してください', 'error');
     return;
   }
-  const res = await fetch('/api/url-redirects', {
-    method: 'POST',
+  const isEdit = !!editId;
+  const res = await fetch(isEdit ? `/api/url-redirects/${editId}` : '/api/url-redirects', {
+    method: isEdit ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ old_url, manual_id })
   });
   const data = await res.json();
   if (res.ok) {
     showAlert('alert', data.message, 'success');
-    document.getElementById('urlOld').value = '';
-    document.getElementById('urlSearch').value = '';
+    cancelEditUrl();
     loadUrlRedirects();
   } else {
-    showAlert('alert', data.error || '登録に失敗しました', 'error');
+    showAlert('alert', data.error || '保存に失敗しました', 'error');
   }
 }
 
