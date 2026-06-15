@@ -19,7 +19,7 @@ export default function Layout({ children }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0, zIndex: 100,
       }}>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>🦷 歯科在庫管理</div>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>{import.meta.env.VITE_APP_TITLE || '🦷 歯科在庫管理'}</div>
       </header>
 
       <main style={{ flex: 1, padding: '16px', maxWidth: 600, width: '100%', margin: '0 auto', paddingBottom: 80 }}>
