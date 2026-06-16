@@ -2321,6 +2321,12 @@ app.post('/admin/fix-categories', async (req, res) => {
 });
 
 // デバッグ：アクション別件数確認
+app.get('/admin/debug-items', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const items = await loadActionItems();
+  res.json(items.map(i => ({ id: i.id, name: i.name, group: i.group, builtin: i.builtin, defaultHidden: i.defaultHidden, order: i.order })));
+});
+
 app.get('/admin/debug-actions', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const records = await loadDB();
