@@ -1031,7 +1031,10 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
     <div id="debugActionsResult" style="display:none;font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all"></div>
     <div id="goalSettings" style="display:flex;flex-direction:column;gap:10px;"></div>
-    <div id="goalMsg" style="font-size:12px;margin-top:10px;min-height:16px;"></div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button onclick="saveAllGoals()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">全スタッフ一括保存</button>
+      <div id="goalMsg" style="font-size:12px;min-height:16px;"></div>
+    </div>
   </div>
 
   <!-- 項目表示設定 -->
@@ -1292,6 +1295,7 @@ async function loadGoalSettings() {
     const visibleItems = allItems.filter(function(i){ return !disabled.includes(i.name); });
     const row = document.createElement('div');
     row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
+    row.dataset.staffRow = n;
     const groups = {};
     visibleItems.forEach(function(item) {
       if (!groups[item.group]) groups[item.group] = [];
@@ -1322,14 +1326,33 @@ function makeGoalGroup(groupLabel, inputs) {
     '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px;background:#f1f5f9;border-radius:8px">' + inputs.join('') + '</div></div>';
 }
 async function saveGoal(staffName, btn) {
-  const row = btn.closest('div');
-  const inputs = row.querySelectorAll('input[data-key]');
+  const row = btn.closest('[data-staff-row]');
+  const inputs = row ? row.querySelectorAll('input[data-key]') : [];
   const goals = {};
-  inputs.forEach(i => { goals[i.dataset.key] = parseInt(i.value)||0; });
+  inputs.forEach(function(i) { goals[i.dataset.key] = parseInt(i.value)||0; });
   const msg = document.getElementById('goalMsg');
-  const res = await adminFetch('/admin/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, goals }) });
-  if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました（ページを更新すると達成率に反映されます）'; setTimeout(()=>msg.textContent='',4000); }
-  else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました ('+res.status+')'; }
+  try {
+    const res = await adminFetch('/admin/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName: staffName, goals: goals }) });
+    if (res.ok) { msg.style.color='#059669'; msg.textContent='保存しました（' + staffName + '）'; setTimeout(function(){msg.textContent='';},4000); }
+    else { msg.style.color='#dc2626'; msg.textContent=staffName + ' の保存に失敗しました ('+res.status+')'; }
+  } catch(e) { msg.style.color='#dc2626'; msg.textContent=staffName + ' エラー: ' + e.message; }
+}
+async function saveAllGoals() {
+  const msg = document.getElementById('goalMsg');
+  const rows = document.querySelectorAll('[data-staff-row]');
+  let ok = 0, fail = 0;
+  for (const row of rows) {
+    const staffName = row.dataset.staffRow;
+    const inputs = row.querySelectorAll('input[data-key]');
+    const goals = {};
+    inputs.forEach(function(i) { goals[i.dataset.key] = parseInt(i.value)||0; });
+    try {
+      const res = await adminFetch('/admin/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName: staffName, goals: goals }) });
+      if (res.ok) ok++; else fail++;
+    } catch(e) { fail++; }
+  }
+  msg.style.color = fail > 0 ? '#dc2626' : '#059669';
+  msg.textContent = '全員保存完了：' + ok + '名成功' + (fail > 0 ? '、' + fail + '名失敗' : '');
 }
 loadGoalSettings();
 
