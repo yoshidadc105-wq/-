@@ -2327,7 +2327,6 @@ app.get('/admin/debug-actions', async (req, res) => {
 app.post('/admin/fix-item-order', async (req, res) => {
   if (!checkAuth(req, res)) return;
   if (!actionItemsCol) return res.json({ ok: false, msg: 'MongoDB未接続' });
-  const defMap = Object.fromEntries(DEFAULT_ACTION_ITEMS.map(d => [d.id, d]));
   let updated = 0;
   for (const def of DEFAULT_ACTION_ITEMS) {
     const r = await actionItemsCol.updateOne(
@@ -2338,6 +2337,18 @@ app.post('/admin/fix-item-order', async (req, res) => {
       { upsert: true }
     );
     if (r.modifiedCount || r.upsertedCount) updated++;
+  }
+  // defaultHidden項目を全スタッフのdisabledItemsに追加
+  const hiddenNames = DEFAULT_ACTION_ITEMS.filter(d => d.defaultHidden).map(d => d.name);
+  const allSettings = await loadStaffSettings();
+  const staffNames = await loadStaffNames();
+  for (const name of staffNames) {
+    const s = allSettings.find(x => x.staffName === name) || {};
+    const disabled = s.disabledItems || [];
+    const newDisabled = [...new Set([...disabled, ...hiddenNames.filter(h => !disabled.includes(h))])];
+    if (newDisabled.length !== disabled.length) {
+      await saveStaffSetting(name, { disabledItems: newDisabled });
+    }
   }
   res.json({ ok: true, updated });
 });
