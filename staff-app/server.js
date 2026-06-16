@@ -2014,6 +2014,32 @@ app.get('/my-stats', async (req, res) => {
     });
   }
 
+  // 週間目標自動+1: 先週すべての目標を達成していたら各項目の目標を+1
+  const bumpWeekKey = weekStart; // 'YYYY-MM-DD'（今週月曜）
+  const lastBumpedWeek = staffSetting.goalBumpedWeek || '';
+  if (lastBumpedWeek !== bumpWeekKey) {
+    const visibleForBump = actionItems.filter(i => !disabledItems.includes(i.name)).map(i => i.name);
+    const goalsToBump = visibleForBump.filter(n => {
+      const g = goals[n] || 0;
+      return g > 0 && (lastW[n] || 0) >= g;
+    });
+    if (goalsToBump.length > 0) {
+      goalsToBump.forEach(n => { goals[n] = (goals[n] || 0) + 1; });
+      if (staffSettingsCol) await staffSettingsCol.updateOne(
+        { staffName: name },
+        { $set: { goals, goalBumpedWeek: bumpWeekKey } },
+        { upsert: true }
+      );
+    } else {
+      // 達成なくても bump 週だけ更新してループ防止
+      if (staffSettingsCol) await staffSettingsCol.updateOne(
+        { staffName: name },
+        { $set: { goalBumpedWeek: bumpWeekKey } },
+        { upsert: true }
+      );
+    }
+  }
+
   // 週間目標達成カウント（山登りの進捗）── アイテム個別
   const visibleItemNames = actionItems.filter(i => !disabledItems.includes(i.name)).map(i => i.name);
   const goalItems = visibleItemNames
