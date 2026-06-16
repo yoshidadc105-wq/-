@@ -1025,6 +1025,7 @@ td{padding:11px 14px;vertical-align:middle}
       <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
       <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
       <button onclick="fixItemOrder()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">項目順番を更新</button>
+      <button onclick="applyDefaultVisibility()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">全スタッフに表示設定を適用</button>
       <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
       <span id="fixCatMsg" style="font-size:12px"></span>
     </div>
@@ -1235,6 +1236,18 @@ async function debugActions() {
     Object.entries(d.counts).sort((a,b) => b[1]-a[1]).forEach(function(e){ lines.push(e[1] + '件　' + e[0]); });
     el.textContent = lines.join('\\n');
   } else { el.textContent = '失敗'; }
+}
+
+async function applyDefaultVisibility() {
+  const msg = document.getElementById('fixCatMsg');
+  msg.style.color = '#7c3aed'; msg.textContent = '適用中...';
+  const res = await adminFetch('/admin/apply-default-visibility', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    msg.style.color = '#065f46';
+    msg.textContent = '完了：' + d.count + '名のスタッフに適用しました。ページを再読み込みしてください。';
+    setTimeout(function(){ location.reload(); }, 2000);
+  } else { msg.style.color = '#dc2626'; msg.textContent = '失敗しました'; }
 }
 
 async function fixItemOrder() {
@@ -2321,6 +2334,20 @@ app.get('/admin/debug-actions', async (req, res) => {
     counts[key] = (counts[key] || 0) + 1;
   }
   res.json({ total: records.length, counts });
+});
+
+// 全スタッフにデフォルト表示設定を適用
+app.post('/admin/apply-default-visibility', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const items = await loadActionItems();
+  const hiddenNames = items.filter(i => i.defaultHidden).map(i => i.name);
+  const staffNames = await loadStaffNames();
+  const allSettings = await loadStaffSettings();
+  for (const name of staffNames) {
+    const s = allSettings.find(x => x.staffName === name) || {};
+    await saveStaffSetting(name, { ...s, disabledItems: hiddenNames });
+  }
+  res.json({ ok: true, count: staffNames.length });
 });
 
 // ビルトイン項目の順番・プロパティをDBに強制反映
