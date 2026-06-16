@@ -166,7 +166,7 @@ const DEFAULT_ACTION_ITEMS = [
   { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true, defaultHidden: true, order: 12 },
   { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true, order: 20 },
   { id: 'i02', name: '物品をすすめた（未購入）', group: '物品', category: 'item_recommend', needsPatient: true, showItemName: true, builtin: true, defaultHidden: true, order: 21 },
-  { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true, order: 30 },
+  { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true, defaultHidden: true, order: 30 },
   { id: 'i14', name: 'ポジティブな行動をした', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true, order: 40 },
   { id: 'i15', name: 'ファン患者を獲得した', group: 'ファン獲得', category: 'fan', needsPatient: true, builtin: true, order: 50 },
   { id: 'i03', name: 'インプラントジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 90 },
