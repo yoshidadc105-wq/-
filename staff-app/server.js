@@ -1274,24 +1274,36 @@ async function fixCategories() {
   }
 }
 
-// 週間目標設定UI
+// 週間目標設定UI（アイテム個別）
 async function loadGoalSettings() {
-  const [namesRes, goalsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/goals')]);
+  const [namesRes, goalsRes, itemsRes, settingsRes] = await Promise.all([
+    fetch('/api/staff-names'), fetch('/api/goals'), fetch('/api/action-items'), fetch('/api/staff-settings')
+  ]);
   const names = await namesRes.json();
   const goals = await goalsRes.json();
+  const allItems = await itemsRes.json();
+  const settings = await settingsRes.json();
   const container = document.getElementById('goalSettings');
   container.innerHTML = '';
-  names.forEach(n => {
+  names.forEach(function(n) {
     const g = goals[n] || {};
+    const s = settings.find(function(x){ return x.staffName === n; }) || {};
+    const disabled = s.disabledItems || [];
+    const visibleItems = allItems.filter(function(i){ return !disabled.includes(i.name); });
     const row = document.createElement('div');
     row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
-    row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:10px">' + n + '</div>' +
-      makeGoalGroup('処置', [makeGoalInput(n,'treatment','処置',g.treatment||10)]) +
-      makeGoalGroup('物品', [makeGoalInput(n,'items','物品販売',g.items||10)]) +
-      makeGoalGroup('アポ管理', [makeGoalInput(n,'appointment','アポ転換',g.appointment||10)]) +
-      makeGoalGroup('チームサポート', [makeGoalInput(n,'team_support','ポジティブ行動',g.team_support||10)]) +
-      makeGoalGroup('ファン獲得', [makeGoalInput(n,'fan','ファン患者',g.fan||10)]) +
-      makeGoalGroup('その他（非表示）', [makeGoalInput(n,'recommend','すすめた',g.recommend||10), makeGoalInput(n,'approach','ジャブ打ち',g.approach||10), makeGoalInput(n,'counseling','成約',g.counseling||10), makeGoalInput(n,'reviews','口コミ',g.reviews||10)]);
+    const groups = {};
+    visibleItems.forEach(function(item) {
+      if (!groups[item.group]) groups[item.group] = [];
+      groups[item.group].push(item);
+    });
+    let html = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:10px">' + n + '</div>';
+    Object.entries(groups).forEach(function(e) {
+      const grpLabel = e[0]; const items = e[1];
+      const inputs = items.map(function(item) { return makeGoalInput(n, item.name, item.name, g[item.name]||10); });
+      html += makeGoalGroup(grpLabel, inputs);
+    });
+    row.innerHTML = html;
     const saveBtn = document.createElement('button');
     saveBtn.textContent = '保存';
     saveBtn.style.cssText = 'margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
@@ -1301,7 +1313,8 @@ async function loadGoalSettings() {
   });
 }
 function makeGoalInput(staff, key, label, val) {
-  return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#64748b;font-weight:600">' + label +
+  var shortLabel = label.length > 12 ? label.slice(0,12) + '…' : label;
+  return '<label title="' + label + '" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#64748b;font-weight:600;max-width:90px">' + shortLabel +
     '<input type="number" min="0" value="' + val + '" data-key="' + key + '" style="width:60px;border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:14px;font-family:inherit;text-align:center" /></label>';
 }
 function makeGoalGroup(groupLabel, inputs) {
@@ -1900,7 +1913,7 @@ app.get('/my-stats', async (req, res) => {
   const thisM = byMonth[thisMonth] || {};
   const lastM = byMonth[lastMonth] || {};
 
-  // 今週（月〜日、JST）の集計
+  // 今週（月〜日、JST）の集計 ── アクション名ごとに個別カウント
   const jstMs = now.getTime() + 9 * 60 * 60 * 1000;
   const jstNow = new Date(jstMs);
   const dow = jstNow.getUTCDay(); // 0=日
@@ -1912,25 +1925,18 @@ app.get('/my-stats', async (req, res) => {
   const lastWeekStartMs = weekStartMs - 7 * 86400 * 1000;
   const lastWeekEnd = new Date(weekStartMs - 86400 * 1000).toISOString().slice(0, 10);
   const lastWeekStart = new Date(lastWeekStartMs).toISOString().slice(0, 10);
-  const zero = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0, team_support: 0, fan: 0 };
-  const thisW = { ...zero };
-  const lastW = { ...zero };
+  const thisW = {}; // { actionName: count }
+  const lastW = {};
+  let thisWTotal = 0, lastWTotal = 0;
   for (const r of allRecords) {
     if (r.staffName !== name || !r.date || r.entryType === 'behavior') continue;
-    const cat = ACTION_CATEGORY[r.action] || itemCatMap[r.action] || r.actionCategory || 'treatment';
-    const target = r.date >= weekStart && r.date <= weekEnd ? thisW
-                 : r.date >= lastWeekStart && r.date <= lastWeekEnd ? lastW : null;
-    if (!target) continue;
-    target.count++;
-    if (cat === 'item') target.items++;
-    if (cat === 'item_recommend') target.recommend++;
-    if (cat === 'counseling') target.counseling++;
-    if (cat === 'counseling_approach') target.approach++;
-    if (cat === 'review') target.reviews++;
-    if (cat === 'treatment') target.treatment++;
-    if (cat === 'appointment') target.appointment++;
-    if (cat === 'team_support') target.team_support++;
-    if (cat === 'fan') target.fan++;
+    if (r.date >= weekStart && r.date <= weekEnd) {
+      thisW[r.action] = (thisW[r.action] || 0) + 1;
+      thisWTotal++;
+    } else if (r.date >= lastWeekStart && r.date <= lastWeekEnd) {
+      lastW[r.action] = (lastW[r.action] || 0) + 1;
+      lastWTotal++;
+    }
   }
 
   function diffBadge(cur, prev) {
@@ -1958,12 +1964,13 @@ app.get('/my-stats', async (req, res) => {
     </tr>`;
   }
 
+  // 月間サマリー：カテゴリ別
   const rows = `
     ${goalRow('処置', 'treatment', thisM.treatment, lastM.treatment, 0)}
-    ${goalRow('物品販売（購入）', 'items', thisM.items, lastM.items, 0)}
+    ${goalRow('物品販売', 'items', thisM.items, lastM.items, 0)}
     ${goalRow('アポ転換', 'appointment', thisM.appointment, lastM.appointment, 0)}
     ${goalRow('ポジティブ行動', 'team_support', thisM.team_support, lastM.team_support, 0)}
-    ${goalRow('ファン患者獲得', 'fan', thisM.fan, lastM.fan, 0)}
+    ${goalRow('ファン患者', 'fan', thisM.fan, lastM.fan, 0)}
     ${goalRow('月間合計', 'count', thisM.count, lastM.count, 0)}
   `;
 
@@ -1980,18 +1987,11 @@ app.get('/my-stats', async (req, res) => {
     });
   }
 
-  // 週間目標達成カウント（山登りの進捗）
-  const goalItems = [
-    { label: '処置', cat: 'treatment', cur: thisW.treatment||0, goal: goals.treatment||0 },
-    { label: '物品販売', cat: 'item', cur: thisW.items||0, goal: goals.items||0 },
-    { label: 'アポ転換', cat: 'appointment', cur: thisW.appointment||0, goal: goals.appointment||0 },
-    { label: 'ポジティブ行動', cat: 'team_support', cur: thisW.team_support||0, goal: goals.team_support||0 },
-    { label: 'ファン患者', cat: 'fan', cur: thisW.fan||0, goal: goals.fan||0 },
-    { label: 'すすめた', cat: 'item_recommend', cur: thisW.recommend||0, goal: goals.recommend||0 },
-    { label: 'ジャブ打ち', cat: 'counseling_approach', cur: thisW.approach||0, goal: goals.approach||0 },
-    { label: '成約', cat: 'counseling', cur: thisW.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', cat: 'review', cur: thisW.reviews||0, goal: goals.reviews||0 },
-  ].filter(g => g.goal > 0 && visibleCats.has(g.cat));
+  // 週間目標達成カウント（山登りの進捗）── アイテム個別
+  const visibleItemNames = actionItems.filter(i => !disabledItems.includes(i.name)).map(i => i.name);
+  const goalItems = visibleItemNames
+    .map(n => ({ label: n, cur: thisW[n]||0, goal: goals[n]||0 }))
+    .filter(g => g.goal > 0);
   const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
   const totalGoals = goalItems.length;
   const allAchieved = totalGoals > 0 && achievedCount === totalGoals;
@@ -2031,17 +2031,9 @@ app.get('/my-stats', async (req, res) => {
   }
 
   const allGoalItems = [
-    { label: '処置', cat: 'treatment', cur: thisW.treatment||0, prev: lastW.treatment||0, goal: goals.treatment||0 },
-    { label: '物品販売', cat: 'item', cur: thisW.items||0, prev: lastW.items||0, goal: goals.items||0 },
-    { label: 'アポ転換', cat: 'appointment', cur: thisW.appointment||0, prev: lastW.appointment||0, goal: goals.appointment||0 },
-    { label: 'ポジティブ行動', cat: 'team_support', cur: thisW.team_support||0, prev: lastW.team_support||0, goal: goals.team_support||0 },
-    { label: 'ファン患者', cat: 'fan', cur: thisW.fan||0, prev: lastW.fan||0, goal: goals.fan||0 },
-    { label: 'すすめた', cat: 'item_recommend', cur: thisW.recommend||0, prev: lastW.recommend||0, goal: goals.recommend||0 },
-    { label: 'ジャブ打ち', cat: 'counseling_approach', cur: thisW.approach||0, prev: lastW.approach||0, goal: goals.approach||0 },
-    { label: '成約', cat: 'counseling', cur: thisW.counseling||0, prev: lastW.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', cat: 'review', cur: thisW.reviews||0, prev: lastW.reviews||0, goal: goals.reviews||0 },
-    { label: '今週合計', cat: null, cur: thisW.count||0, prev: lastW.count||0, goal: 0 },
-  ].filter(g => g.cat === null || visibleCats.has(g.cat));
+    ...visibleItemNames.map(n => ({ label: n, cur: thisW[n]||0, prev: lastW[n]||0, goal: goals[n]||0 })),
+    { label: '今週合計', cur: thisWTotal, prev: lastWTotal, goal: 0 },
+  ];
   const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
 
   res.send(`<!DOCTYPE html>
