@@ -137,6 +137,23 @@
         <label id="itemNameLabel">商品名</label>
         <input type="text" name="itemName" placeholder="例：電動歯ブラシ、ホワイトニングジェルなど" />
       </div>
+
+      <div class="form-group hidden" id="countWrap">
+        <label class="required">本数</label>
+        <input type="number" name="countValue" id="countValue" min="1" max="99" placeholder="例：3" style="width:100px" />
+      </div>
+
+      <div class="form-group hidden" id="typeWrap">
+        <label class="required">種類</label>
+        <select name="otherText" id="typeSelect">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+
+      <div class="form-group hidden" id="freeTextWrap">
+        <label class="required">具体的な内容</label>
+        <input type="text" name="otherText" id="freeTextInput" placeholder="具体的にどんな行動をしたか..." maxlength="200" />
+      </div>
     </div>
 
     <button type="submit" class="submit-btn" id="submitBtn">登録する</button>
@@ -168,6 +185,9 @@
   let loggedInStaff = null;
   let PATIENT_ACTIONS = new Set();
   let ITEM_NAME_ACTIONS = new Set();
+  let COUNT_ACTIONS = new Set();
+  let TYPE_ACTIONS = {};
+  let FREE_TEXT_ACTIONS = new Set();
 
   async function initAuth() {
     try {
@@ -202,6 +222,9 @@
       const visibleItems = allItems.filter(item => !disabled.includes(item.name));
       PATIENT_ACTIONS = new Set(visibleItems.filter(i => i.needsPatient).map(i => i.name));
       ITEM_NAME_ACTIONS = new Set(visibleItems.filter(i => i.showItemName).map(i => i.name));
+      COUNT_ACTIONS = new Set(visibleItems.filter(i => i.needsCount).map(i => i.name));
+      visibleItems.filter(i => i.typeOptions && i.typeOptions.length).forEach(i => { TYPE_ACTIONS[i.name] = i.typeOptions; });
+      FREE_TEXT_ACTIONS = new Set(visibleItems.filter(i => i.needsFreeText).map(i => i.name));
       const sel = document.getElementById('actionSelect');
       const groups = {};
       visibleItems.forEach(item => {
@@ -240,13 +263,32 @@
   function onActionChange() {
     const val = document.getElementById('actionSelect').value;
     const needsPatient = PATIENT_ACTIONS.has(val);
+    const needsCount = COUNT_ACTIONS.has(val);
+    const typeOpts = TYPE_ACTIONS[val];
+    const needsFreeText = FREE_TEXT_ACTIONS.has(val);
+
     document.getElementById('patientNoWrap').classList.toggle('hidden', !needsPatient);
     document.getElementById('itemNameWrap').classList.toggle('hidden', !ITEM_NAME_ACTIONS.has(val));
+    document.getElementById('countWrap').classList.toggle('hidden', !needsCount);
+    document.getElementById('typeWrap').classList.toggle('hidden', !typeOpts);
+    document.getElementById('freeTextWrap').classList.toggle('hidden', !needsFreeText);
+
     if (ITEM_NAME_ACTIONS.has(val)) {
       document.getElementById('itemNameLabel').textContent = val.includes('すすめ') ? 'すすめた商品名' : '販売した商品名';
     }
+    if (typeOpts) {
+      const sel = document.getElementById('typeSelect');
+      sel.innerHTML = '<option value="">選択してください</option>';
+      typeOpts.forEach(function(o) { var opt = document.createElement('option'); opt.value = o; opt.textContent = o; sel.appendChild(opt); });
+    }
+    document.getElementById('typeSelect').required = !!typeOpts;
+    document.getElementById('freeTextInput').required = needsFreeText;
+    document.getElementById('countValue').required = needsCount;
+
     if (!needsPatient) { document.getElementById('patientNo').value = ''; document.getElementById('patientCheck').textContent = ''; }
     document.getElementById('patientNo').required = needsPatient;
+    if (!needsCount) document.getElementById('countValue').value = '';
+    if (!typeOpts && !needsFreeText) document.getElementById('freeTextInput') && (document.getElementById('freeTextInput').value = '');
   }
 
   let checkTimer;
@@ -292,6 +334,9 @@
     document.getElementById('staffNameInput').value = loggedInStaff;
     document.getElementById('patientNoWrap').classList.add('hidden');
     document.getElementById('itemNameWrap').classList.add('hidden');
+    document.getElementById('countWrap').classList.add('hidden');
+    document.getElementById('typeWrap').classList.add('hidden');
+    document.getElementById('freeTextWrap').classList.add('hidden');
     document.getElementById('patientCheck').textContent = '';
     f.style.display = '';
     document.getElementById('successMsg').style.display = 'none';

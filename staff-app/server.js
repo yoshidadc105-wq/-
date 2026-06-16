@@ -161,27 +161,34 @@ app.delete('/admin/action-config/categories/:id', async (req, res) => {
 });
 
 const DEFAULT_ACTION_ITEMS = [
-  { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true },
-  { id: 'i02', name: '物品をすすめた（未購入）', group: '物品', category: 'item_recommend', needsPatient: true, showItemName: true, builtin: true },
-  { id: 'i03', name: 'インプラントジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true },
-  { id: 'i04', name: 'マウスピース矯正ジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true },
-  { id: 'i05', name: 'ホワイトニングジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true },
-  { id: 'i06', name: 'インプラント成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true },
-  { id: 'i07', name: 'マウスピース矯正成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true },
-  { id: 'i08', name: 'ホワイトニング成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true },
-  { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true },
-  { id: 'i10', name: '口コミ獲得', group: '口コミ', category: 'review', needsPatient: true, isKuchikomi: true, builtin: true },
-  { id: 'i11', name: 'シーラント', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
-  { id: 'i12', name: 'レントゲン', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
-  { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true },
-  { id: 'i14', name: 'ポジティブ声掛け', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true },
+  { id: 'i11', name: 'シーラント', group: '処置', category: 'treatment', needsPatient: true, needsCount: true, builtin: true, order: 10 },
+  { id: 'i12', name: 'レントゲン', group: '処置', category: 'treatment', needsPatient: true, typeOptions: ['CT・パノラマ', '臼歯デンタル'], builtin: true, order: 11 },
+  { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true, defaultHidden: true, order: 12 },
+  { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true, order: 20 },
+  { id: 'i02', name: '物品をすすめた（未購入）', group: '物品', category: 'item_recommend', needsPatient: true, showItemName: true, builtin: true, defaultHidden: true, order: 21 },
+  { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true, order: 30 },
+  { id: 'i14', name: 'ポジティブな行動をした', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true, order: 40 },
+  { id: 'i15', name: 'ファン患者を獲得した', group: 'ファン獲得', category: 'fan', needsPatient: true, builtin: true, order: 50 },
+  { id: 'i03', name: 'インプラントジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 90 },
+  { id: 'i04', name: 'マウスピース矯正ジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 91 },
+  { id: 'i05', name: 'ホワイトニングジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 92 },
+  { id: 'i06', name: 'インプラント成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true, defaultHidden: true, order: 93 },
+  { id: 'i07', name: 'マウスピース矯正成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true, defaultHidden: true, order: 94 },
+  { id: 'i08', name: 'ホワイトニング成約', group: 'カウンセリング', category: 'counseling', needsPatient: true, builtin: true, defaultHidden: true, order: 95 },
+  { id: 'i10', name: '口コミ獲得', group: '口コミ', category: 'review', needsPatient: true, isKuchikomi: true, builtin: true, defaultHidden: true, order: 96 },
 ];
 
 async function loadActionItems() {
   // ビルトイン項目は常にデフォルト定義をマージして最新プロパティを保証する
   function mergeWithDefaults(items) {
     const defMap = Object.fromEntries(DEFAULT_ACTION_ITEMS.map(d => [d.id, d]));
-    return items.map(item => item.builtin && defMap[item.id] ? { ...defMap[item.id], ...item, showItemName: defMap[item.id].showItemName, needsPatient: defMap[item.id].needsPatient, category: defMap[item.id].category } : item);
+    return items.map(item => item.builtin && defMap[item.id]
+      ? { ...defMap[item.id], ...item,
+          showItemName: defMap[item.id].showItemName, needsPatient: defMap[item.id].needsPatient,
+          needsCount: defMap[item.id].needsCount, typeOptions: defMap[item.id].typeOptions,
+          needsFreeText: defMap[item.id].needsFreeText, category: defMap[item.id].category,
+          defaultHidden: defMap[item.id].defaultHidden, order: defMap[item.id].order }
+      : item);
   }
   if (actionItemsCol) {
     const items = await actionItemsCol.find({}).sort({ order: 1, _id: 1 }).toArray();
@@ -292,6 +299,9 @@ app.post('/admin/add-staff', async (req, res) => {
   if (password.length < 4) return res.status(400).json({ error: 'パスワードは4文字以上' });
   await addStaffName(staffName.trim());
   await upsertStaffAccount(staffName.trim(), hashPassword(password), email.trim().toLowerCase());
+  const allItems = await loadActionItems();
+  const defaultDisabled = allItems.filter(i => i.defaultHidden).map(i => i.name);
+  await saveStaffSetting(staffName.trim(), { disabledItems: defaultDisabled });
   res.json({ ok: true });
 });
 
@@ -530,6 +540,8 @@ const ACTION_CATEGORY = {
   'レントゲン': 'treatment',
   'フッ素塗布': 'treatment',
   'ポジティブ声掛け': 'team_support',
+  'ポジティブな行動をした': 'team_support',
+  'ファン患者を獲得した': 'fan',
 };
 
 // スタッフ設定API
@@ -605,6 +617,7 @@ app.post('/submit', async (req, res) => {
     action: d.action,
     actionCategory: ACTION_CATEGORY[d.action] || 'treatment',
     itemName: d.itemName ? d.itemName.trim() : '',
+    countValue: d.countValue ? (parseInt(d.countValue) || null) : null,
     otherText: d.otherText ? d.otherText.trim() : '',
   });
   console.log(`患者実績登録: ${d.staffName} 患者${d.patientNo} ${d.action} (${d.date})`);
@@ -998,10 +1011,10 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
   </div>
 
-  <!-- 月間目標設定 -->
-  <div class="section-header"><h2>月間目標設定</h2><div class="section-line"></div></div>
+  <!-- 週間目標設定 -->
+  <div class="section-header"><h2>週間目標設定</h2><div class="section-line"></div></div>
   <div class="mgmt-card" style="max-width:560px">
-    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとの月間目標件数を設定します。ダッシュボードの達成率ゲージに反映されます。</p>
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとの週間目標件数を設定します。実績ページの山登りゲージに反映されます。</p>
     <div style="margin-bottom:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
       <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
@@ -1230,7 +1243,7 @@ async function fixCategories() {
   }
 }
 
-// 月間目標設定UI
+// 週間目標設定UI
 async function loadGoalSettings() {
   const [namesRes, goalsRes] = await Promise.all([fetch('/api/staff-names'), fetch('/api/goals')]);
   const names = await namesRes.json();
@@ -1242,12 +1255,12 @@ async function loadGoalSettings() {
     const row = document.createElement('div');
     row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
     row.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:10px">' + n + '</div>' +
-      makeGoalGroup('物品', [makeGoalInput(n,'items','物品販売',g.items||0), makeGoalInput(n,'recommend','すすめた',g.recommend||0)]) +
-      makeGoalGroup('カウンセリング', [makeGoalInput(n,'approach','ジャブ打ち',g.approach||0), makeGoalInput(n,'counseling','成約',g.counseling||0)]) +
-      makeGoalGroup('アポ管理', [makeGoalInput(n,'appointment','アポ転換',g.appointment||0)]) +
-      makeGoalGroup('口コミ', [makeGoalInput(n,'reviews','口コミ獲得',g.reviews||0)]) +
-      makeGoalGroup('処置', [makeGoalInput(n,'treatment','処置',g.treatment||0)]) +
-      makeGoalGroup('チームサポート', [makeGoalInput(n,'team_support','声掛け',g.team_support||0)]);
+      makeGoalGroup('処置', [makeGoalInput(n,'treatment','処置',g.treatment||10)]) +
+      makeGoalGroup('物品', [makeGoalInput(n,'items','物品販売',g.items||10)]) +
+      makeGoalGroup('アポ管理', [makeGoalInput(n,'appointment','アポ転換',g.appointment||10)]) +
+      makeGoalGroup('チームサポート', [makeGoalInput(n,'team_support','ポジティブ行動',g.team_support||10)]) +
+      makeGoalGroup('ファン獲得', [makeGoalInput(n,'fan','ファン患者',g.fan||10)]) +
+      makeGoalGroup('その他（非表示）', [makeGoalInput(n,'recommend','すすめた',g.recommend||10), makeGoalInput(n,'approach','ジャブ打ち',g.approach||10), makeGoalInput(n,'counseling','成約',g.counseling||10), makeGoalInput(n,'reviews','口コミ',g.reviews||10)]);
     const saveBtn = document.createElement('button');
     saveBtn.textContent = '保存';
     saveBtn.style.cssText = 'margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
@@ -1826,7 +1839,7 @@ app.get('/my-stats', async (req, res) => {
     if (r.staffName !== name) continue;
     const month = r.date ? r.date.slice(0, 7) : null;
     if (!month) continue;
-    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0, team_support: 0 };
+    if (!byMonth[month]) byMonth[month] = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0, team_support: 0, fan: 0 };
     const m = byMonth[month];
     m.count++;
     if (r.entryType !== 'behavior') {
@@ -1839,6 +1852,7 @@ app.get('/my-stats', async (req, res) => {
       if (cat === 'treatment') m.treatment++;
       if (cat === 'appointment') m.appointment++;
       if (cat === 'team_support') m.team_support++;
+      if (cat === 'fan') m.fan++;
     }
   }
   const months = Object.keys(byMonth).sort().slice(-6); // 直近6ヶ月
@@ -1847,6 +1861,39 @@ app.get('/my-stats', async (req, res) => {
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
   const thisM = byMonth[thisMonth] || {};
   const lastM = byMonth[lastMonth] || {};
+
+  // 今週（月〜日、JST）の集計
+  const jstMs = now.getTime() + 9 * 60 * 60 * 1000;
+  const jstNow = new Date(jstMs);
+  const dow = jstNow.getUTCDay(); // 0=日
+  const daysFromMon = dow === 0 ? 6 : dow - 1;
+  const weekStartMs = jstMs - daysFromMon * 86400 * 1000;
+  const weekEndMs = weekStartMs + 6 * 86400 * 1000;
+  const weekStart = new Date(weekStartMs).toISOString().slice(0, 10);
+  const weekEnd = new Date(weekEndMs).toISOString().slice(0, 10);
+  const lastWeekStartMs = weekStartMs - 7 * 86400 * 1000;
+  const lastWeekEnd = new Date(weekStartMs - 86400 * 1000).toISOString().slice(0, 10);
+  const lastWeekStart = new Date(lastWeekStartMs).toISOString().slice(0, 10);
+  const zero = { count: 0, items: 0, recommend: 0, counseling: 0, approach: 0, reviews: 0, treatment: 0, appointment: 0, team_support: 0, fan: 0 };
+  const thisW = { ...zero };
+  const lastW = { ...zero };
+  for (const r of allRecords) {
+    if (r.staffName !== name || !r.date || r.entryType === 'behavior') continue;
+    const cat = ACTION_CATEGORY[r.action] || itemCatMap[r.action] || r.actionCategory || 'treatment';
+    const target = r.date >= weekStart && r.date <= weekEnd ? thisW
+                 : r.date >= lastWeekStart && r.date <= lastWeekEnd ? lastW : null;
+    if (!target) continue;
+    target.count++;
+    if (cat === 'item') target.items++;
+    if (cat === 'item_recommend') target.recommend++;
+    if (cat === 'counseling') target.counseling++;
+    if (cat === 'counseling_approach') target.approach++;
+    if (cat === 'review') target.reviews++;
+    if (cat === 'treatment') target.treatment++;
+    if (cat === 'appointment') target.appointment++;
+    if (cat === 'team_support') target.team_support++;
+    if (cat === 'fan') target.fan++;
+  }
 
   function diffBadge(cur, prev) {
     if (!prev && !cur) return '';
@@ -1874,13 +1921,12 @@ app.get('/my-stats', async (req, res) => {
   }
 
   const rows = `
-    ${goalRow('物品販売（購入）', 'items', thisM.items, lastM.items, goals.items)}
-    ${goalRow('物品をすすめた', 'recommend', thisM.recommend, lastM.recommend, 0)}
-    ${goalRow('ジャブ打ち', 'approach', thisM.approach, lastM.approach, goals.approach)}
-    ${goalRow('カウンセリング成約', 'counseling', thisM.counseling, lastM.counseling, goals.counseling)}
-    ${goalRow('口コミ獲得', 'reviews', thisM.reviews, lastM.reviews, goals.reviews)}
     ${goalRow('処置', 'treatment', thisM.treatment, lastM.treatment, 0)}
-    ${goalRow('書き込み合計', 'count', thisM.count, lastM.count, 0)}
+    ${goalRow('物品販売（購入）', 'items', thisM.items, lastM.items, 0)}
+    ${goalRow('アポ転換', 'appointment', thisM.appointment, lastM.appointment, 0)}
+    ${goalRow('ポジティブ行動', 'team_support', thisM.team_support, lastM.team_support, 0)}
+    ${goalRow('ファン患者獲得', 'fan', thisM.fan, lastM.fan, 0)}
+    ${goalRow('月間合計', 'count', thisM.count, lastM.count, 0)}
   `;
 
   // 日付別記録（カレンダー用）
@@ -1896,16 +1942,17 @@ app.get('/my-stats', async (req, res) => {
     });
   }
 
-  // 目標達成カウント
+  // 週間目標達成カウント（山登りの進捗）
   const goalItems = [
-    { label: '物品販売', cur: thisM.items||0, goal: goals.items||0 },
-    { label: 'すすめた', cur: thisM.recommend||0, goal: goals.recommend||0 },
-    { label: 'ジャブ打ち', cur: thisM.approach||0, goal: goals.approach||0 },
-    { label: '成約', cur: thisM.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', cur: thisM.reviews||0, goal: goals.reviews||0 },
-    { label: 'アポ転換', cur: thisM.appointment||0, goal: goals.appointment||0 },
-    { label: '処置', cur: thisM.treatment||0, goal: goals.treatment||0 },
-    { label: '声掛け', cur: thisM.team_support||0, goal: goals.team_support||0 },
+    { label: '処置', cur: thisW.treatment||0, goal: goals.treatment||0 },
+    { label: '物品販売', cur: thisW.items||0, goal: goals.items||0 },
+    { label: 'アポ転換', cur: thisW.appointment||0, goal: goals.appointment||0 },
+    { label: 'ポジティブ行動', cur: thisW.team_support||0, goal: goals.team_support||0 },
+    { label: 'ファン患者', cur: thisW.fan||0, goal: goals.fan||0 },
+    { label: 'すすめた', cur: thisW.recommend||0, goal: goals.recommend||0 },
+    { label: 'ジャブ打ち', cur: thisW.approach||0, goal: goals.approach||0 },
+    { label: '成約', cur: thisW.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', cur: thisW.reviews||0, goal: goals.reviews||0 },
   ].filter(g => g.goal > 0);
   const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
   const totalGoals = goalItems.length;
@@ -1940,21 +1987,22 @@ app.get('/my-stats', async (req, res) => {
         ${achieved ? '<div class="ring-badge">達成</div>' : ''}
       </div>
       <div class="ring-label">${label}</div>
-      <div class="ring-diff">${diffHtml} 先月比</div>
+      <div class="ring-diff">${diffHtml} 先週比</div>
       ${pct !== null && over > 100 ? `<div class="ring-over">${over}% 達成！</div>` : ''}
     </div>`;
   }
 
   const allGoalItems = [
-    { label: '物品販売', cur: thisM.items||0, prev: lastM.items||0, goal: goals.items||0 },
-    { label: 'すすめた', cur: thisM.recommend||0, prev: lastM.recommend||0, goal: goals.recommend||0 },
-    { label: 'ジャブ打ち', cur: thisM.approach||0, prev: lastM.approach||0, goal: goals.approach||0 },
-    { label: '成約', cur: thisM.counseling||0, prev: lastM.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', cur: thisM.reviews||0, prev: lastM.reviews||0, goal: goals.reviews||0 },
-    { label: 'アポ転換', cur: thisM.appointment||0, prev: lastM.appointment||0, goal: goals.appointment||0 },
-    { label: '処置', cur: thisM.treatment||0, prev: lastM.treatment||0, goal: goals.treatment||0 },
-    { label: '声掛け', cur: thisM.team_support||0, prev: lastM.team_support||0, goal: goals.team_support||0 },
-    { label: '合計', cur: thisM.count||0, prev: lastM.count||0, goal: 0 },
+    { label: '処置', cur: thisW.treatment||0, prev: lastW.treatment||0, goal: goals.treatment||0 },
+    { label: '物品販売', cur: thisW.items||0, prev: lastW.items||0, goal: goals.items||0 },
+    { label: 'アポ転換', cur: thisW.appointment||0, prev: lastW.appointment||0, goal: goals.appointment||0 },
+    { label: 'ポジティブ行動', cur: thisW.team_support||0, prev: lastW.team_support||0, goal: goals.team_support||0 },
+    { label: 'ファン患者', cur: thisW.fan||0, prev: lastW.fan||0, goal: goals.fan||0 },
+    { label: 'すすめた', cur: thisW.recommend||0, prev: lastW.recommend||0, goal: goals.recommend||0 },
+    { label: 'ジャブ打ち', cur: thisW.approach||0, prev: lastW.approach||0, goal: goals.approach||0 },
+    { label: '成約', cur: thisW.counseling||0, prev: lastW.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', cur: thisW.reviews||0, prev: lastW.reviews||0, goal: goals.reviews||0 },
+    { label: '今週合計', cur: thisW.count||0, prev: lastW.count||0, goal: 0 },
   ];
   const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
 
@@ -2032,7 +2080,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
 <div class="mountain-wrap">
   <div class="mtn-overlay">
     <div class="mtn-pct" id="mtnPct">0%</div>
-    <div class="mtn-sub">今月の総合達成率</div>
+    <div class="mtn-sub">今週の総合達成率</div>
     <div class="mtn-status ${allAchieved ? 'all' : totalGoals > 0 ? 'part' : 'none'}">
       ${allAchieved ? '🏆 全目標達成！' : totalGoals > 0 ? achievedCount + '/' + totalGoals + ' 項目達成中' : '目標を設定しよう'}
     </div>
