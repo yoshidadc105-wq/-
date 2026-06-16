@@ -1861,8 +1861,15 @@ app.get('/my-stats', async (req, res) => {
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
   const goals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
+  const staffSetting = settings.find(s => s.staffName === name) || {};
+  const disabledItems = staffSetting.disabledItems || [];
   const actionItems = await loadActionItems();
   const itemCatMap = Object.fromEntries(actionItems.map(i => [i.name, i.category]));
+  // ONになっているカテゴリのセット
+  const visibleCats = new Set(
+    actionItems.filter(i => !disabledItems.includes(i.name))
+      .map(i => ACTION_CATEGORY[i.name] || i.category || 'treatment')
+  );
 
   // 月別集計
   const byMonth = {};
@@ -1975,16 +1982,16 @@ app.get('/my-stats', async (req, res) => {
 
   // 週間目標達成カウント（山登りの進捗）
   const goalItems = [
-    { label: '処置', cur: thisW.treatment||0, goal: goals.treatment||0 },
-    { label: '物品販売', cur: thisW.items||0, goal: goals.items||0 },
-    { label: 'アポ転換', cur: thisW.appointment||0, goal: goals.appointment||0 },
-    { label: 'ポジティブ行動', cur: thisW.team_support||0, goal: goals.team_support||0 },
-    { label: 'ファン患者', cur: thisW.fan||0, goal: goals.fan||0 },
-    { label: 'すすめた', cur: thisW.recommend||0, goal: goals.recommend||0 },
-    { label: 'ジャブ打ち', cur: thisW.approach||0, goal: goals.approach||0 },
-    { label: '成約', cur: thisW.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', cur: thisW.reviews||0, goal: goals.reviews||0 },
-  ].filter(g => g.goal > 0);
+    { label: '処置', cat: 'treatment', cur: thisW.treatment||0, goal: goals.treatment||0 },
+    { label: '物品販売', cat: 'item', cur: thisW.items||0, goal: goals.items||0 },
+    { label: 'アポ転換', cat: 'appointment', cur: thisW.appointment||0, goal: goals.appointment||0 },
+    { label: 'ポジティブ行動', cat: 'team_support', cur: thisW.team_support||0, goal: goals.team_support||0 },
+    { label: 'ファン患者', cat: 'fan', cur: thisW.fan||0, goal: goals.fan||0 },
+    { label: 'すすめた', cat: 'item_recommend', cur: thisW.recommend||0, goal: goals.recommend||0 },
+    { label: 'ジャブ打ち', cat: 'counseling_approach', cur: thisW.approach||0, goal: goals.approach||0 },
+    { label: '成約', cat: 'counseling', cur: thisW.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', cat: 'review', cur: thisW.reviews||0, goal: goals.reviews||0 },
+  ].filter(g => g.goal > 0 && visibleCats.has(g.cat));
   const achievedCount = goalItems.filter(g => g.cur >= g.goal).length;
   const totalGoals = goalItems.length;
   const allAchieved = totalGoals > 0 && achievedCount === totalGoals;
@@ -2024,17 +2031,17 @@ app.get('/my-stats', async (req, res) => {
   }
 
   const allGoalItems = [
-    { label: '処置', cur: thisW.treatment||0, prev: lastW.treatment||0, goal: goals.treatment||0 },
-    { label: '物品販売', cur: thisW.items||0, prev: lastW.items||0, goal: goals.items||0 },
-    { label: 'アポ転換', cur: thisW.appointment||0, prev: lastW.appointment||0, goal: goals.appointment||0 },
-    { label: 'ポジティブ行動', cur: thisW.team_support||0, prev: lastW.team_support||0, goal: goals.team_support||0 },
-    { label: 'ファン患者', cur: thisW.fan||0, prev: lastW.fan||0, goal: goals.fan||0 },
-    { label: 'すすめた', cur: thisW.recommend||0, prev: lastW.recommend||0, goal: goals.recommend||0 },
-    { label: 'ジャブ打ち', cur: thisW.approach||0, prev: lastW.approach||0, goal: goals.approach||0 },
-    { label: '成約', cur: thisW.counseling||0, prev: lastW.counseling||0, goal: goals.counseling||0 },
-    { label: '口コミ', cur: thisW.reviews||0, prev: lastW.reviews||0, goal: goals.reviews||0 },
-    { label: '今週合計', cur: thisW.count||0, prev: lastW.count||0, goal: 0 },
-  ];
+    { label: '処置', cat: 'treatment', cur: thisW.treatment||0, prev: lastW.treatment||0, goal: goals.treatment||0 },
+    { label: '物品販売', cat: 'item', cur: thisW.items||0, prev: lastW.items||0, goal: goals.items||0 },
+    { label: 'アポ転換', cat: 'appointment', cur: thisW.appointment||0, prev: lastW.appointment||0, goal: goals.appointment||0 },
+    { label: 'ポジティブ行動', cat: 'team_support', cur: thisW.team_support||0, prev: lastW.team_support||0, goal: goals.team_support||0 },
+    { label: 'ファン患者', cat: 'fan', cur: thisW.fan||0, prev: lastW.fan||0, goal: goals.fan||0 },
+    { label: 'すすめた', cat: 'item_recommend', cur: thisW.recommend||0, prev: lastW.recommend||0, goal: goals.recommend||0 },
+    { label: 'ジャブ打ち', cat: 'counseling_approach', cur: thisW.approach||0, prev: lastW.approach||0, goal: goals.approach||0 },
+    { label: '成約', cat: 'counseling', cur: thisW.counseling||0, prev: lastW.counseling||0, goal: goals.counseling||0 },
+    { label: '口コミ', cat: 'review', cur: thisW.reviews||0, prev: lastW.reviews||0, goal: goals.reviews||0 },
+    { label: '今週合計', cat: null, cur: thisW.count||0, prev: lastW.count||0, goal: 0 },
+  ].filter(g => g.cat === null || visibleCats.has(g.cat));
   const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
 
   res.send(`<!DOCTYPE html>
