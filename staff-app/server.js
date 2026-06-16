@@ -162,7 +162,7 @@ app.delete('/admin/action-config/categories/:id', async (req, res) => {
 
 const DEFAULT_ACTION_ITEMS = [
   { id: 'i11', name: 'シーラント', group: '処置', category: 'treatment', needsPatient: true, needsCount: true, builtin: true, order: 10 },
-  { id: 'i12', name: 'レントゲン', group: '処置', category: 'treatment', needsPatient: true, typeOptions: ['CT・パノラマ', '臼歯デンタル'], builtin: true, order: 11 },
+  { id: 'i12', name: 'レントゲン（CT・パノラマ／臼歯デンタル）', group: '処置', category: 'treatment', needsPatient: true, builtin: true, order: 11 },
   { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true, defaultHidden: true, order: 12 },
   { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true, order: 20 },
   { id: 'i02', name: '物品をすすめた（未購入）', group: '物品', category: 'item_recommend', needsPatient: true, showItemName: true, builtin: true, defaultHidden: true, order: 21 },
@@ -179,16 +179,21 @@ const DEFAULT_ACTION_ITEMS = [
 ];
 
 async function loadActionItems() {
-  // ビルトイン項目は常にデフォルト定義をマージして最新プロパティを保証する
+  // ビルトイン項目は常にデフォルト定義をマージ＆不足分を追加する
   function mergeWithDefaults(items) {
     const defMap = Object.fromEntries(DEFAULT_ACTION_ITEMS.map(d => [d.id, d]));
-    return items.map(item => item.builtin && defMap[item.id]
+    const idSet = new Set(items.map(i => i.id));
+    // 既存アイテムをデフォルト定義でマージ
+    const merged = items.map(item => item.builtin && defMap[item.id]
       ? { ...defMap[item.id], ...item,
           showItemName: defMap[item.id].showItemName, needsPatient: defMap[item.id].needsPatient,
           needsCount: defMap[item.id].needsCount, typeOptions: defMap[item.id].typeOptions,
           needsFreeText: defMap[item.id].needsFreeText, category: defMap[item.id].category,
           defaultHidden: defMap[item.id].defaultHidden, order: defMap[item.id].order }
       : item);
+    // DBに存在しない新しいビルトイン項目を追加
+    const missing = DEFAULT_ACTION_ITEMS.filter(d => !idSet.has(d.id));
+    return [...merged, ...missing].sort((a, b) => (a.order||999) - (b.order||999));
   }
   if (actionItemsCol) {
     const items = await actionItemsCol.find({}).sort({ order: 1, _id: 1 }).toArray();
@@ -538,6 +543,7 @@ const ACTION_CATEGORY = {
   'アポ転換': 'appointment',
   'シーラント': 'treatment',
   'レントゲン': 'treatment',
+  'レントゲン（CT・パノラマ／臼歯デンタル）': 'treatment',
   'フッ素塗布': 'treatment',
   'ポジティブ声掛け': 'team_support',
   'ポジティブな行動をした': 'team_support',
@@ -1018,6 +1024,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div style="margin-bottom:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
       <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
+      <button onclick="fixItemOrder()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">項目順番を更新</button>
       <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
       <span id="fixCatMsg" style="font-size:12px"></span>
     </div>
@@ -1228,6 +1235,17 @@ async function debugActions() {
     Object.entries(d.counts).sort((a,b) => b[1]-a[1]).forEach(function(e){ lines.push(e[1] + '件　' + e[0]); });
     el.textContent = lines.join('\\n');
   } else { el.textContent = '失敗'; }
+}
+
+async function fixItemOrder() {
+  const msg = document.getElementById('fixCatMsg');
+  msg.style.color = '#0f766e'; msg.textContent = '更新中...';
+  const res = await adminFetch('/admin/fix-item-order', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    msg.style.color = '#065f46';
+    msg.textContent = '完了：' + d.updated + '件の項目を更新しました。ページを再読み込みしてください。';
+  } else { msg.style.color = '#dc2626'; msg.textContent = '失敗しました'; }
 }
 
 async function fixCategories() {
@@ -2303,6 +2321,25 @@ app.get('/admin/debug-actions', async (req, res) => {
     counts[key] = (counts[key] || 0) + 1;
   }
   res.json({ total: records.length, counts });
+});
+
+// ビルトイン項目の順番・プロパティをDBに強制反映
+app.post('/admin/fix-item-order', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!actionItemsCol) return res.json({ ok: false, msg: 'MongoDB未接続' });
+  const defMap = Object.fromEntries(DEFAULT_ACTION_ITEMS.map(d => [d.id, d]));
+  let updated = 0;
+  for (const def of DEFAULT_ACTION_ITEMS) {
+    const r = await actionItemsCol.updateOne(
+      { id: def.id },
+      { $set: { order: def.order, name: def.name, category: def.category, needsPatient: !!def.needsPatient,
+                needsCount: !!def.needsCount, needsFreeText: !!def.needsFreeText, defaultHidden: !!def.defaultHidden,
+                typeOptions: def.typeOptions || null, showItemName: !!def.showItemName, group: def.group } },
+      { upsert: true }
+    );
+    if (r.modifiedCount || r.upsertedCount) updated++;
+  }
+  res.json({ ok: true, updated });
 });
 
 app.get('/health', (_req, res) => res.send('OK'));
