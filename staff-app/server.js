@@ -783,11 +783,30 @@ app.get('/dashboard', async (req, res) => {
       </tr>`;
   }).join('');
 
-  // KPIサマリー
-  const totalItems = staffList.reduce((s,[,d])=>s+Object.values(d.itemsMap).reduce((a,b)=>a+b,0),0);
-  const totalCounseling = staffList.reduce((s,[,d])=>s+Object.values(d.counselingMap).reduce((a,b)=>a+b,0),0);
-  const totalReviews = staffList.reduce((s,[,d])=>s+d.reviews,0);
+  // KPIサマリー（アクション名別集計）
+  const actionTotals = {};
+  for (const r of records) {
+    if (r.entryType === 'behavior' || !r.action) continue;
+    actionTotals[r.action] = (actionTotals[r.action] || 0) + 1;
+  }
   const totalPatients = new Set(records.filter(r=>r.patientNo).map(r=>r.patientNo)).size;
+  // ONになっているデフォルト項目（defaultHidden=falseのもの）のKPIカード
+  const actionItems4kpi = await loadActionItems();
+  const kpiItems = actionItems4kpi.filter(i => !i.defaultHidden);
+  const kpiColors = ['green','blue','orange','purple','teal','pink'];
+  const kpiCards = kpiItems.map((item, idx) => {
+    const cnt = actionTotals[item.name] || 0;
+    const color = kpiColors[idx % kpiColors.length];
+    return `<div class="kpi-card ${color}">
+      <div class="kpi-label">${esc(item.name)}</div>
+      <div class="kpi-value">${cnt}</div>
+      <div class="kpi-sub">合計件数</div>
+    </div>`;
+  }).join('') + `<div class="kpi-card green">
+    <div class="kpi-label">登録患者数</div>
+    <div class="kpi-value">${totalPatients}</div>
+    <div class="kpi-sub">ユニーク患者番号</div>
+  </div>`;
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -820,6 +839,10 @@ header p{font-size:11px;color:rgba(255,255,255,.75);margin-top:2px}
 .kpi-card.blue{border-color:#3b82f6}
 .kpi-card.orange{border-color:#f59e0b}
 .kpi-card.purple{border-color:#8b5cf6}
+.kpi-card.teal{border-color:#14b8a6}
+.kpi-card.pink{border-color:#ec4899}
+.kpi-card.teal .kpi-value{color:#0d9488}
+.kpi-card.pink .kpi-value{color:#db2777}
 .kpi-label{font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .kpi-value{font-size:30px;font-weight:700;line-height:1;margin-bottom:4px}
 .kpi-card.green .kpi-value{color:#0f766e}
@@ -943,26 +966,7 @@ td{padding:11px 14px;vertical-align:middle}
 
   <!-- KPIカード -->
   <div class="kpi-grid">
-    <div class="kpi-card green">
-      <div class="kpi-label">登録患者数</div>
-      <div class="kpi-value">${totalPatients}</div>
-      <div class="kpi-sub">ユニーク患者番号</div>
-    </div>
-    <div class="kpi-card orange">
-      <div class="kpi-label">物品販売</div>
-      <div class="kpi-value">${totalItems}</div>
-      <div class="kpi-sub">合計件数</div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">カウンセリング成約</div>
-      <div class="kpi-value">${totalCounseling}</div>
-      <div class="kpi-sub">合計件数</div>
-    </div>
-    <div class="kpi-card purple">
-      <div class="kpi-label">口コミ獲得</div>
-      <div class="kpi-value">${totalReviews}</div>
-      <div class="kpi-sub">合計件数</div>
-    </div>
+    ${kpiCards}
   </div>
 
   <!-- フィルター -->
