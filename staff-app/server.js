@@ -2024,7 +2024,7 @@ app.get('/my-stats', async (req, res) => {
       return g > 0 && (lastW[n] || 0) >= g;
     });
     if (goalsToBump.length > 0) {
-      goalsToBump.forEach(n => { goals[n] = (goals[n] || 0) + 1; });
+      goalsToBump.forEach(n => { goals[n] = (lastW[n] || 0) + 1; });
       if (staffSettingsCol) await staffSettingsCol.updateOne(
         { staffName: name },
         { $set: { goals, goalBumpedWeek: bumpWeekKey } },
