@@ -2356,6 +2356,24 @@ app.post('/admin/apply-default-visibility', async (req, res) => {
   res.json({ ok: true, count: staffNames.length });
 });
 
+// カスタム項目を復元
+app.post('/admin/restore-custom-items', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!actionItemsCol) return res.json({ ok: false, msg: 'MongoDB未接続' });
+  const customItems = [
+    { id: 'custom-apo-01', name: '土曜、平日夕方患者を平日の午前や日中でアポをとった。', group: 'アポ管理', category: 'appointment', needsPatient: false, builtin: false, defaultHidden: false, order: 31 },
+  ];
+  let added = 0;
+  for (const item of customItems) {
+    const exists = await actionItemsCol.findOne({ id: item.id });
+    if (!exists) {
+      await actionItemsCol.insertOne(item);
+      added++;
+    }
+  }
+  res.json({ ok: true, added });
+});
+
 // ビルトイン項目の順番・プロパティをDBに強制反映
 app.post('/admin/fix-item-order', async (req, res) => {
   if (!checkAuth(req, res)) return;
