@@ -64,6 +64,10 @@
   </style>
 </head>
 <body>
+<div id="login-bar" style="background:#673ab7;color:#fff;padding:8px 20px;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+  <span>のびのび歯科 スタッフ評価</span>
+  <span id="login-status"></span>
+</div>
 <div class="top-bar"></div>
 <header>
   <h1>スタッフ評価フォーム</h1>
@@ -96,5 +100,15 @@
   </a>
 
 </div>
+<script>
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(me => {
+  const el = document.getElementById('login-status');
+  if (me) {
+    el.innerHTML = 'ログイン中: <strong>' + me.name + '</strong>　<a href="/staff-logout" style="color:#e1bee7;font-size:12px">ログアウト</a>';
+  } else {
+    el.innerHTML = '<a href="/login" style="color:#e1bee7">ログイン</a>';
+  }
+}).catch(() => {});
+</script>
 </body>
 </html>

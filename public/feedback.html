@@ -238,6 +238,7 @@
   const FORM_HTML = `
   <!-- Deadline banner -->
   <div id="deadline-banner" style="display:none" class="deadline-banner"></div>
+  <div id="staff-info-bar" style="text-align:right;font-size:13px;color:#555;margin-bottom:4px"></div>
 
   <!-- Success screen -->
   <div id="success-screen">
@@ -566,6 +567,23 @@
 
     root.innerHTML = FORM_HTML;
 
+    // Login check
+    let staffName = '';
+    try {
+      const meRes = await fetch('/api/me');
+      if (!meRes.ok) {
+        location.href = '/login?next=' + encodeURIComponent(location.pathname);
+        return;
+      }
+      const me = await meRes.json();
+      staffName = me.name;
+    } catch {
+      location.href = '/login?next=' + encodeURIComponent(location.pathname);
+      return;
+    }
+
+    document.getElementById('staff-info-bar').innerHTML = 'ログイン中: <strong>' + staffName + '</strong>　<a href="/staff-logout" style="color:#888;font-size:12px">ログアウト</a>';
+
     // Deadline check
     let deadlineClosed = false;
     try {
@@ -615,17 +633,16 @@
       opt.textContent = t.name;
       sel.appendChild(opt);
     });
-    // Populate respondent dropdown (回答者) from separate list
-    try {
-      const respondents = await fetch('/api/respondents').then(r => r.json());
+    // Auto-fill respondent from login session
+    {
       const resSel = document.getElementById('respondent');
-      respondents.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t.name;
-        opt.textContent = t.name;
-        resSel.appendChild(opt);
-      });
-    } catch {}
+      const opt = document.createElement('option');
+      opt.value = staffName;
+      opt.textContent = staffName;
+      resSel.appendChild(opt);
+      resSel.value = staffName;
+      resSel.disabled = true;
+    }
 
     if (deadlineClosed) {
       document.getElementById('submit-btn').disabled = true;

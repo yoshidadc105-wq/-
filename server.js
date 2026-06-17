@@ -827,6 +827,25 @@ function checkFeedbackAuth(req, res) {
   return true;
 }
 
+// ===== スタッフ認証 =====
+const staffSessions = new Map(); // token → { name, email, expiry }
+const STAFF_SESSION_MS = 8 * 60 * 60 * 1000; // 8時間
+
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+function checkStaffSession(req) {
+  const token = getCookie(req, 'staffToken');
+  if (!token) return null;
+  const sess = staffSessions.get(token);
+  if (!sess || Date.now() > sess.expiry) {
+    staffSessions.delete(token);
+    return null;
+  }
+  return sess;
+}
+
 // ---- ログイン画面 ----
 app.get('/staff-admin/login', (req, res) => {
   const error = req.query.error ? '<p style="color:red;margin:0 0 12px">パスワードが違います</p>' : '';
@@ -876,6 +895,41 @@ app.get('/staff-admin/logout', (req, res) => {
   if (token) adminSessions.delete(token);
   res.setHeader('Set-Cookie', 'adminToken=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
   res.redirect('/staff-admin/login');
+});
+
+app.get('/api/me', (req, res) => {
+  const sess = checkStaffSession(req);
+  if (!sess) return res.status(401).json({ error: 'not logged in' });
+  res.json({ name: sess.name, email: sess.email });
+});
+
+app.get('/login', (req, res) => {
+  if (checkStaffSession(req)) return res.redirect(req.query.next || '/');
+  const errHtml = req.query.error ? '<p style="color:red;margin:0 0 12px">メールアドレスまたはパスワードが違います</p>' : '';
+  const nextInput = req.query.next ? `<input type="hidden" name="next" value="${escHtml(req.query.next)}">` : '';
+  res.send(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>スタッフログイン</title>
+<style>body{font-family:sans-serif;background:#ede7f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.box{background:#fff;padding:40px;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.12);width:320px}h2{margin:0 0 6px;font-size:1.3rem;text-align:center;color:#333}.sub{text-align:center;font-size:13px;color:#888;margin-bottom:24px}label{display:block;margin-bottom:6px;font-size:.9rem;color:#555}input[type=email],input[type=password]{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #ccc;border-radius:6px;font-size:1rem;margin-bottom:16px}button{width:100%;padding:12px;background:#673ab7;color:#fff;border:none;border-radius:6px;font-size:1rem;cursor:pointer}button:hover{background:#512da8}</style>
+</head><body><div class="box"><h2>スタッフログイン</h2><p class="sub">のびのび歯科</p>${errHtml}<form method="POST" action="/login">${nextInput}<label>メールアドレス</label><input type="email" name="email" autofocus required><label>パスワード</label><input type="password" name="password" required><button type="submit">ログイン</button></form></div></body></html>`);
+});
+
+app.post('/login', express.urlencoded({ extended: false }), ah(async (req, res) => {
+  const { email, password, next } = req.body;
+  const db = await getDb();
+  const account = await db.collection('staffAccounts').findOne({ email: (email || '').toLowerCase().trim() });
+  const redirectBack = '/login?error=1' + (next ? '&next=' + encodeURIComponent(next) : '');
+  if (!account) return res.redirect(redirectBack);
+  if (hashPassword(password || '', account.salt) !== account.passwordHash) return res.redirect(redirectBack);
+  const token = crypto.randomBytes(32).toString('hex');
+  staffSessions.set(token, { name: account.name, email: account.email, expiry: Date.now() + STAFF_SESSION_MS });
+  res.setHeader('Set-Cookie', `staffToken=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${STAFF_SESSION_MS / 1000}`);
+  res.redirect(next || '/');
+}));
+
+app.get('/staff-logout', (req, res) => {
+  const token = getCookie(req, 'staffToken');
+  if (token) staffSessions.delete(token);
+  res.setHeader('Set-Cookie', 'staffToken=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+  res.redirect('/login');
 });
 
 // フィードバック受信
@@ -1809,6 +1863,39 @@ ${dataSection}`;
   }
 });
 
+// ===== スタッフアカウント管理 API =====
+app.get('/api/staff-accounts', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const list = await (await getDb()).collection('staffAccounts').find({}).sort({ createdAt: 1 }).toArray();
+  res.json(list.map(({ id, name, email, createdAt }) => ({ id, name, email, createdAt })));
+}));
+app.post('/api/staff-accounts', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const name = (req.body.name || '').trim();
+  const email = (req.body.email || '').toLowerCase().trim();
+  const password = (req.body.password || '').trim();
+  if (!name || !email || !password) return res.status(400).json({ error: '全項目必須です' });
+  const db = await getDb();
+  if (await db.collection('staffAccounts').findOne({ email })) return res.status(409).json({ error: 'このメールアドレスは登録済みです' });
+  const salt = crypto.randomBytes(16).toString('hex');
+  const doc = { id: crypto.randomUUID(), name, email, passwordHash: hashPassword(password, salt), salt, createdAt: new Date().toISOString() };
+  await db.collection('staffAccounts').insertOne(doc);
+  res.json({ id: doc.id, name, email });
+}));
+app.delete('/api/staff-accounts/:id', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  await (await getDb()).collection('staffAccounts').deleteOne({ id: req.params.id });
+  res.json({ ok: true });
+}));
+app.put('/api/staff-accounts/:id/password', ah(async (req, res) => {
+  if (!checkFeedbackAuth(req, res)) return;
+  const password = (req.body.password || '').trim();
+  if (!password) return res.status(400).json({ error: 'パスワードが必要です' });
+  const salt = crypto.randomBytes(16).toString('hex');
+  await (await getDb()).collection('staffAccounts').updateOne({ id: req.params.id }, { $set: { passwordHash: hashPassword(password, salt), salt } });
+  res.json({ ok: true });
+}));
+
 // ===== 統合管理画面 =====
 
 app.get('/staff-admin', async (req, res) => {
@@ -1823,12 +1910,13 @@ app.get('/staff-admin', async (req, res) => {
     ? { submittedAt: { $gte: selectedPeriod.start, $lte: selectedPeriod.end } }
     : {};
 
-  const [feedbacks, selfRecs, targets, compFBArr, respondentDocs] = await Promise.all([
+  const [feedbacks, selfRecs, targets, compFBArr, respondentDocs, staffAccountDocs] = await Promise.all([
     db.collection('feedback').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('selfAssessments').find(dateQuery).sort({ submittedAt: -1 }).toArray(),
     db.collection('targets').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
     db.collection('compFeedback').find({}).toArray(),
     db.collection('respondents').find({}).sort({ order: 1, createdAt: 1 }).toArray(),
+    db.collection('staffAccounts').find({}).sort({ createdAt: 1 }).toArray(),
   ]);
   // Convert compFeedback array to object keyed by name
   const compFB = {};
@@ -2385,6 +2473,31 @@ async function addTarget2() {
   msg.style.color='#2e7d32'; msg.textContent='追加しました'; inp.value='';
   setTimeout(() => location.reload(), 800);
 }
+async function addStaffAccount() {
+  const name = document.getElementById('acc-name').value;
+  const email = document.getElementById('acc-email').value.trim();
+  const password = document.getElementById('acc-pw').value;
+  const msg = document.getElementById('acc-msg');
+  if (!name || !email || !password) { msg.style.color='#c62828'; msg.textContent='全項目入力してください'; return; }
+  const r = await fetch('/api/staff-accounts', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password})});
+  if (r.status===409) { msg.style.color='#c62828'; msg.textContent='このメールアドレスは登録済みです'; return; }
+  if (!r.ok) { msg.style.color='#c62828'; msg.textContent='エラー'; return; }
+  msg.style.color='#2e7d32'; msg.textContent='追加しました';
+  setTimeout(() => location.reload(), 800);
+}
+async function delStaffAccount(id) {
+  if (!confirm('このアカウントを削除しますか？')) return;
+  await fetch('/api/staff-accounts/' + id, {method:'DELETE'});
+  location.reload();
+}
+async function resetPw(id) {
+  const pw = document.getElementById('pw-' + id).value;
+  if (!pw) { alert('新しいパスワードを入力してください'); return; }
+  const r = await fetch('/api/staff-accounts/' + id + '/password', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  if (!r.ok) { alert('エラーが発生しました'); return; }
+  alert('パスワードを変更しました');
+  location.reload();
+}
 async function addTarget() {
   const inp = document.getElementById('nt'); const msg = document.getElementById('tmsg');
   const name = inp.value.trim();
@@ -2517,6 +2630,31 @@ async function saveQuestions() {
     ${allNames.length === 0 ? '<div class="empty">まだデータはありません</div>' : compRows}
   </div>
   <div class="tab-panel" id="panel-settings">
+    <div class="set-card">
+      <div class="set-hd">スタッフアカウント管理</div>
+      <div class="set-bd">
+        <p style="font-size:12px;color:#555;margin-bottom:12px">スタッフがフォームにログインするためのアカウントです。メールアドレスとパスワードを設定してください。</p>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">
+          <thead><tr style="background:#ede7f6"><th style="padding:8px;text-align:left">名前</th><th style="padding:8px;text-align:left">メールアドレス</th><th style="padding:8px;text-align:left">パスワード変更</th><th style="padding:8px"></th></tr></thead>
+          <tbody>
+            ${staffAccountDocs.length === 0 ? '<tr><td colspan="4" style="padding:10px;color:#9e9e9e">未登録</td></tr>' : staffAccountDocs.map(a => '<tr style="border-bottom:1px solid #f3e5f5"><td style="padding:8px">' + escHtml(a.name) + '</td><td style="padding:8px">' + escHtml(a.email) + '</td><td style="padding:8px"><input type="password" id="pw-' + a.id + '" placeholder="新パスワード" style="border:1px solid #ce93d8;border-radius:4px;padding:4px 6px;font-size:12px;width:130px"> <button onclick="resetPw(\'' + a.id + '\')" style="background:#7b1fa2;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer">変更</button></td><td style="padding:8px"><button onclick="delStaffAccount(\'' + a.id + '\')" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer">削除</button></td></tr>').join('')}
+          </tbody>
+        </table>
+        <div style="background:#f9f5ff;border-radius:8px;padding:16px;border:1px solid #e1bee7">
+          <div style="font-size:13px;font-weight:bold;margin-bottom:12px;color:#4a148c">新しいアカウントを追加</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="acc-name" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px">
+              <option value="">名前を選択...</option>
+              ${targets.map(t => '<option value="' + escHtml(t.name) + '">' + escHtml(t.name) + '</option>').join('')}
+            </select>
+            <input type="email" id="acc-email" placeholder="メールアドレス" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px;width:180px">
+            <input type="password" id="acc-pw" placeholder="パスワード" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px;width:140px">
+            <button class="add-btn" onclick="addStaffAccount()">＋ 追加</button>
+            <span id="acc-msg" style="font-size:12px"></span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="set-card">
       <div class="set-hd">行動基準評価 回答者 ／ 360度評価 評価対象者</div>
       <div class="set-bd">

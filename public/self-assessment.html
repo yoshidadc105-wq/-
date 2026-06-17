@@ -480,18 +480,30 @@
     } catch {}
   })();
 
-  // 回答者プルダウンにrespondentsを読み込む
+  // ログインチェック・回答者自動設定
   (async () => {
     try {
-      const respondents = await fetch('/api/targets').then(r => r.json());
+      const meRes = await fetch('/api/me');
+      if (!meRes.ok) {
+        location.href = '/login?next=' + encodeURIComponent(location.pathname);
+        return;
+      }
+      const me = await meRes.json();
       const sel = document.getElementById('respondent');
-      respondents.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t.name;
-        opt.textContent = t.name;
-        sel.appendChild(opt);
-      });
-    } catch {}
+      const opt = document.createElement('option');
+      opt.value = me.name;
+      opt.textContent = me.name;
+      sel.appendChild(opt);
+      sel.value = me.name;
+      sel.disabled = true;
+      // Show logout link
+      const bar = document.createElement('div');
+      bar.style.cssText = 'text-align:right;font-size:13px;color:#555;margin-bottom:4px';
+      bar.innerHTML = 'ログイン中: <strong>' + me.name + '</strong>　<a href="/staff-logout" style="color:#888;font-size:12px">ログアウト</a>';
+      document.querySelector('.container').insertBefore(bar, document.querySelector('.header-card'));
+    } catch {
+      location.href = '/login?next=' + encodeURIComponent(location.pathname);
+    }
   })();
 
   // Auto-grow textareas
