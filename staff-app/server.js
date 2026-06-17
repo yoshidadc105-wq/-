@@ -650,21 +650,20 @@ app.get('/dashboard', async (req, res) => {
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
-      byStaff[r.staffName] = { count: 0, itemsMap: {}, recommendMap: {}, counselingMap: {}, approachMap: {}, reviews: 0, treatmentMap: {}, patients: new Set(), freePhrases: [] };
+      byStaff[r.staffName] = { count: 0, actionMap: {}, patients: new Set(), freePhrases: [], itemsMap: {}, counselingMap: {}, treatmentMap: {}, reviews: 0 };
     }
     const s = byStaff[r.staffName];
     s.count++;
     if (r.entryType === 'behavior') {
       if (r.freeText) s.freePhrases.push(r.freeText);
     } else {
+      s.actionMap[r.action] = (s.actionMap[r.action] || 0) + 1;
       const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
       const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
-      if (cat === 'item')              s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
-      if (cat === 'item_recommend')    s.recommendMap = s.recommendMap || {}; if (cat === 'item_recommend') s.recommendMap[label] = (s.recommendMap[label] || 0) + 1;
-      if (cat === 'counseling')        s.counselingMap[r.action] = (s.counselingMap[r.action] || 0) + 1;
-      if (cat === 'counseling_approach') s.approachMap = s.approachMap || {}; if (cat === 'counseling_approach') s.approachMap[r.action] = (s.approachMap[r.action] || 0) + 1;
-      if (cat === 'review')            s.reviews++;
-      if (cat === 'treatment')         s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
+      if (cat === 'item')    s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
+      if (cat === 'counseling') s.counselingMap[r.action] = (s.counselingMap[r.action] || 0) + 1;
+      if (cat === 'treatment')  s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
+      if (cat === 'review')     s.reviews++;
       if (r.patientNo) s.patients.add(r.patientNo);
     }
   }
@@ -733,41 +732,51 @@ app.get('/dashboard', async (req, res) => {
   const staffOptions = allStaffNames.map(n => `<option value="${esc(n)}"${staffFilter === n ? ' selected' : ''}>${esc(n)}</option>`).join('');
 
   const staffSettings = await loadStaffSettings();
-  const kuchikomiEnabled = new Set(staffSettings.filter(s => s.showKuchikomi).map(s => s.staffName));
+
+  // ONになっているアイテムをグループ別にまとめてカラム定義を作る
+  const dashItems = await loadActionItems();
+  const enabledItems = dashItems.filter(i => !i.defaultHidden);
+  const groupOrder = [];
+  const groupItemsMap = {};
+  for (const item of enabledItems) {
+    if (!groupItemsMap[item.group]) { groupItemsMap[item.group] = []; groupOrder.push(item.group); }
+    groupItemsMap[item.group].push(item.name);
+  }
+
+  const thCols = groupOrder.map(g => `<th class="num">${esc(g)}</th>`).join('');
 
   const summaryRows = staffList.map(([name, s]) => {
-    const itemsTotal = Object.values(s.itemsMap).reduce((x,y)=>x+y,0);
-    const itemsDetail = Object.entries(s.itemsMap).map(([k,v])=>`${k}:${v}`).join('、') || '';
-    const recommendTotal = Object.values(s.recommendMap||{}).reduce((x,y)=>x+y,0);
-    const approachTotal = Object.values(s.approachMap||{}).reduce((x,y)=>x+y,0);
-    const counselingTotal = Object.values(s.counselingMap).reduce((x,y)=>x+y,0);
-    const counselingDetail = Object.entries(s.counselingMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
-    const treatmentDetail = Object.entries(s.treatmentMap).map(([k,v])=>`${k}:${v}`).join('、') || '-';
     const initial = name.charAt(0);
+    const groupCells = groupOrder.map(g => {
+      const names = groupItemsMap[g];
+      const total = names.reduce((sum, n) => sum + (s.actionMap[n] || 0), 0);
+      const detail = names.map(n => s.actionMap[n] ? `${n}:${s.actionMap[n]}` : null).filter(Boolean).join('、');
+      const badge = total > 0 ? `<span class="badge badge-gray">${total}</span>` : `<span style="color:#cbd5e1">0</span>`;
+      return `<td class="num">${badge}${detail ? `<br><small style="color:#94a3b8;font-size:10px">${esc(detail)}</small>` : ''}</td>`;
+    }).join('');
+
+    const stSetting = staffSettings.find(x => x.staffName === name) || {};
+    const g = stSetting.goals || {};
+    const goalParts = enabledItems.map(item => {
+      const cur = s.actionMap[item.name] || 0;
+      const target = g[item.name] || 0;
+      if (!target) return null;
+      const pct = Math.min(Math.round(cur / target * 100), 100);
+      const color = pct >= 100 ? '#059669' : pct >= 70 ? '#f59e0b' : '#2aab96';
+      return `<div style="font-size:11px;color:#64748b">${esc(item.name)} ${cur}/${target}</div>
+        <div style="height:5px;background:#e2e8f0;border-radius:3px;margin:2px 0 4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
+        </div>`;
+    }).filter(Boolean).join('');
+
     return `
       <tr class="staff-row" onclick="openModal('${esc(name).replace(/'/g, "\\'")}')">
         <td><span class="avatar">${esc(initial)}</span><strong>${esc(name)}</strong></td>
         <td class="num"><span class="badge badge-gray">${s.count}</span></td>
         <td class="num">${s.patients.size}</td>
-        <td class="num"><span class="badge badge-orange">${itemsTotal}</span>${itemsDetail ? `<br><small style="color:#94a3b8;font-size:11px">${esc(itemsDetail)}</small>` : ''}<br><small style="color:#94a3b8;font-size:11px">すすめた:${recommendTotal}</small></td>
-        <td class="num"><span class="badge badge-purple">${approachTotal}</span><br><small style="color:#94a3b8;font-size:11px">ジャブ打ち</small></td>
-        <td class="num"><span class="badge badge-blue">${counselingTotal}</span><br><small style="color:#94a3b8;font-size:11px">${esc(counselingDetail)}</small></td>
-        <td class="num"><span class="badge badge-green">${s.reviews}</span></td>
-        <td style="font-size:11px;color:#64748b;max-width:160px">${esc(treatmentDetail)}</td>
-        <td class="num" onclick="event.stopPropagation()" style="min-width:90px">
-          ${(() => {
-            const g = (staffSettings.find(s=>s.staffName===name)||{}).goals||{};
-            const target = g.items || 0;
-            const pct = target > 0 ? Math.min(Math.round(itemsTotal/target*100),100) : 0;
-            const color = pct>=100 ? '#059669' : pct>=70 ? '#f59e0b' : '#2aab96';
-            return target > 0
-              ? `<div style="font-size:11px;color:#64748b">物品 ${itemsTotal}/${target}</div>
-                 <div style="height:6px;background:#e2e8f0;border-radius:3px;margin-top:3px;overflow:hidden">
-                   <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
-                 </div>
-                 <div style="font-size:11px;font-weight:700;color:${color};margin-top:2px">${pct}%${pct>=100?' ✓':''}</div>`
-              : '<span style="color:#cbd5e1;font-size:11px">未設定</span>';
-          })()}
+        ${groupCells}
+        <td onclick="event.stopPropagation()" style="min-width:100px">
+          ${goalParts || '<span style="color:#cbd5e1;font-size:11px">未設定</span>'}
         </td>
         <td onclick="event.stopPropagation()" style="white-space:nowrap">
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
@@ -1005,11 +1014,11 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="table-scroll">
     <table>
       <thead><tr>
-        <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th><th class="num">物品販売/すすめ</th>
-        <th class="num">ジャブ打ち</th><th class="num">成約</th><th class="num">口コミ</th>
-        <th>処置内訳</th><th class="num">月間目標</th><th>出力</th>
+        <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th>
+        ${thCols}
+        <th>目標進捗</th><th>出力</th>
       </tr></thead>
-      <tbody>${summaryRows || '<tr><td colspan="9" class="empty">まだデータがありません</td></tr>'}</tbody>
+      <tbody>${summaryRows || `<tr><td colspan="${4 + groupOrder.length}" class="empty">まだデータがありません</td></tr>`}</tbody>
     </table>
     </div>
   </div>
