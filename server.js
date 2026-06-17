@@ -2447,7 +2447,7 @@ function initDragSort(listId, reorderUrl) {
 document.addEventListener('DOMContentLoaded', () => {
   initDragSort('target-sort-list', '/api/targets/reorder');
   initDragSort('target-sort-list-2', '/api/targets/reorder');
-  initDragSort('resp-sort-list', '/api/respondents/reorder');
+
 });
 async function addRespondent() {
   const inp = document.getElementById('nr'); const msg = document.getElementById('rmsg');
@@ -2666,20 +2666,6 @@ async function saveQuestions() {
           <input type="text" id="nt2" class="add-input" placeholder="名前を入力" />
           <button class="add-btn" onclick="addTarget2()">＋ 追加</button>
           <span id="tmsg2" style="font-size:12px"></span>
-        </div>
-      </div>
-    </div>
-    <div class="set-card">
-      <div class="set-hd">360度評価 — 回答者（評価する人）</div>
-      <div class="set-bd">
-        <p style="font-size:12px;color:#555;margin-bottom:12px">360度評価フォームの「回答者（あなたの名前）」プルダウンに表示される名前リストです。</p>
-        <div class="sort-list" id="resp-sort-list">
-          ${respondentDocs.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
-        </div>
-        <div class="add-row">
-          <input type="text" id="nr" class="add-input" placeholder="名前を入力" />
-          <button class="add-btn" onclick="addRespondent()">＋ 追加</button>
-          <span id="rmsg" style="font-size:12px"></span>
         </div>
       </div>
     </div>
