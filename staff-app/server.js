@@ -1345,6 +1345,7 @@ function clearHistoryFilter() {
 // ===== スタッフ設定タブ（週間目標 + 項目表示） =====
 let currentStaffTab = null;
 async function loadStaffSettingsTabs() {
+  try {
   const [namesRes, goalsRes, itemsRes, settingsRes] = await Promise.all([
     fetch('/api/staff-names'), fetch('/api/goals'), fetch('/api/action-items'), fetch('/api/staff-settings')
   ]);
@@ -1429,6 +1430,11 @@ async function loadStaffSettingsTabs() {
 
   // Show first tab
   switchStaffTab(names[0]);
+  } catch(err) {
+    var p = document.getElementById('staffTabPanels');
+    if (p) p.innerHTML = '<p style="color:#dc2626;font-size:13px">読み込みエラー: ' + err.message + '</p>';
+    console.error('loadStaffSettingsTabs error:', err);
+  }
 }
 
 function switchStaffTab(name) {
@@ -1486,7 +1492,7 @@ async function saveAllGoals() {
   msg.style.color = fail > 0 ? '#dc2626' : '#059669';
   msg.textContent = '全員保存完了：' + ok + '名成功' + (fail > 0 ? '、' + fail + '名失敗' : '');
 }
-loadGoalSettings();
+loadStaffSettingsTabs();
 
 // 項目表示設定（スタッフ別ON/OFF）
 function makeToggle(on) {
