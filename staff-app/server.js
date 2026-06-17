@@ -2034,7 +2034,8 @@ app.get('/my-stats', async (req, res) => {
       action: r.action,
       patientNo: r.patientNo || '',
       itemName: r.itemName || '',
-      freeText: r.freeText || ''
+      freeText: r.freeText || '',
+      countValue: r.countValue || null
     });
   }
 
@@ -2331,7 +2332,7 @@ function renderCal() {
       if (records.length > 0) {
         const cnt = document.createElement('div');
         cnt.className = 'cal-count';
-        cnt.textContent = records.length + '件';
+        cnt.textContent = String(records.length) + '件';
         cell.appendChild(cnt);
       }
       cell.onclick = () => showDetail(dateStr, records);
