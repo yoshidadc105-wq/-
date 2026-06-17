@@ -2320,8 +2320,8 @@ function renderCal() {
     cell.appendChild(numEl);
     if (records.length) {
       const dotsWrap = document.createElement('div');
-      const showDots = Math.min(records.length, 4);
-      for (let i=0; i<showDots; i++) {
+      dotsWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:2px';
+      for (let i=0; i<records.length; i++) {
         const dot = document.createElement('span');
         dot.className = 'cal-dot';
         dotsWrap.appendChild(dot);
