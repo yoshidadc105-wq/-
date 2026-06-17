@@ -2328,14 +2328,6 @@ function renderCal() {
     numEl.textContent = day;
     cell.appendChild(numEl);
     if (records.length) {
-      const dotsWrap = document.createElement('div');
-      dotsWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:2px';
-      for (let i=0; i<records.length; i++) {
-        const dot = document.createElement('span');
-        dot.className = 'cal-dot';
-        dotsWrap.appendChild(dot);
-      }
-      cell.appendChild(dotsWrap);
       if (records.length > 0) {
         const cnt = document.createElement('div');
         cnt.className = 'cal-count';
