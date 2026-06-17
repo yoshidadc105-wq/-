@@ -2658,10 +2658,7 @@ async function saveQuestions() {
         <div style="background:#f9f5ff;border-radius:8px;padding:16px;border:1px solid #e1bee7">
           <div style="font-size:13px;font-weight:bold;margin-bottom:12px;color:#4a148c">新しいアカウントを追加</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <select id="acc-name" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px">
-              <option value="">名前を選択...</option>
-              ${targets.map(t => '<option value="' + escHtml(t.name) + '">' + escHtml(t.name) + '</option>').join('')}
-            </select>
+            <input type="text" id="acc-name" placeholder="名前を入力" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px;width:140px">
             <input type="email" id="acc-email" placeholder="メールアドレス" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px;width:180px">
             <input type="password" id="acc-pw" placeholder="パスワード" style="border:1px solid #ce93d8;border-radius:4px;padding:6px 8px;font-size:13px;width:140px">
             <button class="add-btn" onclick="addStaffAccount()">＋ 追加</button>
