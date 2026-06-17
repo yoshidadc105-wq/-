@@ -2491,5 +2491,25 @@ app.post('/admin/fix-item-order', async (req, res) => {
 
 app.get('/health', (_req, res) => res.send('OK'));
 
+// アプリアイコン（ホーム画面追加用）
+function makeIconSvg(size) {
+  const r = Math.round(size * 0.195);
+  const fs = Math.round(size * 0.52);
+  const cy = Math.round(size * 0.67);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#2aab96"/>
+    </linearGradient>
+  </defs>
+  <rect width="${size}" height="${size}" rx="${r}" fill="url(#g)"/>
+  <text x="${size/2}" y="${cy}" text-anchor="middle" font-size="${fs}" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">🦷</text>
+</svg>`;
+}
+app.get('/icon-192.png', (_req, res) => { res.set('Content-Type','image/svg+xml'); res.send(makeIconSvg(192)); });
+app.get('/icon-512.png', (_req, res) => { res.set('Content-Type','image/svg+xml'); res.send(makeIconSvg(512)); });
+app.get('/apple-touch-icon.png', (_req, res) => { res.set('Content-Type','image/svg+xml'); res.send(makeIconSvg(180)); });
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`スタッフ実績サーバー起動: port=${PORT}`));
