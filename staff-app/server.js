@@ -162,8 +162,9 @@ app.delete('/admin/action-config/categories/:id', async (req, res) => {
 
 const DEFAULT_ACTION_ITEMS = [
   { id: 'i11', name: 'シーラント', group: '処置', category: 'treatment', needsPatient: true, needsCount: true, builtin: true, order: 10 },
-  { id: 'i12', name: 'レントゲン（CT・パノラマ／臼歯デンタル）', group: '処置', category: 'treatment', needsPatient: true, builtin: true, order: 11 },
-  { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true, defaultHidden: true, order: 12 },
+  { id: 'i12', name: 'X線パック　成人', group: '処置', category: 'treatment', needsPatient: true, builtin: true, order: 11 },
+  { id: 'i16', name: 'X線パック　小児', group: '処置', category: 'treatment', needsPatient: true, builtin: true, order: 12 },
+  { id: 'i13', name: 'フッ素塗布', group: '処置', category: 'treatment', needsPatient: true, builtin: true, defaultHidden: true, order: 13 },
   { id: 'i01', name: '物品を販売した（購入）', group: '物品', category: 'item', needsPatient: true, showItemName: true, builtin: true, order: 20 },
   { id: 'i02', name: '物品をすすめた（未購入）', group: '物品', category: 'item_recommend', needsPatient: true, showItemName: true, builtin: true, defaultHidden: true, order: 21 },
   { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true, defaultHidden: true, order: 30 },
@@ -544,6 +545,8 @@ const ACTION_CATEGORY = {
   'シーラント': 'treatment',
   'レントゲン': 'treatment',
   'レントゲン（CT・パノラマ／臼歯デンタル）': 'treatment',
+  'X線パック　成人': 'treatment',
+  'X線パック　小児': 'treatment',
   'フッ素塗布': 'treatment',
   'ポジティブ声掛け': 'team_support',
   'ポジティブな行動をした': 'team_support',
