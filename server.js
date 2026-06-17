@@ -2447,6 +2447,7 @@ function initDragSort(listId, reorderUrl) {
 document.addEventListener('DOMContentLoaded', () => {
   initDragSort('target-sort-list', '/api/targets/reorder');
   initDragSort('target-sort-list-2', '/api/targets/reorder');
+  initDragSort('resp-sort-list', '/api/respondents/reorder');
 
 });
 async function addRespondent() {
@@ -2472,6 +2473,20 @@ async function addTarget2() {
   if (!r.ok) { msg.style.color='#c62828'; msg.textContent='エラー'; return; }
   msg.style.color='#2e7d32'; msg.textContent='追加しました'; inp.value='';
   setTimeout(() => location.reload(), 800);
+}
+async function addRespondent() {
+  const inp = document.getElementById('nr'); const msg = document.getElementById('rmsg');
+  const name = inp.value.trim();
+  if (!name) { msg.style.color='#c62828'; msg.textContent='名前を入力'; return; }
+  const r = await fetch('/api/respondents', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if (r.status===409) { msg.style.color='#c62828'; msg.textContent='すでに登録済み'; return; }
+  if (!r.ok) { msg.style.color='#c62828'; msg.textContent='エラー'; return; }
+  msg.style.color='#2e7d32'; msg.textContent='追加しました'; inp.value='';
+  setTimeout(() => location.reload(), 800);
+}
+async function delRespondent(id) {
+  if (!confirm('削除しますか？')) return;
+  await fetch('/api/respondents/' + id, {method:'DELETE'}); location.reload();
 }
 async function addStaffAccount() {
   const name = document.getElementById('acc-name').value;
@@ -2656,9 +2671,23 @@ async function saveQuestions() {
       </div>
     </div>
     <div class="set-card">
-      <div class="set-hd">行動基準評価 回答者 ／ 360度評価 評価対象者</div>
+      <div class="set-hd">行動基準評価 — 回答者（自己評価するスタッフ）</div>
       <div class="set-bd">
-        <p style="font-size:12px;color:#555;margin-bottom:12px">行動基準評価の「回答者」と360度評価の「評価される人」は同じリストです。</p>
+        <p style="font-size:12px;color:#555;margin-bottom:12px">行動基準評価フォームに回答できるスタッフのリストです。</p>
+        <div class="sort-list" id="resp-sort-list">
+          ${respondentDocs.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delRespondent('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
+        </div>
+        <div class="add-row">
+          <input type="text" id="nr" class="add-input" placeholder="名前を入力" />
+          <button class="add-btn" onclick="addRespondent()">＋ 追加</button>
+          <span id="rmsg" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="set-hd">360度評価 — 評価対象者（評価される人）</div>
+      <div class="set-bd">
+        <p style="font-size:12px;color:#555;margin-bottom:12px">360度評価で「評価される側」として表示される名前リストです。</p>
         <div class="sort-list" id="target-sort-list-2">
           ${targets.map(t => `<div class="sort-item" data-id="${t.id}" draggable="true"><span class="drag-handle">⠿</span><span>${escHtml(t.name)}</span><button class="del-btn" onclick="delTarget('${t.id}')">✕</button></div>`).join('') || '<p style="color:#9e9e9e;font-size:13px">未登録</p>'}
         </div>

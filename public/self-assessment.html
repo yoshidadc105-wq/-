@@ -489,9 +489,9 @@
         return;
       }
       const me = await meRes.json();
-      // targetsリストにない人は行動基準評価の対象外
-      const targets = await fetch('/api/targets').then(r => r.json()).catch(() => []);
-      if (!targets.some(t => t.name === me.name)) {
+      // respondentsリストにない人は行動基準評価の対象外
+      const respondents = await fetch('/api/respondents').then(r => r.json()).catch(() => []);
+      if (!respondents.some(t => t.name === me.name)) {
         document.querySelector('.container').innerHTML =
           '<div style="background:#fff;border-radius:8px;padding:32px;text-align:center;margin-top:40px;box-shadow:0 1px 3px rgba(0,0,0,.1)">' +
           '<p style="font-size:16px;color:#555;margin-bottom:16px">あなたは行動基準評価の対象外です。</p>' +
