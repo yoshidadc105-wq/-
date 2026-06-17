@@ -2241,7 +2241,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
 </div>
 
 <div class="rings-section">
-  <div class="rings-title">今月の実績 — ${thisMonth}</div>
+  <div class="rings-title">今週の実績 — ${weekStart} 〜 ${weekEnd}</div>
   <div class="rings-grid">${ringCards}</div>
   <div class="month-label">先月比 <strong>▲▼</strong> で確認</div>
 </div>
