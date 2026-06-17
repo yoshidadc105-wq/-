@@ -1025,26 +1025,9 @@ td{padding:11px 14px;vertical-align:middle}
 
   <!-- 入力履歴 -->
   <div class="section-header"><h2>入力履歴（新しい順）</h2><div class="section-line"></div></div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
-    <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:#475569">スタッフ
-      <select id="histStaffFilter" style="border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:13px;font-family:inherit;background:#fff">
-        <option value="">すべて</option>
-        ${allStaffNames.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
-      </select>
-    </label>
-    <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:#475569">日付（から）
-      <input type="date" id="histDateFrom" style="border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:13px;font-family:inherit" />
-    </label>
-    <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:#475569">日付（まで）
-      <input type="date" id="histDateTo" style="border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:13px;font-family:inherit" />
-    </label>
-    <button onclick="filterHistory()" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:7px;padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;align-self:flex-end">絞り込む</button>
-    <button onclick="clearHistoryFilter()" style="background:#f1f5f9;color:#475569;border:1.5px solid #e2e8f0;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;align-self:flex-end">クリア</button>
-    <span id="histFilterCount" style="font-size:12px;color:#64748b;align-self:flex-end"></span>
-  </div>
   <div class="table-card">
     <div class="table-scroll">
-    <table id="historyTable">
+    <table>
       <thead><tr>
         <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th>
       </tr></thead>
@@ -1053,9 +1036,10 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
   </div>
 
-  <!-- スタッフ設定（週間目標 + 項目表示） -->
-  <div class="section-header"><h2>スタッフ設定</h2><div class="section-line"></div></div>
-  <div class="mgmt-card" style="max-width:700px">
+  <!-- 週間目標設定 -->
+  <div class="section-header"><h2>週間目標設定</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:560px">
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとの週間目標件数を設定します。実績ページの山登りゲージに反映されます。</p>
     <div style="margin-bottom:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
       <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
@@ -1065,15 +1049,18 @@ td{padding:11px 14px;vertical-align:middle}
       <span id="fixCatMsg" style="font-size:12px"></span>
     </div>
     <div id="debugActionsResult" style="display:none;font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all"></div>
-    <!-- Staff tabs -->
-    <div id="staffTabBar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px"></div>
-    <div id="staffTabPanels"></div>
-    <div id="itemVisibilityMsg" style="font-size:12px;margin-bottom:8px;min-height:16px;"></div>
+    <div id="goalSettings" style="display:flex;flex-direction:column;gap:10px;"></div>
     <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button onclick="saveAllGoals()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">全スタッフ一括保存</button>
       <div id="goalMsg" style="font-size:12px;min-height:16px;"></div>
     </div>
   </div>
+
+  <!-- 項目表示設定 -->
+  <div class="section-header"><h2>項目表示設定（スタッフ別）</h2><div class="section-line"></div></div>
+  <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとに入力フォームに表示する項目をON/OFFできます</p>
+  <div id="itemVisibilitySettings"></div>
+  <div id="itemVisibilityMsg" style="font-size:12px;margin-bottom:20px;min-height:16px;"></div>
 
   <!-- グループ管理 -->
   <div class="section-header"><h2>グループ管理</h2><div class="section-line"></div></div>
@@ -1309,43 +1296,8 @@ async function fixCategories() {
   }
 }
 
-// ===== 入力履歴フィルター =====
-function filterHistory() {
-  const staffVal = document.getElementById('histStaffFilter').value;
-  const dateFrom = document.getElementById('histDateFrom').value;
-  const dateTo = document.getElementById('histDateTo').value;
-  const tbody = document.querySelector('#historyTable tbody');
-  const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
-  let shown = 0;
-  rows.forEach(function(tr) {
-    const tds = tr.querySelectorAll('td');
-    if (tds.length < 2) { tr.style.display = ''; shown++; return; }
-    const dateText = (tds[0].textContent || '').trim().replace(/\//g, '-');
-    const staffText = (tds[1].textContent || '').trim();
-    let ok = true;
-    if (staffVal && staffText !== staffVal) ok = false;
-    if (ok && dateFrom && dateText < dateFrom) ok = false;
-    if (ok && dateTo && dateText > dateTo) ok = false;
-    tr.style.display = ok ? '' : 'none';
-    if (ok) shown++;
-  });
-  const countEl = document.getElementById('histFilterCount');
-  if (countEl) countEl.textContent = rows.length > 0 ? shown + '件表示中' : '';
-}
-function clearHistoryFilter() {
-  document.getElementById('histStaffFilter').value = '';
-  document.getElementById('histDateFrom').value = '';
-  document.getElementById('histDateTo').value = '';
-  const tbody = document.querySelector('#historyTable tbody');
-  if (tbody) tbody.querySelectorAll('tr').forEach(function(tr){ tr.style.display = ''; });
-  const countEl = document.getElementById('histFilterCount');
-  if (countEl) countEl.textContent = '';
-}
-
-// ===== スタッフ設定タブ（週間目標 + 項目表示） =====
-let currentStaffTab = null;
-async function loadStaffSettingsTabs() {
-  try {
+// 週間目標設定UI（アイテム個別）
+async function loadGoalSettings() {
   const [namesRes, goalsRes, itemsRes, settingsRes] = await Promise.all([
     fetch('/api/staff-names'), fetch('/api/goals'), fetch('/api/action-items'), fetch('/api/staff-settings')
   ]);
@@ -1353,106 +1305,35 @@ async function loadStaffSettingsTabs() {
   const goals = await goalsRes.json();
   const allItems = await itemsRes.json();
   const settings = await settingsRes.json();
-
-  const tabBar = document.getElementById('staffTabBar');
-  const panels = document.getElementById('staffTabPanels');
-  tabBar.innerHTML = '';
-  panels.innerHTML = '';
-
-  if (!names.length) { panels.innerHTML = '<p style="font-size:13px;color:#94a3b8">スタッフが登録されていません</p>'; return; }
-
-  names.forEach(function(n, idx) {
-    // Tab button
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = n;
-    btn.dataset.tabName = n;
-    btn.style.cssText = 'border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;background:#f8fafc;color:#475569;transition:all .15s';
-    btn.onclick = function() { switchStaffTab(n); };
-    tabBar.appendChild(btn);
-
-    // Panel
-    const panel = document.createElement('div');
-    panel.id = 'staffPanel_' + n.replace(/\s/g,'_');
-    panel.dataset.panelName = n;
-    panel.style.display = 'none';
-
+  const container = document.getElementById('goalSettings');
+  container.innerHTML = '';
+  names.forEach(function(n) {
+    const g = goals[n] || {};
     const s = settings.find(function(x){ return x.staffName === n; }) || {};
     const disabled = s.disabledItems || [];
-    const g = goals[n] || {};
-
-    // 項目表示設定 section
-    const visSection = document.createElement('div');
-    visSection.style.cssText = 'margin-bottom:16px';
-    visSection.innerHTML = '<div style="font-size:12px;font-weight:700;color:#475569;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">項目表示設定</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:8px" id="vis_' + n.replace(/\s/g,'_') + '"></div>';
-    panel.appendChild(visSection);
-    const wrap = visSection.querySelector('[id^="vis_"]');
-    allItems.forEach(function(item) {
-      const on = !disabled.includes(item.name);
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.dataset.staff = n;
-      chip.dataset.item = item.name;
-      chip.dataset.on = on ? '1' : '0';
-      chip.style.cssText = 'display:flex;align-items:center;gap:6px;border:1.5px solid ' + (on?'#2aab96':'#e2e8f0') + ';border-radius:20px;padding:5px 12px;background:' + (on?'#f0fdf4':'#f8fafc') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:' + (on?'#065f46':'#94a3b8') + ';transition:all .15s';
-      chip.innerHTML = item.name + ' ' + makeToggle(on);
-      chip.onclick = function() { toggleItemVisibility(this); };
-      wrap.appendChild(chip);
-    });
-
-    // 週間目標設定 section
-    const goalSection = document.createElement('div');
-    goalSection.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px';
-    goalSection.dataset.staffRow = n;
     const visibleItems = allItems.filter(function(i){ return !disabled.includes(i.name); });
+    const row = document.createElement('div');
+    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
+    row.dataset.staffRow = n;
     const groups = {};
     visibleItems.forEach(function(item) {
       if (!groups[item.group]) groups[item.group] = [];
       groups[item.group].push(item);
     });
-    let goalHTML = '<div style="font-size:12px;font-weight:700;color:#475569;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">週間目標設定</div>';
+    let html = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:10px">' + n + '</div>';
     Object.entries(groups).forEach(function(e) {
       const grpLabel = e[0]; const items = e[1];
       const inputs = items.map(function(item) { return makeGoalInput(n, item.name, item.name, g[item.name]||10); });
-      goalHTML += makeGoalGroup(grpLabel, inputs);
+      html += makeGoalGroup(grpLabel, inputs);
     });
-    goalSection.innerHTML = goalHTML;
+    row.innerHTML = html;
     const saveBtn = document.createElement('button');
     saveBtn.textContent = '保存';
-    saveBtn.style.cssText = 'margin-top:8px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+    saveBtn.style.cssText = 'margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
     saveBtn.onclick = function() { saveGoal(n, this); };
-    goalSection.appendChild(saveBtn);
-    panel.appendChild(goalSection);
-
-    panels.appendChild(panel);
+    row.appendChild(saveBtn);
+    container.appendChild(row);
   });
-
-  // Show first tab
-  switchStaffTab(names[0]);
-  } catch(err) {
-    var p = document.getElementById('staffTabPanels');
-    if (p) p.innerHTML = '<p style="color:#dc2626;font-size:13px">読み込みエラー: ' + err.message + '</p>';
-    console.error('loadStaffSettingsTabs error:', err);
-  }
-}
-
-function switchStaffTab(name) {
-  currentStaffTab = name;
-  document.querySelectorAll('#staffTabBar button').forEach(function(btn) {
-    const active = btn.dataset.tabName === name;
-    btn.style.background = active ? 'linear-gradient(135deg,#0f766e,#2aab96)' : '#f8fafc';
-    btn.style.color = active ? '#fff' : '#475569';
-    btn.style.borderColor = active ? '#0f766e' : '#e2e8f0';
-  });
-  document.querySelectorAll('#staffTabPanels > div').forEach(function(panel) {
-    panel.style.display = panel.dataset.panelName === name ? '' : 'none';
-  });
-}
-
-// 週間目標設定UI（アイテム個別） - kept for saveAllGoals compatibility
-async function loadGoalSettings() {
-  return loadStaffSettingsTabs();
 }
 function makeGoalInput(staff, key, label, val) {
   var shortLabel = label.length > 12 ? label.slice(0,12) + '…' : label;
@@ -1492,7 +1373,7 @@ async function saveAllGoals() {
   msg.style.color = fail > 0 ? '#dc2626' : '#059669';
   msg.textContent = '全員保存完了：' + ok + '名成功' + (fail > 0 ? '、' + fail + '名失敗' : '');
 }
-loadStaffSettingsTabs();
+loadGoalSettings();
 
 // 項目表示設定（スタッフ別ON/OFF）
 function makeToggle(on) {
@@ -1503,9 +1384,38 @@ function makeToggle(on) {
     '<span style="position:absolute;top:3px;left:' + (on?'19px':'3px') + ';width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span>' +
     '</span></span>';
 }
-// loadItemVisibilitySettings is now merged into loadStaffSettingsTabs
 async function loadItemVisibilitySettings() {
-  return loadStaffSettingsTabs();
+  const [namesRes, settingsRes, itemsRes] = await Promise.all([
+    fetch('/api/staff-names'), fetch('/api/staff-settings'), fetch('/api/action-items')
+  ]);
+  const names = await namesRes.json();
+  const settings = await settingsRes.json();
+  const items = await itemsRes.json();
+  const container = document.getElementById('itemVisibilitySettings');
+  container.innerHTML = '';
+  names.forEach(staffName => {
+    const s = settings.find(x => x.staffName === staffName) || {};
+    const disabled = s.disabledItems || [];
+    const card = document.createElement('div');
+    card.className = 'mgmt-card';
+    card.style.cssText = 'margin-bottom:14px;max-width:640px';
+    card.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:12px">' + staffName + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px" id="vis_' + staffName.replace(/\s/g,'_') + '"></div>';
+    container.appendChild(card);
+    const wrap = card.querySelector('[id^="vis_"]');
+    items.forEach(item => {
+      const on = !disabled.includes(item.name);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.dataset.staff = staffName;
+      chip.dataset.item = item.name;
+      chip.dataset.on = on ? '1' : '0';
+      chip.style.cssText = 'display:flex;align-items:center;gap:6px;border:1.5px solid ' + (on?'#2aab96':'#e2e8f0') + ';border-radius:20px;padding:5px 12px;background:' + (on?'#f0fdf4':'#f8fafc') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:' + (on?'#065f46':'#94a3b8') + ';transition:all .15s';
+      chip.innerHTML = item.name + ' ' + makeToggle(on);
+      chip.onclick = function() { toggleItemVisibility(this); };
+      wrap.appendChild(chip);
+    });
+  });
 }
 async function toggleItemVisibility(chip) {
   const staffName = chip.dataset.staff;
@@ -1524,7 +1434,7 @@ async function toggleItemVisibility(chip) {
     else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; chip.dataset.on=newOn?'0':'1'; }
   } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー'; chip.dataset.on=newOn?'0':'1'; }
 }
-// loadItemVisibilitySettings() is called via loadGoalSettings() above
+loadItemVisibilitySettings();
 
 // ===== スタッフ管理テーブル =====
 async function loadStaffTable() {
