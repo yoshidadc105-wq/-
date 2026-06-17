@@ -1910,6 +1910,8 @@ td.label { background: #f9fafb; font-weight: bold; width: 38%; color: #374151; }
 
 // スタッフ個人実績ページ
 app.get('/my-stats', async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('Pragma', 'no-cache');
   const name = getStaffFromReq(req);
   if (!name) return res.redirect('/staff-login');
   const allRecords = await loadDB();
@@ -2348,6 +2350,7 @@ function showDetail(dateStr, records) {
   let html = '<div class="cal-detail"><div class="cal-detail-date">📅 ' + y+'年'+parseInt(m)+'月'+parseInt(d)+'日（'+dow+'）— ' + records.length + '件</div>';
   records.forEach(r => {
     let txt = r.action;
+    if (r.countValue) txt += '　' + r.countValue + '件';
     if (r.patientNo) txt += '　患者番号：' + r.patientNo;
     if (r.itemName) txt += '　' + r.itemName;
     html += '<div class="cal-detail-item">' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
