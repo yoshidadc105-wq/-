@@ -2357,7 +2357,6 @@ function showDetail(dateStr, records) {
   });
   html += '</div>';
   det.innerHTML = html;
-  det.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 renderCal();
