@@ -187,6 +187,7 @@ async function loadActionItems() {
     // 既存アイテムをデフォルト定義でマージ
     const merged = items.map(item => item.builtin && defMap[item.id]
       ? { ...defMap[item.id], ...item,
+          name: defMap[item.id].name,
           showItemName: defMap[item.id].showItemName, needsPatient: defMap[item.id].needsPatient,
           needsCount: defMap[item.id].needsCount, typeOptions: defMap[item.id].typeOptions,
           needsFreeText: defMap[item.id].needsFreeText, category: defMap[item.id].category,
