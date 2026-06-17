@@ -1036,31 +1036,27 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
   </div>
 
-  <!-- 週間目標設定 -->
-  <div class="section-header"><h2>週間目標設定</h2><div class="section-line"></div></div>
-  <div class="mgmt-card" style="max-width:560px">
-    <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとの週間目標件数を設定します。実績ページの山登りゲージに反映されます。</p>
-    <div style="margin-bottom:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="font-size:12px;color:#713f12;font-weight:600">⚠️ 過去の記録の集計カテゴリを一括修正</span>
-      <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
-      <button onclick="fixItemOrder()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">項目順番を更新</button>
-      <button onclick="applyDefaultVisibility()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">全スタッフに表示設定を適用</button>
-      <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
-      <span id="fixCatMsg" style="font-size:12px"></span>
+  <!-- スタッフ設定（週間目標 + 項目表示） -->
+  <div class="section-header"><h2>スタッフ設定</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:760px">
+    <div style="margin-bottom:14px;padding:10px 14px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:11px;color:#713f12;font-weight:600">⚠️ 一括操作</span>
+      <button onclick="fixCategories()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">一括修正を実行</button>
+      <button onclick="fixItemOrder()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">項目順番を更新</button>
+      <button onclick="applyDefaultVisibility()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">全スタッフに表示設定を適用</button>
+      <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
+      <span id="fixCatMsg" style="font-size:11px"></span>
     </div>
     <div id="debugActionsResult" style="display:none;font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all"></div>
-    <div id="goalSettings" style="display:flex;flex-direction:column;gap:10px;"></div>
-    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <button onclick="saveAllGoals()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">全スタッフ一括保存</button>
+    <!-- スタッフタブ -->
+    <div id="staffTabBar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+    <div id="staffTabContent"></div>
+    <div id="itemVisibilityMsg" style="font-size:12px;min-height:16px;"></div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button onclick="saveAllGoals()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">全スタッフ一括保存</button>
       <div id="goalMsg" style="font-size:12px;min-height:16px;"></div>
     </div>
   </div>
-
-  <!-- 項目表示設定 -->
-  <div class="section-header"><h2>項目表示設定（スタッフ別）</h2><div class="section-line"></div></div>
-  <p style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフごとに入力フォームに表示する項目をON/OFFできます</p>
-  <div id="itemVisibilitySettings"></div>
-  <div id="itemVisibilityMsg" style="font-size:12px;margin-bottom:20px;min-height:16px;"></div>
 
   <!-- グループ管理 -->
   <div class="section-header"><h2>グループ管理</h2><div class="section-line"></div></div>
@@ -1296,45 +1292,7 @@ async function fixCategories() {
   }
 }
 
-// 週間目標設定UI（アイテム個別）
-async function loadGoalSettings() {
-  const [namesRes, goalsRes, itemsRes, settingsRes] = await Promise.all([
-    fetch('/api/staff-names'), fetch('/api/goals'), fetch('/api/action-items'), fetch('/api/staff-settings')
-  ]);
-  const names = await namesRes.json();
-  const goals = await goalsRes.json();
-  const allItems = await itemsRes.json();
-  const settings = await settingsRes.json();
-  const container = document.getElementById('goalSettings');
-  container.innerHTML = '';
-  names.forEach(function(n) {
-    const g = goals[n] || {};
-    const s = settings.find(function(x){ return x.staffName === n; }) || {};
-    const disabled = s.disabledItems || [];
-    const visibleItems = allItems.filter(function(i){ return !disabled.includes(i.name); });
-    const row = document.createElement('div');
-    row.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;';
-    row.dataset.staffRow = n;
-    const groups = {};
-    visibleItems.forEach(function(item) {
-      if (!groups[item.group]) groups[item.group] = [];
-      groups[item.group].push(item);
-    });
-    let html = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:10px">' + n + '</div>';
-    Object.entries(groups).forEach(function(e) {
-      const grpLabel = e[0]; const items = e[1];
-      const inputs = items.map(function(item) { return makeGoalInput(n, item.name, item.name, g[item.name]||10); });
-      html += makeGoalGroup(grpLabel, inputs);
-    });
-    row.innerHTML = html;
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = '保存';
-    saveBtn.style.cssText = 'margin-top:10px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
-    saveBtn.onclick = function() { saveGoal(n, this); };
-    row.appendChild(saveBtn);
-    container.appendChild(row);
-  });
-}
+// ===== スタッフ設定タブ（週間目標 + 項目表示） =====
 function makeGoalInput(staff, key, label, val) {
   var shortLabel = label.length > 12 ? label.slice(0,12) + '…' : label;
   return '<label title="' + label + '" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#64748b;font-weight:600;max-width:90px">' + shortLabel +
@@ -1343,6 +1301,91 @@ function makeGoalInput(staff, key, label, val) {
 function makeGoalGroup(groupLabel, inputs) {
   return '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;padding-left:2px">' + groupLabel + '</div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px;background:#f1f5f9;border-radius:8px">' + inputs.join('') + '</div></div>';
+}
+function makeToggle(on) {
+  return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:' + (on?'#0f766e':'#94a3b8') + '">' +
+    (on?'ON':'OFF') +
+    '<span style="position:relative;display:inline-block;width:36px;height:20px">' +
+    '<span style="position:absolute;inset:0;background:' + (on?'#2aab96':'#cbd5e1') + ';border-radius:10px"></span>' +
+    '<span style="position:absolute;top:3px;left:' + (on?'19px':'3px') + ';width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span>' +
+    '</span></span>';
+}
+var _staffTabData = null;
+async function loadStaffTabs() {
+  const [namesRes, goalsRes, itemsRes, settingsRes] = await Promise.all([
+    fetch('/api/staff-names'), fetch('/api/goals'), fetch('/api/action-items'), fetch('/api/staff-settings')
+  ]);
+  _staffTabData = {
+    names: await namesRes.json(),
+    goals: await goalsRes.json(),
+    allItems: await itemsRes.json(),
+    settings: await settingsRes.json()
+  };
+  const tabBar = document.getElementById('staffTabBar');
+  const content = document.getElementById('staffTabContent');
+  tabBar.innerHTML = '';
+  content.innerHTML = '';
+  if (!_staffTabData.names.length) { content.innerHTML = '<p style="font-size:13px;color:#94a3b8">スタッフが登録されていません</p>'; return; }
+  _staffTabData.names.forEach(function(n, idx) {
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.textContent = n; btn.dataset.tab = n;
+    btn.style.cssText = 'border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;background:#f8fafc;color:#475569;transition:all .15s';
+    btn.onclick = function(){ switchTab(n); };
+    tabBar.appendChild(btn);
+    var panel = document.createElement('div');
+    panel.id = 'sp_' + idx; panel.dataset.tabPanel = n; panel.style.display = 'none';
+    buildPanel(panel, n);
+    content.appendChild(panel);
+  });
+  switchTab(_staffTabData.names[0]);
+}
+function switchTab(name) {
+  document.querySelectorAll('#staffTabBar button').forEach(function(b) {
+    var active = b.dataset.tab === name;
+    b.style.background = active ? 'linear-gradient(135deg,#0f766e,#2aab96)' : '#f8fafc';
+    b.style.color = active ? '#fff' : '#475569';
+    b.style.borderColor = active ? '#0f766e' : '#e2e8f0';
+  });
+  document.querySelectorAll('#staffTabContent > div').forEach(function(p) {
+    p.style.display = p.dataset.tabPanel === name ? '' : 'none';
+  });
+}
+function buildPanel(panel, n) {
+  var d = _staffTabData;
+  var s = d.settings.find(function(x){ return x.staffName === n; }) || {};
+  var disabled = s.disabledItems || [];
+  var g = d.goals[n] || {};
+  // 項目表示設定
+  var visDiv = document.createElement('div');
+  visDiv.style.cssText = 'margin-bottom:14px';
+  visDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">項目表示設定</div><div style="display:flex;flex-wrap:wrap;gap:6px"></div>';
+  var wrap = visDiv.querySelector('div:last-child');
+  d.allItems.forEach(function(item) {
+    var on = !disabled.includes(item.name);
+    var chip = document.createElement('button');
+    chip.type = 'button'; chip.dataset.staff = n; chip.dataset.item = item.name; chip.dataset.on = on ? '1' : '0';
+    chip.style.cssText = 'display:flex;align-items:center;gap:5px;border:1.5px solid ' + (on?'#2aab96':'#e2e8f0') + ';border-radius:20px;padding:4px 10px;background:' + (on?'#f0fdf4':'#f8fafc') + ';cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;color:' + (on?'#065f46':'#94a3b8');
+    chip.innerHTML = item.name + ' ' + makeToggle(on);
+    chip.onclick = function(){ toggleItemVisibility(this); };
+    wrap.appendChild(chip);
+  });
+  panel.appendChild(visDiv);
+  // 週間目標設定
+  var goalDiv = document.createElement('div');
+  goalDiv.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px';
+  goalDiv.dataset.staffRow = n;
+  goalDiv.innerHTML = '<div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">週間目標設定</div>';
+  var visibleItems = d.allItems.filter(function(i){ return !disabled.includes(i.name); });
+  var groups = {};
+  visibleItems.forEach(function(item){ if (!groups[item.group]) groups[item.group] = []; groups[item.group].push(item); });
+  Object.entries(groups).forEach(function(e) {
+    goalDiv.innerHTML += makeGoalGroup(e[0], e[1].map(function(item){ return makeGoalInput(n, item.name, item.name, g[item.name]||10); }));
+  });
+  var saveBtn = document.createElement('button');
+  saveBtn.textContent = '保存'; saveBtn.style.cssText = 'margin-top:8px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+  saveBtn.onclick = function(){ saveGoal(n, this); };
+  goalDiv.appendChild(saveBtn);
+  panel.appendChild(goalDiv);
 }
 async function saveGoal(staffName, btn) {
   const row = btn.closest('[data-staff-row]');
@@ -1373,50 +1416,6 @@ async function saveAllGoals() {
   msg.style.color = fail > 0 ? '#dc2626' : '#059669';
   msg.textContent = '全員保存完了：' + ok + '名成功' + (fail > 0 ? '、' + fail + '名失敗' : '');
 }
-loadGoalSettings();
-
-// 項目表示設定（スタッフ別ON/OFF）
-function makeToggle(on) {
-  return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:' + (on?'#0f766e':'#94a3b8') + '">' +
-    (on?'ON':'OFF') +
-    '<span style="position:relative;display:inline-block;width:36px;height:20px">' +
-    '<span style="position:absolute;inset:0;background:' + (on?'#2aab96':'#cbd5e1') + ';border-radius:10px"></span>' +
-    '<span style="position:absolute;top:3px;left:' + (on?'19px':'3px') + ';width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span>' +
-    '</span></span>';
-}
-async function loadItemVisibilitySettings() {
-  const [namesRes, settingsRes, itemsRes] = await Promise.all([
-    fetch('/api/staff-names'), fetch('/api/staff-settings'), fetch('/api/action-items')
-  ]);
-  const names = await namesRes.json();
-  const settings = await settingsRes.json();
-  const items = await itemsRes.json();
-  const container = document.getElementById('itemVisibilitySettings');
-  container.innerHTML = '';
-  names.forEach(staffName => {
-    const s = settings.find(x => x.staffName === staffName) || {};
-    const disabled = s.disabledItems || [];
-    const card = document.createElement('div');
-    card.className = 'mgmt-card';
-    card.style.cssText = 'margin-bottom:14px;max-width:640px';
-    card.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0f766e;margin-bottom:12px">' + staffName + '</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:8px" id="vis_' + staffName.replace(/\s/g,'_') + '"></div>';
-    container.appendChild(card);
-    const wrap = card.querySelector('[id^="vis_"]');
-    items.forEach(item => {
-      const on = !disabled.includes(item.name);
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.dataset.staff = staffName;
-      chip.dataset.item = item.name;
-      chip.dataset.on = on ? '1' : '0';
-      chip.style.cssText = 'display:flex;align-items:center;gap:6px;border:1.5px solid ' + (on?'#2aab96':'#e2e8f0') + ';border-radius:20px;padding:5px 12px;background:' + (on?'#f0fdf4':'#f8fafc') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:' + (on?'#065f46':'#94a3b8') + ';transition:all .15s';
-      chip.innerHTML = item.name + ' ' + makeToggle(on);
-      chip.onclick = function() { toggleItemVisibility(this); };
-      wrap.appendChild(chip);
-    });
-  });
-}
 async function toggleItemVisibility(chip) {
   const staffName = chip.dataset.staff;
   const itemName = chip.dataset.item;
@@ -1434,7 +1433,7 @@ async function toggleItemVisibility(chip) {
     else { msg.style.color='#dc2626'; msg.textContent='保存に失敗しました'; chip.dataset.on=newOn?'0':'1'; }
   } catch(e) { msg.style.color='#dc2626'; msg.textContent='通信エラー'; chip.dataset.on=newOn?'0':'1'; }
 }
-loadItemVisibilitySettings();
+loadStaffTabs();
 
 // ===== スタッフ管理テーブル =====
 async function loadStaffTable() {
