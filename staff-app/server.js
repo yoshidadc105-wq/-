@@ -1904,7 +1904,16 @@ app.get('/my-stats', async (req, res) => {
   const allRecords = await loadDB();
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
-  const goals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
+  const rawGoals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
+  // 旧名→新名マイグレーション（項目リネーム時に目標値を引き継ぐ）
+  const GOAL_NAME_MIGRATION = {
+    'レントゲン（CT・パノラマ／臼歯デンタル）': 'X線パック　成人',
+    'レントゲン': 'X線パック　成人',
+  };
+  const goals = {};
+  for (const [k, v] of Object.entries(rawGoals)) {
+    goals[GOAL_NAME_MIGRATION[k] || k] = v;
+  }
   const staffSetting = settings.find(s => s.staffName === name) || {};
   const disabledItems = staffSetting.disabledItems || [];
   const actionItems = await loadActionItems();
