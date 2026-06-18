@@ -1032,16 +1032,57 @@ td{padding:11px 14px;vertical-align:middle}
 
   <!-- 入力履歴 -->
   <div class="section-header"><h2>入力履歴（新しい順）</h2><div class="section-line"></div></div>
+  <div class="filter-card" style="margin-bottom:12px">
+    <label>スタッフ</label>
+    <select id="hStaff" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+      <option value="">全員</option>
+      ${allStaffNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+    </select>
+    <label>日付</label>
+    <input type="date" id="hFrom" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+    <span style="color:#cbd5e1">—</span>
+    <input type="date" id="hTo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+    <button onclick="filterHistory()" class="btn-primary">絞り込む</button>
+    <button onclick="clearHistory()" class="btn-reset">クリア</button>
+    <span id="hCount" style="font-size:12px;color:#64748b"></span>
+  </div>
   <div class="table-card">
     <div class="table-scroll">
-    <table>
+    <table id="historyTable">
       <thead><tr>
         <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th>
       </tr></thead>
-      <tbody>${detailRows || '<tr><td colspan="5" class="empty">まだデータがありません</td></tr>'}</tbody>
+      <tbody id="historyBody">${detailRows || '<tr><td colspan="5" class="empty">まだデータがありません</td></tr>'}</tbody>
     </table>
     </div>
   </div>
+  <script>
+  function filterHistory() {
+    var staff = document.getElementById('hStaff').value;
+    var from = document.getElementById('hFrom').value;
+    var to = document.getElementById('hTo').value;
+    var rows = document.querySelectorAll('#historyBody tr');
+    var shown = 0;
+    rows.forEach(function(tr) {
+      var tds = tr.querySelectorAll('td');
+      if (tds.length < 2) { tr.style.display=''; return; }
+      var date = tds[0].textContent.trim();
+      var s = tds[1].querySelector('strong');
+      var sName = s ? s.textContent.trim() : tds[1].textContent.trim();
+      var ok = (!staff || sName === staff) && (!from || date >= from) && (!to || date <= to);
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    document.getElementById('hCount').textContent = shown + '件表示中';
+  }
+  function clearHistory() {
+    document.getElementById('hStaff').value = '';
+    document.getElementById('hFrom').value = '';
+    document.getElementById('hTo').value = '';
+    document.querySelectorAll('#historyBody tr').forEach(function(tr){ tr.style.display=''; });
+    document.getElementById('hCount').textContent = '';
+  }
+  <\/script>
 
   <!-- スタッフ設定（週間目標 + 項目表示） -->
   <div class="section-header"><h2>スタッフ設定</h2><div class="section-line"></div></div>
