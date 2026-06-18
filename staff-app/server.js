@@ -410,22 +410,40 @@ async function saveRecord(record) {
   } catch (err) { console.error('DB保存エラー:', err.message); }
 }
 
+// 管理者セッション
+function createAdminToken() {
+  const payload = Buffer.from('admin').toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload + '_admin').digest('hex');
+  return `${payload}.${sig}`;
+}
+function verifyAdminToken(token) {
+  if (!token) return false;
+  const dot = token.lastIndexOf('.');
+  if (dot < 0) return false;
+  const payload = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload + '_admin').digest('hex');
+  return sig === expected;
+}
+function getAdminFromReq(req) {
+  const cookie = req.headers.cookie || '';
+  const match = cookie.match(/adminSession=([^;]+)/);
+  if (!match) return false;
+  return verifyAdminToken(decodeURIComponent(match[1]));
+}
+
 function checkAuth(req, res) {
+  if (getAdminFromReq(req)) return true;
+  // fallback: Basic auth for backward compatibility
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Basic ')) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
-    res.status(401).send('認証が必要です');
-    return false;
+  if (auth && auth.startsWith('Basic ')) {
+    const pass = Buffer.from(auth.slice(6), 'base64').toString().slice(
+      Buffer.from(auth.slice(6), 'base64').toString().indexOf(':') + 1
+    );
+    if (pass === ADMIN_PASSWORD) return true;
   }
-  const pass = Buffer.from(auth.slice(6), 'base64').toString().slice(
-    Buffer.from(auth.slice(6), 'base64').toString().indexOf(':') + 1
-  );
-  if (pass !== ADMIN_PASSWORD) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
-    res.status(401).send('パスワードが違います');
-    return false;
-  }
-  return true;
+  res.redirect('/dashboard-login');
+  return false;
 }
 
 function esc(str) {
@@ -641,6 +659,75 @@ app.post('/submit', async (req, res) => {
   });
   console.log(`患者実績登録: ${d.staffName} 患者${d.patientNo} ${d.action} (${d.date})`);
   res.status(200).json({ ok: true });
+});
+
+app.get('/dashboard-login', (req, res) => {
+  if (getAdminFromReq(req)) return res.redirect('/dashboard');
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ダッシュボード ログイン</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Noto Sans JP',sans-serif;background:linear-gradient(160deg,#071020 0%,#0d1f35 50%,#071020 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:40px 32px 36px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.5);backdrop-filter:blur(12px)}
+    .logo{text-align:center;margin-bottom:32px}
+    .logo-icon{width:72px;height:72px;background:linear-gradient(135deg,#0f766e,#2aab96);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto 14px;box-shadow:0 0 30px rgba(42,171,150,.5)}
+    .logo h1{font-size:18px;font-weight:900;color:#fff}
+    .logo p{font-size:12px;color:rgba(255,255,255,.4);margin-top:4px}
+    label{display:block;font-size:12px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;letter-spacing:.04em}
+    input[type=password]{width:100%;border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 16px;font-size:15px;font-family:inherit;outline:none;background:rgba(255,255,255,.06);color:#e2e8f0;transition:border .2s,box-shadow .2s}
+    input::placeholder{color:rgba(255,255,255,.25)}
+    input:focus{border-color:#2aab96;background:rgba(42,171,150,.08);box-shadow:0 0 0 3px rgba(42,171,150,.2)}
+    .btn{display:block;width:100%;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:20px;letter-spacing:.05em;box-shadow:0 4px 20px rgba(42,171,150,.5)}
+    .btn:active{transform:scale(.98)}
+    .error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <h1>実績ダッシュボード</h1>
+    <p>のびのび歯科・矯正歯科</p>
+  </div>
+  <div class="error" id="err"></div>
+  <label>パスワード</label>
+  <input type="password" id="pw" placeholder="パスワードを入力" autocomplete="current-password"/>
+  <button class="btn" onclick="doLogin()">ログイン</button>
+</div>
+<script>
+  document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+  async function doLogin(){
+    var pw=document.getElementById('pw').value;
+    var err=document.getElementById('err');
+    err.style.display='none';
+    if(!pw){err.textContent='パスワードを入力してください';err.style.display='block';return;}
+    var res=await fetch('/dashboard-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+    if(res.ok){location.href='/dashboard';}
+    else{var d=await res.json();err.textContent=d.error||'ログインに失敗しました';err.style.display='block';}
+  }
+</script>
+</body>
+</html>`);
+});
+
+app.post('/dashboard-login', (req, res) => {
+  const { password } = req.body || {};
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'パスワードが違います' });
+  }
+  const token = createAdminToken();
+  res.setHeader('Set-Cookie', `adminSession=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+  res.json({ ok: true });
+});
+
+app.get('/dashboard-logout', (req, res) => {
+  res.setHeader('Set-Cookie', 'adminSession=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.redirect('/dashboard-login');
 });
 
 app.get('/dashboard', async (req, res) => {
@@ -980,6 +1067,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div style="display:flex;gap:8px;align-items:center">
       <div class="header-badge">管理者専用</div>
       <button onclick="deleteAllRecords()" style="background:rgba(239,68,68,.8);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🗑 全データ削除</button>
+      <a href="/dashboard-logout" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;text-decoration:none">ログアウト</a>
     </div>
   </div>
 </header>
