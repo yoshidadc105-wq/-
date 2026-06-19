@@ -880,7 +880,8 @@ app.get('/dashboard', async (req, res) => {
   }).join('');
 
   const detailRows = records.slice().reverse().slice(0, 100).map(r => {
-    const actionLabel = r.action ? `<span class="badge badge-gray">${esc(r.action)}${r.itemName ? `（${esc(r.itemName)}）` : ''}${r.otherText ? `（${esc(r.otherText)}）` : ''}</span>` : '-';
+    const countPart = r.countValue ? `　${r.countValue}${r.action === 'シーラント' ? '本' : '件'}` : '';
+    const actionLabel = r.action ? `<span class="badge badge-gray">${esc(r.action)}${countPart}${r.itemName ? `（${esc(r.itemName)}）` : ''}${r.otherText ? `（${esc(r.otherText)}）` : ''}</span>` : '-';
     const entryBadge = r.entryType === 'behavior' ? '<span class="badge badge-blue" style="margin-right:4px">行動</span>' : '';
     return `
       <tr>
@@ -2484,7 +2485,7 @@ function showDetail(dateStr, records) {
   let html = '<div class="cal-detail"><div class="cal-detail-date">📅 ' + y+'年'+parseInt(m)+'月'+parseInt(d)+'日（'+dow+'）— ' + records.length + '件</div>';
   records.forEach(r => {
     let txt = r.action;
-    if (r.countValue) txt += '　' + r.countValue + '件';
+    if (r.countValue) txt += '　' + r.countValue + (r.action === 'シーラント' ? '本' : '件');
     if (r.patientNo) txt += '　患者番号：' + r.patientNo;
     if (r.itemName) txt += '　' + r.itemName;
     html += '<div class="cal-detail-item">' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
