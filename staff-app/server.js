@@ -180,7 +180,7 @@ const DEFAULT_ACTION_ITEMS = [
   { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true, defaultHidden: true, order: 30 },
   { id: 'i14', name: 'ポジティブな行動をした', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true, order: 40 },
   { id: 'i15', name: 'ファン患者を獲得した', group: 'ファン獲得', category: 'fan', needsPatient: true, builtin: true, order: 50 },
-  { id: 'i18', name: 'その他', group: 'その他', category: 'other', builtin: true, order: 60 },
+  { id: 'i18', name: 'その他', group: 'その他', category: 'other', builtin: true, order: 60, defaultHidden: true },
   { id: 'i03', name: 'インプラントジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 90 },
   { id: 'i04', name: 'マウスピース矯正ジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 91 },
   { id: 'i05', name: 'ホワイトニングジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 92 },
