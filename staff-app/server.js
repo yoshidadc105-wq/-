@@ -689,8 +689,8 @@ app.post('/peer-eval', async (req, res) => {
   const POINT_MAP = { gold: 5, silver: 3, bronze: 1 };
   if (POINT_MAP[pointType] !== points) return res.status(400).json({ error: '不正なポイント値' });
   const jstNow = new Date(Date.now() + 9*60*60*1000);
-  const jstH = jstNow.getUTCHours();
-  if (jstH < 9) jstNow.setUTCDate(jstNow.getUTCDate() - 1);
+  const jstH = jstNow.getUTCHours(), jstMin = jstNow.getUTCMinutes();
+  if (jstH < 9 || (jstH === 9 && jstMin === 0)) jstNow.setUTCDate(jstNow.getUTCDate() - 1);
   const evalDate = jstNow.toISOString().slice(0,10);
   await saveRecord({
     id: crypto.randomUUID(),
