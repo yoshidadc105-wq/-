@@ -251,21 +251,22 @@
     } catch(e) { console.error(e); }
   }
 
-  // 日付セット＆時間制限（日本時間 18:45〜翌9:00のみ入力可）
+  // 日付セット＆時間制限（日本時間 13:30〜14:25 / 18:45〜翌9:00のみ入力可）
   const now = new Date();
   const jstMs = now.getTime() + 9 * 60 * 60 * 1000;
   const jst = new Date(jstMs);
   const jstH = jst.getUTCHours(), jstMin = jst.getUTCMinutes();
   const totalMin = jstH * 60 + jstMin;
-  // 入力可能時間外（9:01〜18:44）はロック
-  const isOpen = totalMin >= 18 * 60 + 45 || totalMin <= 9 * 60;
+  const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
+              || totalMin >= 18 * 60 + 45
+              || totalMin <= 9 * 60;
   if (!isOpen) {
     document.querySelector('.card').style.display = 'none';
     const lockDiv = document.createElement('div');
     lockDiv.style.cssText = 'text-align:center;padding:48px 24px;color:#e2e8f0';
     lockDiv.innerHTML = '<div style="font-size:48px;margin-bottom:16px">🔒</div>' +
       '<div style="font-size:18px;font-weight:700;margin-bottom:8px">入力時間外です</div>' +
-      '<div style="font-size:14px;color:rgba(255,255,255,.5)">入力可能時間：18:45 〜 翌9:00</div>';
+      '<div style="font-size:14px;color:rgba(255,255,255,.5)">入力可能時間：13:30〜14:25 / 18:45〜翌9:00</div>';
     document.querySelector('.container') ? document.querySelector('.container').prepend(lockDiv) : document.body.prepend(lockDiv);
   }
   // 0:00〜9:00 は前日扱い
