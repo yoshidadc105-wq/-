@@ -383,7 +383,7 @@ app.get('/admin/login-as/:name', (req, res) => {
   res.redirect('/my-stats');
 });
 
-
+app.post('/admin/goals', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { staffName, goals } = req.body;
   if (!staffName || !goals) return res.status(400).json({ error: 'invalid' });
