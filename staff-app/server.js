@@ -365,7 +365,16 @@ app.delete('/admin/staff-records/:name', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/admin/goals', async (req, res) => {
+// 管理者がスタッフとしてログイン（なりすまし）
+app.get('/admin/login-as/:name', (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const name = decodeURIComponent(req.params.name);
+  const token = createStaffToken(name);
+  res.setHeader('Set-Cookie', `staffSession=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`);
+  res.redirect('/my-stats');
+});
+
+
   if (!checkAuth(req, res)) return;
   const { staffName, goals } = req.body;
   if (!staffName || !goals) return res.status(400).json({ error: 'invalid' });
@@ -890,6 +899,7 @@ app.get('/dashboard', async (req, res) => {
           ${goalParts || '<span style="color:#cbd5e1;font-size:11px">未設定</span>'}
         </td>
         <td onclick="event.stopPropagation()" style="white-space:nowrap">
+          <a href="/admin/login-as/${encodeURIComponent(name)}" class="btn-eval" style="background:linear-gradient(135deg,#6366f1,#818cf8)">👤 本人画面</a>
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
           <a href="/evaluation?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-eval">評価表</a>
           <button onclick="deleteStaffRecords('${esc(name)}')" style="background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🗑 記録削除</button>
