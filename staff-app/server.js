@@ -964,7 +964,7 @@ app.get('/dashboard', async (req, res) => {
     } else if (r.entryType === 'peer_eval') {
       if (!s.peerEvals) s.peerEvals = [];
       s.peerEvals.push(r);
-      s.actionMap['その他'] = (s.actionMap['その他'] || 0) + 1;
+      s.actionMap['その他'] = (s.actionMap['その他'] || 0) + (r.points || 1);
     } else {
       s.actionMap[r.action] = (s.actionMap[r.action] || 0) + 1;
       const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
@@ -2428,12 +2428,13 @@ app.get('/my-stats', async (req, res) => {
   for (const r of allRecords) {
     if (r.staffName !== name || !r.date || r.entryType === 'behavior') continue;
     const actionKey = r.entryType === 'peer_eval' ? 'その他' : r.action;
+    const addVal = r.entryType === 'peer_eval' ? (r.points || 1) : 1;
     if (r.date >= weekStart && r.date <= weekEnd) {
-      thisW[actionKey] = (thisW[actionKey] || 0) + 1;
+      thisW[actionKey] = (thisW[actionKey] || 0) + addVal;
       if (r.countValue) thisWCountSum[actionKey] = (thisWCountSum[actionKey] || 0) + r.countValue;
       thisWTotal++;
     } else if (r.date >= lastWeekStart && r.date <= lastWeekEnd) {
-      lastW[actionKey] = (lastW[actionKey] || 0) + 1;
+      lastW[actionKey] = (lastW[actionKey] || 0) + addVal;
       lastWTotal++;
     }
   }
