@@ -227,7 +227,7 @@
       // 評価者はすぐ評価画面へ
       if (s && s.isEvaluator) { location.href = '/peer-eval'; return; }
       const disabled = (s && s.disabledItems) || [];
-      const visibleItems = allItems.filter(item => !disabled.includes(item.name));
+      const visibleItems = allItems.filter(item => !disabled.includes(item.name) && item.id !== 'i18');
       PATIENT_ACTIONS = new Set(visibleItems.filter(i => i.needsPatient).map(i => i.name));
       ITEM_NAME_ACTIONS = new Set(visibleItems.filter(i => i.showItemName).map(i => i.name));
       COUNT_ACTIONS = new Set(visibleItems.filter(i => i.needsCount).map(i => i.name));
