@@ -2285,7 +2285,18 @@ app.get('/my-stats', async (req, res) => {
   }
 
   // 週間目標達成カウント（山登りの進捗）── アイテム個別
-  const visibleItemNames = actionItems.filter(i => !disabledItems.includes(i.name)).map(i => i.name);
+  // 入力フォームと同じグループ順で並び替え
+  const actionConfig = await loadActionConfig();
+  const groupOrderList = actionConfig.groups && actionConfig.groups.length
+    ? actionConfig.groups
+    : ['処置', '物品', 'アポ管理', 'チームサポート', 'ファン獲得', 'カウンセリング', '口コミ', '行動', 'その他'];
+  const visibleItems2 = actionItems.filter(i => !disabledItems.includes(i.name));
+  visibleItems2.sort((a, b) => {
+    const gi = g => { const idx = groupOrderList.indexOf(g); return idx >= 0 ? idx : 999; };
+    const gd = gi(a.group) - gi(b.group);
+    return gd !== 0 ? gd : (a.order||999) - (b.order||999);
+  });
+  const visibleItemNames = visibleItems2.map(i => i.name);
   const goalItems = visibleItemNames
     .map(n => ({ label: n, cur: thisW[n]||0, goal: goals[n]||0 }))
     .filter(g => g.goal > 0);
