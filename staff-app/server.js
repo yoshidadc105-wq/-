@@ -180,6 +180,7 @@ const DEFAULT_ACTION_ITEMS = [
   { id: 'i09', name: 'アポ転換', group: 'アポ管理', category: 'appointment', needsPatient: true, builtin: true, defaultHidden: true, order: 30 },
   { id: 'i14', name: 'ポジティブな行動をした', group: 'チームサポート', category: 'team_support', needsFreeText: true, builtin: true, order: 40 },
   { id: 'i15', name: 'ファン患者を獲得した', group: 'ファン獲得', category: 'fan', needsPatient: true, builtin: true, order: 50 },
+  { id: 'i18', name: 'その他', group: 'その他', category: 'other', builtin: true, order: 60 },
   { id: 'i03', name: 'インプラントジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 90 },
   { id: 'i04', name: 'マウスピース矯正ジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 91 },
   { id: 'i05', name: 'ホワイトニングジャブ打ち', group: 'カウンセリング', category: 'counseling_approach', needsPatient: true, builtin: true, defaultHidden: true, order: 92 },
@@ -634,7 +635,7 @@ textarea::placeholder{color:rgba(255,255,255,.25)}
     <textarea id="reason" placeholder="どんな行動が良かったか記入してください"></textarea>
   </div>
   <button class="btn" id="submitBtn" onclick="doSubmit()">評価を送る</button>
-  <a href="/my-stats" class="nav-link">← 自分の実績に戻る</a>
+  <a href="/staff-logout" class="nav-link">ログアウト</a>
 </div>
 <script>
 var selectedPoint = null, selectedScore = 0;
@@ -960,6 +961,10 @@ app.get('/dashboard', async (req, res) => {
     s.count++;
     if (r.entryType === 'behavior') {
       if (r.freeText) s.freePhrases.push(r.freeText);
+    } else if (r.entryType === 'peer_eval') {
+      if (!s.peerEvals) s.peerEvals = [];
+      s.peerEvals.push(r);
+      s.actionMap['その他'] = (s.actionMap['その他'] || 0) + 1;
     } else {
       s.actionMap[r.action] = (s.actionMap[r.action] || 0) + 1;
       const cat = ACTION_CATEGORY[r.action] || r.actionCategory || 'treatment';
@@ -1028,6 +1033,7 @@ app.get('/dashboard', async (req, res) => {
       treatmentMap: s.treatmentMap,
       reviews: s.reviews,
       freePhrases: s.freePhrases,
+      peerEvals: (s.peerEvals || []).map(r => ({ pointType: r.pointType, points: r.points, fromStaff: r.fromStaff, reason: r.reason, date: r.date })),
     };
   }
 
@@ -1544,6 +1550,10 @@ td{padding:11px 14px;vertical-align:middle}
       <h3>行動・取り組みの記録</h3>
       <ul id="modalPhrases"></ul>
     </div>
+    <div class="modal-section">
+      <h3>⭐ 受け取った評価</h3>
+      <ul id="modalPeerEvals" style="font-size:12px"></ul>
+    </div>
   </div>
 </div>
 
@@ -1592,6 +1602,13 @@ function openModal(staffName) {
   const ul = document.getElementById('modalPhrases');
   if (!d.freePhrases || d.freePhrases.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; }
   else { ul.innerHTML = [...new Set(d.freePhrases)].map(p => '<li>' + p + '</li>').join(''); }
+  const MEDAL = { gold:'🥇', silver:'🥈', bronze:'🥉' };
+  const evalUl = document.getElementById('modalPeerEvals');
+  if (evalUl) {
+    const evals = d.peerEvals || [];
+    if (evals.length === 0) { evalUl.innerHTML = '<li class="modal-empty">なし</li>'; }
+    else { evalUl.innerHTML = evals.map(e => '<li>' + (MEDAL[e.pointType]||'⭐') + ' <strong>+' + e.points + 'pt</strong>　' + e.date + '　' + e.fromStaff + '：' + e.reason + '</li>').join(''); }
+  }
   document.getElementById('modalOverlay').classList.add('open');
 }
 function closeModal() {
@@ -2410,12 +2427,13 @@ app.get('/my-stats', async (req, res) => {
   let thisWTotal = 0, lastWTotal = 0;
   for (const r of allRecords) {
     if (r.staffName !== name || !r.date || r.entryType === 'behavior') continue;
+    const actionKey = r.entryType === 'peer_eval' ? 'その他' : r.action;
     if (r.date >= weekStart && r.date <= weekEnd) {
-      thisW[r.action] = (thisW[r.action] || 0) + 1;
-      if (r.countValue) thisWCountSum[r.action] = (thisWCountSum[r.action] || 0) + r.countValue;
+      thisW[actionKey] = (thisW[actionKey] || 0) + 1;
+      if (r.countValue) thisWCountSum[actionKey] = (thisWCountSum[actionKey] || 0) + r.countValue;
       thisWTotal++;
     } else if (r.date >= lastWeekStart && r.date <= lastWeekEnd) {
-      lastW[r.action] = (lastW[r.action] || 0) + 1;
+      lastW[actionKey] = (lastW[actionKey] || 0) + 1;
       lastWTotal++;
     }
   }
@@ -2461,11 +2479,15 @@ app.get('/my-stats', async (req, res) => {
     if (r.staffName !== name || !r.date) continue;
     if (!byDate[r.date]) byDate[r.date] = [];
     byDate[r.date].push({
+      entryType: r.entryType || 'patient',
       action: r.action,
       patientNo: r.patientNo || '',
       itemName: r.itemName || '',
       freeText: r.freeText || '',
-      countValue: r.countValue || null
+      countValue: r.countValue || null,
+      pointType: r.pointType || null,
+      fromStaff: r.fromStaff || '',
+      reason: r.reason || ''
     });
   }
 
@@ -2800,11 +2822,17 @@ function showDetail(dateStr, records) {
   const [y,m,d] = dateStr.split('-');
   const dow = WEEKDAYS[new Date(+y,+m-1,+d).getDay()];
   let html = '<div class="cal-detail"><div class="cal-detail-date">📅 ' + y+'年'+parseInt(m)+'月'+parseInt(d)+'日（'+dow+'）— ' + records.length + '件</div>';
+  const MEDAL = { gold:'🥇', silver:'🥈', bronze:'🥉' };
   records.forEach(r => {
-    let txt = r.action;
-    if (r.countValue) txt += '　' + r.countValue + (r.action === 'シーラント' ? '本' : '件');
-    if (r.patientNo) txt += '　患者番号：' + r.patientNo;
-    if (r.itemName) txt += '　' + r.itemName;
+    let txt;
+    if (r.entryType === 'peer_eval') {
+      txt = (MEDAL[r.pointType]||'⭐') + ' ' + (r.fromStaff||'') + 'から評価　' + (r.reason||'');
+    } else {
+      txt = r.action;
+      if (r.countValue) txt += '　' + r.countValue + (r.action === 'シーラント' ? '本' : '件');
+      if (r.patientNo) txt += '　患者番号：' + r.patientNo;
+      if (r.itemName) txt += '　' + r.itemName;
+    }
     html += '<div class="cal-detail-item">' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
   });
   html += '</div>';
