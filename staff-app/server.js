@@ -467,7 +467,6 @@ function getAdminFromReq(req) {
 
 function checkAuth(req, res) {
   if (getAdminFromReq(req)) return true;
-  // fallback: Basic auth for backward compatibility
   const auth = req.headers.authorization;
   if (auth && auth.startsWith('Basic ')) {
     const pass = Buffer.from(auth.slice(6), 'base64').toString().slice(
@@ -475,7 +474,10 @@ function checkAuth(req, res) {
     );
     if (pass === ADMIN_PASSWORD) return true;
   }
-  res.redirect('/dashboard-login');
+  // AJAXリクエストには401、通常リクエストはログインページへ
+  const isAjax = req.headers['content-type']?.includes('application/json') || req.headers['x-requested-with'] === 'XMLHttpRequest';
+  if (isAjax) { res.status(401).json({ error: '認証が必要です' }); }
+  else { res.redirect('/dashboard-login'); }
   return false;
 }
 
@@ -1676,6 +1678,9 @@ async function loadStaffTabs() {
     allItems: await itemsRes.json(),
     settings: await settingsRes.json()
   };
+  // 評価者はスタッフ設定タブから除外
+  const evaluatorNames = new Set(_staffTabData.settings.filter(s => s.isEvaluator).map(s => s.staffName));
+  _staffTabData.names = _staffTabData.names.filter(n => !evaluatorNames.has(n));
   const tabBar = document.getElementById('staffTabBar');
   const content = document.getElementById('staffTabContent');
   tabBar.innerHTML = '';
