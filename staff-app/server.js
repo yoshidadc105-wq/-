@@ -688,11 +688,15 @@ app.post('/peer-eval', async (req, res) => {
   if (!toStaff || !pointType || !points || !reason) return res.status(400).json({ error: '入力が不足しています' });
   const POINT_MAP = { gold: 5, silver: 3, bronze: 1 };
   if (POINT_MAP[pointType] !== points) return res.status(400).json({ error: '不正なポイント値' });
+  const jstNow = new Date(Date.now() + 9*60*60*1000);
+  const jstH = jstNow.getUTCHours();
+  if (jstH < 9) jstNow.setUTCDate(jstNow.getUTCDate() - 1);
+  const evalDate = jstNow.toISOString().slice(0,10);
   await saveRecord({
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     entryType: 'peer_eval',
-    date: new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10),
+    date: evalDate,
     staffName: toStaff,
     fromStaff,
     pointType,
