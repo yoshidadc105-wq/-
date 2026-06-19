@@ -350,6 +350,21 @@ app.delete('/admin/all-records', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.delete('/admin/staff-records/:name', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const name = decodeURIComponent(req.params.name);
+  if (mongoCol) {
+    await mongoCol.deleteMany({ staffName: name });
+  } else {
+    const all = await loadDB();
+    const filtered = all.filter(r => r.staffName !== name);
+    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+    fs.writeFileSync(DB_FILE, JSON.stringify(filtered, null, 2));
+  }
+  console.log(`スタッフ記録削除: ${name}`);
+  res.json({ ok: true });
+});
+
 app.post('/admin/goals', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const { staffName, goals } = req.body;
@@ -877,6 +892,7 @@ app.get('/dashboard', async (req, res) => {
         <td onclick="event.stopPropagation()" style="white-space:nowrap">
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
           <a href="/evaluation?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-eval">評価表</a>
+          <button onclick="deleteStaffRecords('${esc(name)}')" style="background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🗑 記録削除</button>
         </td>
       </tr>`;
   }).join('');
@@ -1802,6 +1818,12 @@ async function deleteAllRecords() {
   if (!confirm('最終確認：本当にすべてのデータを削除しますか？')) return;
   const res = await adminFetch('/admin/all-records', { method: 'DELETE' });
   if (res.ok) { alert('削除しました。ページを更新します。'); location.reload(); }
+  else alert('削除に失敗しました。');
+}
+async function deleteStaffRecords(name) {
+  if (!confirm('⚠️ ' + name + ' の入力データをすべて削除します。\\nこの操作は元に戻せません。\\n\\n本当に削除しますか？')) return;
+  const res = await adminFetch('/admin/staff-records/' + encodeURIComponent(name), { method: 'DELETE' });
+  if (res.ok) { alert(name + ' のデータを削除しました。ページを更新します。'); location.reload(); }
   else alert('削除に失敗しました。');
 }
 <\/script>
