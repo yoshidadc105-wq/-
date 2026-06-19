@@ -897,9 +897,11 @@ app.get('/dashboard', async (req, res) => {
 
   // KPIサマリー（アクション名別集計）
   const actionTotals = {};
+  const actionCountTotals = {}; // countValueの合計（シーラント本数など）
   for (const r of records) {
     if (r.entryType === 'behavior' || !r.action) continue;
     actionTotals[r.action] = (actionTotals[r.action] || 0) + 1;
+    if (r.countValue) actionCountTotals[r.action] = (actionCountTotals[r.action] || 0) + r.countValue;
   }
   const totalPatients = new Set(records.filter(r=>r.patientNo).map(r=>r.patientNo)).size;
   // ONになっているデフォルト項目（defaultHidden=falseのもの）のKPIカード
@@ -909,10 +911,13 @@ app.get('/dashboard', async (req, res) => {
   const kpiCards = kpiItems.map((item, idx) => {
     const cnt = actionTotals[item.name] || 0;
     const color = kpiColors[idx % kpiColors.length];
+    const totalCount = actionCountTotals[item.name];
+    const countLine = totalCount ? `<div class="kpi-sub" style="margin-top:2px">合計 ${totalCount}本</div>` : '';
     return `<div class="kpi-card ${color}">
       <div class="kpi-label">${esc(item.name)}</div>
       <div class="kpi-value">${cnt}</div>
       <div class="kpi-sub">合計件数</div>
+      ${countLine}
     </div>`;
   }).join('') + `<div class="kpi-card green">
     <div class="kpi-label">登録患者数</div>
@@ -2118,11 +2123,13 @@ app.get('/my-stats', async (req, res) => {
   const lastWeekStart = new Date(lastWeekStartMs).toISOString().slice(0, 10);
   const thisW = {}; // { actionName: count }
   const lastW = {};
+  const thisWCountSum = {}; // countValueの合計（本数など）
   let thisWTotal = 0, lastWTotal = 0;
   for (const r of allRecords) {
     if (r.staffName !== name || !r.date || r.entryType === 'behavior') continue;
     if (r.date >= weekStart && r.date <= weekEnd) {
       thisW[r.action] = (thisW[r.action] || 0) + 1;
+      if (r.countValue) thisWCountSum[r.action] = (thisWCountSum[r.action] || 0) + r.countValue;
       thisWTotal++;
     } else if (r.date >= lastWeekStart && r.date <= lastWeekEnd) {
       lastW[r.action] = (lastW[r.action] || 0) + 1;
@@ -2217,7 +2224,7 @@ app.get('/my-stats', async (req, res) => {
     ? Math.min(Math.round(goalItems.reduce((s,g) => s + Math.min(g.cur/g.goal*100, 100), 0) / totalGoals), 100)
     : 0;
 
-  function ringCard(label, cur, prev, goal) {
+  function ringCard(label, cur, prev, goal, countSum) {
     const pct = goal > 0 ? Math.min(Math.round(cur/goal*100), 100) : null;
     const over = goal > 0 ? Math.round(cur/goal*100) : 0;
     const achieved = pct !== null && pct >= 100;
@@ -2229,6 +2236,7 @@ app.get('/my-stats', async (req, res) => {
     const diffHtml = diff > 0 ? `<span style="color:#34d399;font-size:11px;font-weight:700">▲${diff}</span>`
                    : diff < 0 ? `<span style="color:#f87171;font-size:11px;font-weight:700">▼${Math.abs(diff)}</span>`
                    : `<span style="color:#64748b;font-size:11px">→</span>`;
+    const countSumHtml = countSum ? `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">合計 ${countSum}本</div>` : '';
     return `<div class="ring-card${achieved?' ring-achieved':''}">
       <div class="ring-wrap">
         <svg width="88" height="88" viewBox="0 0 88 88">
@@ -2244,15 +2252,16 @@ app.get('/my-stats', async (req, res) => {
       </div>
       <div class="ring-label">${label}</div>
       <div class="ring-diff">${diffHtml} 先週比</div>
+      ${countSumHtml}
       ${pct !== null && over > 100 ? `<div class="ring-over">${over}% 達成！</div>` : ''}
     </div>`;
   }
 
   const allGoalItems = [
-    ...visibleItemNames.map(n => ({ label: n, cur: thisW[n]||0, prev: lastW[n]||0, goal: goals[n]||0 })),
-    { label: '今週合計', cur: thisWTotal, prev: lastWTotal, goal: 0 },
+    ...visibleItemNames.map(n => ({ label: n, cur: thisW[n]||0, prev: lastW[n]||0, goal: goals[n]||0, countSum: thisWCountSum[n]||0 })),
+    { label: '今週合計', cur: thisWTotal, prev: lastWTotal, goal: 0, countSum: 0 },
   ];
-  const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal)).join('');
+  const ringCards = allGoalItems.map(g => ringCard(g.label, g.cur, g.prev, g.goal, g.countSum)).join('');
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
