@@ -1274,6 +1274,9 @@ td{padding:11px 14px;vertical-align:middle}
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
         <input type="checkbox" id="newItemNeedsPatient" checked style="width:16px;height:16px;accent-color:#0f766e" /> 患者番号が必要
       </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;cursor:pointer">
+        <input type="checkbox" id="newItemNeedsFreeText" style="width:16px;height:16px;accent-color:#0f766e" /> 自由記述が必要
+      </label>
     </div>
     <div id="itemModalMsg" style="font-size:12px;min-height:16px;margin-bottom:12px;"></div>
     <div style="display:flex;gap:8px">
@@ -1732,15 +1735,17 @@ function openItemModal(item) {
   document.getElementById('newItemName').value = item ? item.name : '';
   document.getElementById('newItemGroup').value = item ? item.group : '';
   document.getElementById('newItemNeedsPatient').checked = item ? !!item.needsPatient : true;
+  document.getElementById('newItemNeedsFreeText').checked = item ? !!item.needsFreeText : false;
   document.getElementById('itemModalOverlay').style.display = 'flex';
 }
 async function saveNewItem() {
   const name = document.getElementById('newItemName').value.trim();
   const group = document.getElementById('newItemGroup').value.trim();
   const needsPatient = document.getElementById('newItemNeedsPatient').checked;
+  const needsFreeText = document.getElementById('newItemNeedsFreeText').checked;
   const msg = document.getElementById('itemModalMsg');
   if (!name || !group) { msg.style.color='#dc2626'; msg.textContent='項目名とグループを入力してください'; return; }
-  const body = JSON.stringify({ name, group, needsPatient });
+  const body = JSON.stringify({ name, group, needsPatient, needsFreeText });
   const url = editingItemId ? '/admin/action-items/' + encodeURIComponent(editingItemId) : '/admin/action-items';
   const method = editingItemId ? 'PUT' : 'POST';
   const res = await adminFetch(url, { method, headers:{'Content-Type':'application/json'}, body });
