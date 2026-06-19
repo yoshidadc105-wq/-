@@ -529,6 +529,179 @@ app.get('/api/me', (req, res) => {
   res.json({ staffName: staff || null });
 });
 
+// 評価者フラグ設定
+app.post('/admin/staff-evaluator', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, isEvaluator } = req.body;
+  await saveStaffSetting(staffName, { isEvaluator: !!isEvaluator });
+  res.json({ ok: true });
+});
+
+// ピア評価フォームページ
+app.get('/peer-eval', async (req, res) => {
+  const fromStaff = getStaffFromReq(req);
+  if (!fromStaff) return res.redirect('/staff-login');
+  const settings = await loadStaffSettings();
+  const mySetting = settings.find(s => s.staffName === fromStaff) || {};
+  if (!mySetting.isEvaluator) return res.status(403).send('評価権限がありません');
+  const allNames = await loadStaffNames();
+  const evaluatorNames = settings.filter(s => s.isEvaluator).map(s => s.staffName);
+  const targetNames = allNames.filter(n => !evaluatorNames.includes(n));
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>スタッフ評価</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:linear-gradient(160deg,#071020 0%,#0d1f35 50%,#071020 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden}
+body::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:500px;height:500px;background:radial-gradient(circle,rgba(42,171,150,.12) 0%,transparent 70%);pointer-events:none}
+.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:32px 28px 28px;width:100%;max-width:420px;box-shadow:0 24px 80px rgba(0,0,0,.5);backdrop-filter:blur(12px)}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.header h1{font-size:18px;font-weight:900;color:#fff}
+.from-badge{font-size:11px;color:rgba(255,255,255,.45);background:rgba(255,255,255,.07);border-radius:20px;padding:4px 12px}
+label{display:block;font-size:12px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;letter-spacing:.04em}
+.form-group{margin-bottom:18px}
+select{width:100%;border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 16px;font-size:15px;font-family:inherit;outline:none;background:rgba(255,255,255,.06);color:#e2e8f0;transition:border .2s}
+select:focus{border-color:#2aab96;background:rgba(42,171,150,.08);box-shadow:0 0 0 3px rgba(42,171,150,.2)}
+select option{background:#0d1f35;color:#e2e8f0}
+.point-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px}
+.point-btn{border:2px solid rgba(255,255,255,.12);border-radius:14px;padding:14px 8px;font-family:inherit;cursor:pointer;background:rgba(255,255,255,.04);color:#e2e8f0;text-align:center;transition:all .2s}
+.point-btn:hover{transform:translateY(-2px)}
+.point-btn.gold{border-color:#f59e0b}
+.point-btn.silver{border-color:#94a3b8}
+.point-btn.bronze{border-color:#cd7c2f}
+.point-btn.selected.gold{background:rgba(245,158,11,.2);border-color:#f59e0b;box-shadow:0 0 16px rgba(245,158,11,.3)}
+.point-btn.selected.silver{background:rgba(148,163,184,.2);border-color:#94a3b8;box-shadow:0 0 16px rgba(148,163,184,.3)}
+.point-btn.selected.bronze{background:rgba(205,124,47,.2);border-color:#cd7c2f;box-shadow:0 0 16px rgba(205,124,47,.3)}
+.point-emoji{font-size:28px;margin-bottom:6px}
+.point-name{font-size:13px;font-weight:700}
+.point-score{font-size:11px;color:rgba(255,255,255,.45);margin-top:2px}
+textarea{width:100%;border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 16px;font-size:14px;font-family:inherit;outline:none;background:rgba(255,255,255,.06);color:#e2e8f0;resize:vertical;min-height:90px;transition:border .2s}
+textarea:focus{border-color:#2aab96;background:rgba(42,171,150,.08);box-shadow:0 0 0 3px rgba(42,171,150,.2)}
+textarea::placeholder{color:rgba(255,255,255,.25)}
+.btn{display:block;width:100%;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 4px 20px rgba(42,171,150,.5);margin-top:8px;letter-spacing:.05em;transition:opacity .2s,transform .1s}
+.btn:hover{opacity:.9}
+.btn:active{transform:scale(.98)}
+.btn:disabled{background:rgba(255,255,255,.1);color:rgba(255,255,255,.3);box-shadow:none;cursor:not-allowed}
+.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+.success{background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);color:#34d399;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none;text-align:center}
+.nav-link{display:block;text-align:center;margin-top:16px;font-size:12px;color:rgba(255,255,255,.35);text-decoration:none}
+.nav-link:hover{color:rgba(255,255,255,.6)}
+.star{position:fixed;border-radius:50%;background:white;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>⭐ スタッフ評価</h1>
+    <span class="from-badge">評価者：${esc(fromStaff)}</span>
+  </div>
+  <div class="error" id="err"></div>
+  <div class="success" id="suc"></div>
+  <div class="form-group">
+    <label>評価するスタッフ</label>
+    <select id="toStaff">
+      <option value="">選択してください</option>
+      ${targetNames.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+    </select>
+  </div>
+  <div class="form-group">
+    <label>ポイント</label>
+    <div class="point-grid">
+      <button type="button" class="point-btn gold" onclick="selectPoint('gold',5,this)">
+        <div class="point-emoji">🥇</div>
+        <div class="point-name">ゴールド</div>
+        <div class="point-score">5ポイント</div>
+      </button>
+      <button type="button" class="point-btn silver" onclick="selectPoint('silver',3,this)">
+        <div class="point-emoji">🥈</div>
+        <div class="point-name">シルバー</div>
+        <div class="point-score">3ポイント</div>
+      </button>
+      <button type="button" class="point-btn bronze" onclick="selectPoint('bronze',1,this)">
+        <div class="point-emoji">🥉</div>
+        <div class="point-name">ブロンズ</div>
+        <div class="point-score">1ポイント</div>
+      </button>
+    </div>
+  </div>
+  <div class="form-group">
+    <label>評価の理由</label>
+    <textarea id="reason" placeholder="どんな行動が良かったか記入してください"></textarea>
+  </div>
+  <button class="btn" id="submitBtn" onclick="doSubmit()">評価を送る</button>
+  <a href="/my-stats" class="nav-link">← 自分の実績に戻る</a>
+</div>
+<script>
+var selectedPoint = null, selectedScore = 0;
+function selectPoint(type, score, btn) {
+  document.querySelectorAll('.point-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedPoint = type; selectedScore = score;
+}
+for(var i=0;i<20;i++){var s=document.createElement('div');s.className='star';var sz=Math.random()*2+0.5;s.style.cssText='width:'+sz+'px;height:'+sz+'px;top:'+(Math.random()*100)+'%;left:'+(Math.random()*100)+'%;opacity:'+(Math.random()*0.5+0.1);document.body.appendChild(s);}
+async function doSubmit() {
+  var toStaff = document.getElementById('toStaff').value;
+  var reason = document.getElementById('reason').value.trim();
+  var err = document.getElementById('err');
+  var suc = document.getElementById('suc');
+  err.style.display = 'none'; suc.style.display = 'none';
+  if (!toStaff) { err.textContent='評価するスタッフを選択してください'; err.style.display='block'; return; }
+  if (!selectedPoint) { err.textContent='ポイントを選択してください'; err.style.display='block'; return; }
+  if (!reason) { err.textContent='評価の理由を入力してください'; err.style.display='block'; return; }
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '送信中...';
+  try {
+    var res = await fetch('/peer-eval', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ toStaff, pointType: selectedPoint, points: selectedScore, reason }) });
+    if (res.ok) {
+      suc.textContent = toStaff + 'さんに' + (selectedPoint==='gold'?'🥇ゴールド':selectedPoint==='silver'?'🥈シルバー':'🥉ブロンズ') + 'ポイントを送りました！';
+      suc.style.display = 'block';
+      document.getElementById('toStaff').value = '';
+      document.getElementById('reason').value = '';
+      document.querySelectorAll('.point-btn').forEach(b => b.classList.remove('selected'));
+      selectedPoint = null; selectedScore = 0;
+    } else {
+      var d = await res.json();
+      err.textContent = d.error || '送信に失敗しました'; err.style.display = 'block';
+    }
+  } catch(e) { err.textContent = '通信エラーが発生しました'; err.style.display = 'block'; }
+  btn.disabled = false; btn.textContent = '評価を送る';
+}
+</script>
+</body>
+</html>`);
+});
+
+app.post('/peer-eval', async (req, res) => {
+  const fromStaff = getStaffFromReq(req);
+  if (!fromStaff) return res.status(401).json({ error: '未ログイン' });
+  const settings = await loadStaffSettings();
+  const mySetting = settings.find(s => s.staffName === fromStaff) || {};
+  if (!mySetting.isEvaluator) return res.status(403).json({ error: '評価権限がありません' });
+  const { toStaff, pointType, points, reason } = req.body;
+  if (!toStaff || !pointType || !points || !reason) return res.status(400).json({ error: '入力が不足しています' });
+  const POINT_MAP = { gold: 5, silver: 3, bronze: 1 };
+  if (POINT_MAP[pointType] !== points) return res.status(400).json({ error: '不正なポイント値' });
+  await saveRecord({
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    entryType: 'peer_eval',
+    date: new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10),
+    staffName: toStaff,
+    fromStaff,
+    pointType,
+    points,
+    reason,
+    action: 'その他',
+    actionCategory: 'other',
+  });
+  console.log(`ピア評価: ${fromStaff} → ${toStaff} ${pointType}(${points}pt)`);
+  res.json({ ok: true });
+});
+
 app.get('/api/staff-names', async (req, res) => {
   res.json(await loadStaffNames());
 });
@@ -1278,7 +1451,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="table-scroll">
     <table id="staffTable">
       <thead><tr>
-        <th>スタッフ名</th><th>メールアドレス</th><th>最終ログイン</th><th style="text-align:center">操作</th>
+        <th>スタッフ名</th><th>メールアドレス</th><th>最終ログイン</th><th style="text-align:center">評価者</th><th style="text-align:center">操作</th>
       </tr></thead>
       <tbody id="staffTableBody"></tbody>
     </table>
@@ -1619,21 +1792,38 @@ loadStaffTabs();
 
 // ===== スタッフ管理テーブル =====
 async function loadStaffTable() {
-  const [namesRes, accountsRes] = await Promise.all([fetch('/api/staff-names'), adminFetch('/api/admin/accounts')]);
+  const [namesRes, accountsRes, settingsRes] = await Promise.all([fetch('/api/staff-names'), adminFetch('/api/admin/accounts'), fetch('/api/staff-settings')]);
   const names = await namesRes.json();
   const accounts = await accountsRes.json();
+  const settings = await settingsRes.json();
   const accountMap = {};
   accounts.forEach(a => { accountMap[a.staffName] = a; });
+  const settingsMap = {};
+  settings.forEach(s => { settingsMap[s.staffName] = s; });
   const tbody = document.getElementById('staffTableBody');
-  if (!names.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">スタッフが登録されていません</td></tr>'; return; }
+  if (!names.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">スタッフが登録されていません</td></tr>'; return; }
   tbody.innerHTML = '';
   names.forEach(n => {
     const a = accountMap[n] || {};
+    const s = settingsMap[n] || {};
     const tr = document.createElement('tr');
     const loginTime = a.lastLogin ? new Date(a.lastLogin).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '未ログイン';
     tr.innerHTML = '<td><strong>' + n + '</strong></td>' +
       '<td style="color:#475569">' + (a.email || '<span style="color:#cbd5e1">未設定</span>') + '</td>' +
       '<td style="color:#94a3b8;font-size:12px">' + loginTime + '</td>';
+    // 評価者トグル
+    const evalTd = document.createElement('td');
+    evalTd.style.cssText = 'text-align:center';
+    const evalBtn = document.createElement('button');
+    evalBtn.textContent = s.isEvaluator ? '⭐ ON' : 'OFF';
+    evalBtn.style.cssText = 'border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;' + (s.isEvaluator ? 'background:#fef3c7;color:#d97706' : 'background:#f1f5f9;color:#94a3b8');
+    evalBtn.onclick = async function() {
+      const newVal = !s.isEvaluator;
+      await adminFetch('/admin/staff-evaluator', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName: n, isEvaluator: newVal }) });
+      loadStaffTable();
+    };
+    evalTd.appendChild(evalBtn);
+    tr.appendChild(evalTd);
     const opTd = document.createElement('td');
     opTd.style.cssText = 'text-align:center;white-space:nowrap';
     const editBtn = document.createElement('button');
@@ -2130,6 +2320,22 @@ app.get('/my-stats', async (req, res) => {
   const name = getStaffFromReq(req);
   if (!name) return res.redirect('/staff-login');
   const allRecords = await loadDB();
+  // 受け取った評価履歴
+  const peerEvals = allRecords
+    .filter(r => r.entryType === 'peer_eval' && r.staffName === name)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const totalPoints = peerEvals.reduce((s, r) => s + (r.points || 0), 0);
+  const POINT_MEDAL = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+  const POINT_LABEL = { gold: 'ゴールド', silver: 'シルバー', bronze: 'ブロンズ' };
+  const evalHtml = peerEvals.length === 0 ? '<p style="color:rgba(255,255,255,.35);font-size:13px;text-align:center;padding:16px 0">まだ評価はありません</p>' :
+    peerEvals.map(r => `<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:20px">${POINT_MEDAL[r.pointType]||'⭐'}</span>
+        <span style="font-size:13px;font-weight:700;color:#fbbf24">${POINT_LABEL[r.pointType]||''} +${r.points}pt</span>
+        <span style="font-size:11px;color:rgba(255,255,255,.35);margin-left:auto">${r.date} ${esc(r.fromStaff)}</span>
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.5">${esc(r.reason)}</div>
+    </div>`).join('');
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
   const rawGoals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
@@ -2414,7 +2620,10 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
 
 <div class="topbar">
   <div class="hero-name"><span>自分の実績</span><strong>${esc(name)}</strong></div>
-  <a href="/staff-logout" class="logout-btn">ログアウト</a>
+  <div style="display:flex;gap:8px;align-items:center">
+    ${staffSetting.isEvaluator ? `<a href="/peer-eval" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#fff;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;text-decoration:none">⭐ 評価する</a>` : ''}
+    <a href="/staff-logout" class="logout-btn">ログアウト</a>
+  </div>
 </div>
 
 <div class="mountain-wrap">
@@ -2477,6 +2686,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
 
 <div class="container">
   <a href="/" class="back-link">← 入力フォームへ戻る</a>
+
+  <!-- 評価履歴 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+      <span>⭐ 受け取った評価</span>
+      <span style="font-size:13px;font-weight:700;color:#fbbf24">合計 ${totalPoints}pt</span>
+    </div>
+    <div style="padding:4px 0">${evalHtml}</div>
+  </div>
 
   <div class="card" id="calCard">
     <div class="card-header">📅 記録カレンダー</div>
