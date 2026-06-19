@@ -233,14 +233,20 @@
       FREE_TEXT_ACTIONS = new Set(visibleItems.filter(i => i.needsFreeText).map(i => i.name));
       const sel = document.getElementById('actionSelect');
       const groups = {};
+      const groupOrder = [];
       visibleItems.forEach(item => {
-        if (!groups[item.group]) groups[item.group] = [];
+        if (!groups[item.group]) { groups[item.group] = []; groupOrder.push(item.group); }
         groups[item.group].push(item);
       });
-      Object.entries(groups).forEach(([grp, items]) => {
+      const FIXED_GROUP_ORDER = ['処置', '物品', 'アポ管理', 'チームサポート', 'ファン獲得', 'カウンセリング', '口コミ', '行動', 'その他'];
+      const sortedGroups = [
+        ...FIXED_GROUP_ORDER.filter(g => groups[g]),
+        ...groupOrder.filter(g => !FIXED_GROUP_ORDER.includes(g))
+      ];
+      sortedGroups.forEach(grp => {
         const og = document.createElement('optgroup');
         og.label = '── ' + grp + ' ──';
-        items.forEach(item => {
+        groups[grp].forEach(item => {
           const opt = document.createElement('option');
           opt.value = item.name;
           opt.textContent = item.name;
