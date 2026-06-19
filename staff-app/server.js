@@ -135,6 +135,15 @@ app.post('/admin/action-config/groups', async (req, res) => {
   await saveActionConfig(config);
   res.json({ ok: true });
 });
+app.put('/admin/action-config/groups', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { groups } = req.body;
+  if (!Array.isArray(groups)) return res.status(400).json({ error: 'groups required' });
+  const config = await loadActionConfig();
+  config.groups = groups;
+  await saveActionConfig(config);
+  res.json({ ok: true });
+});
 app.delete('/admin/action-config/groups/:name', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const config = await loadActionConfig();
@@ -1797,10 +1806,15 @@ function renderGroupList() {
   const el = document.getElementById('groupList');
   if (!el) return;
   el.innerHTML = '';
+  let dragSrc = null;
   currentConfig.groups.forEach(g => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:5px 10px;font-size:13px;color:#334155';
-    row.textContent = g;
+    row.dataset.group = g;
+    row.draggable = true;
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:5px 10px;font-size:13px;color:#334155;cursor:grab;user-select:none';
+    const handle = document.createElement('span');
+    handle.textContent = '⠿ ' + g;
+    handle.style.cssText = 'flex:1;color:#334155';
     const btn = document.createElement('button');
     btn.textContent = '×';
     btn.style.cssText = 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;margin-left:8px';
@@ -1808,6 +1822,27 @@ function renderGroupList() {
       await adminFetch('/admin/action-config/groups/'+encodeURIComponent(g), { method:'DELETE' });
       loadConfig();
     };
+    row.addEventListener('dragstart', e => { dragSrc = row; row.style.opacity = '0.4'; });
+    row.addEventListener('dragend', e => {
+      row.style.opacity = '';
+      el.querySelectorAll('[data-group]').forEach(r => r.style.background = '#f8fafc');
+    });
+    row.addEventListener('dragover', e => { e.preventDefault(); row.style.background = '#e0f2fe'; });
+    row.addEventListener('dragleave', e => { row.style.background = '#f8fafc'; });
+    row.addEventListener('drop', async e => {
+      e.preventDefault();
+      row.style.background = '#f8fafc';
+      if (!dragSrc || dragSrc === row) return;
+      const rows = [...el.querySelectorAll('[data-group]')];
+      const fromIdx = rows.indexOf(dragSrc);
+      const toIdx = rows.indexOf(row);
+      el.insertBefore(dragSrc, toIdx < fromIdx ? row : row.nextSibling);
+      const newOrder = [...el.querySelectorAll('[data-group]')].map(r => r.dataset.group);
+      currentConfig.groups = newOrder;
+      await adminFetch('/admin/action-config/groups', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ groups: newOrder }) });
+      loadConfig();
+    });
+    row.appendChild(handle);
     row.appendChild(btn);
     el.appendChild(row);
   });
