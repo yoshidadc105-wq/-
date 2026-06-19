@@ -1057,7 +1057,7 @@ app.get('/dashboard', async (req, res) => {
     groupItemsMap[item.group].push(item.name);
   }
 
-  const thCols = groupOrder.map(g => `<th class="num">${esc(g)}</th>`).join('');
+  const thCols = groupOrder.map(g => `<th class="num">${esc(g)}</th>`).join('') + `<th class="num">その他</th>`;
 
   const summaryRows = staffList.map(([name, s]) => {
     const initial = name.charAt(0);
@@ -1068,6 +1068,8 @@ app.get('/dashboard', async (req, res) => {
       const badge = total > 0 ? `<span class="badge badge-gray">${total}</span>` : `<span style="color:#cbd5e1">0</span>`;
       return `<td class="num">${badge}${detail ? `<br><small style="color:#94a3b8;font-size:10px">${esc(detail)}</small>` : ''}</td>`;
     }).join('');
+    const otherTotal = s.actionMap['その他'] || 0;
+    const otherCell = `<td class="num">${otherTotal > 0 ? `<span class="badge badge-gray">${otherTotal}pt</span>` : `<span style="color:#cbd5e1">0</span>`}</td>`;
 
     const stSetting = staffSettings.find(x => x.staffName === name) || {};
     const g = stSetting.goals || {};
@@ -1089,6 +1091,7 @@ app.get('/dashboard', async (req, res) => {
         <td class="num"><span class="badge badge-gray">${s.count}</span></td>
         <td class="num">${s.patients.size}</td>
         ${groupCells}
+        ${otherCell}
         <td onclick="event.stopPropagation()" style="min-width:100px">
           ${goalParts || '<span style="color:#cbd5e1;font-size:11px">未設定</span>'}
         </td>
@@ -1341,7 +1344,7 @@ td{padding:11px 14px;vertical-align:middle}
         ${thCols}
         <th>目標進捗</th><th>出力</th>
       </tr></thead>
-      <tbody>${summaryRows || `<tr><td colspan="${4 + groupOrder.length}" class="empty">まだデータがありません</td></tr>`}</tbody>
+      <tbody>${summaryRows || `<tr><td colspan="${5 + groupOrder.length}" class="empty">まだデータがありません</td></tr>`}</tbody>
     </table>
     </div>
   </div>
