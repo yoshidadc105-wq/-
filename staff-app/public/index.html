@@ -224,15 +224,8 @@
       const settings = await settingsRes.json();
       const allItems = await itemsRes.json();
       const s = settings.find(x => x.staffName === loggedInStaff);
-      // 評価者ボタンを追加
-      if (s && s.isEvaluator) {
-        const evalBtn = document.createElement('a');
-        evalBtn.href = '/peer-eval';
-        evalBtn.className = 'hdr-btn';
-        evalBtn.textContent = '⭐ 評価する';
-        evalBtn.style.cssText = 'background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#fff;border-color:transparent';
-        hu.insertBefore(evalBtn, pwBtn);
-      }
+      // 評価者はすぐ評価画面へ
+      if (s && s.isEvaluator) { location.href = '/peer-eval'; return; }
       const disabled = (s && s.disabledItems) || [];
       const visibleItems = allItems.filter(item => !disabled.includes(item.name));
       PATIENT_ACTIONS = new Set(visibleItems.filter(i => i.needsPatient).map(i => i.name));
