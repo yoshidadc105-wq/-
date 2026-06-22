@@ -5,6 +5,7 @@ const axios = require('axios');
 const { Resend } = require('resend');
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const { google } = require('googleapis');
 
 const app = express();
 
@@ -18,6 +19,8 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const PRINTNODE_API_KEY = process.env.PRINTNODE_API_KEY;
 const PRINTNODE_PRINTER_ID = process.env.PRINTNODE_PRINTER_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
 const DB_FILE = path.join(__dirname, 'data', 'submissions.json');
 
@@ -219,6 +222,7 @@ app.post('/submit', async (req, res) => {
 
   sendFormEmail(d).catch((err) => console.error('メール送信エラー:', err.message));
   printQuestionnaire(d).catch((err) => console.error('印刷エラー:', err.message));
+  appendToSheet(d).catch((err) => console.error('スプレッドシート記録エラー:', err.message));
 });
 
 app.get('/admin', (req, res) => {
@@ -325,6 +329,43 @@ function scheduleText(d) {
     `午前　${d.sch_am_mon||'-'}　${d.sch_am_tue||'-'}　${d.sch_am_wed||'-'}　${d.sch_am_thu||'-'}　${d.sch_am_fri||'-'}　${d.sch_am_sat||'-'}　${d.sch_am_sun||'-'}　${d.sch_am_hol||'-'}`,
     `午後　${d.sch_pm_mon||'-'}　${d.sch_pm_tue||'-'}　${d.sch_pm_wed||'-'}　${d.sch_pm_thu||'-'}　${d.sch_pm_fri||'-'}　${d.sch_pm_sat||'-'}　${d.sch_pm_sun||'-'}　${d.sch_pm_hol||'-'}`,
   ].join('\n');
+}
+
+async function appendToSheet(d) {
+  if (!GOOGLE_SPREADSHEET_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) return;
+  const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  const sheets = google.sheets({ version: 'v4', auth });
+  const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  const isChild = d.type === 'child';
+  const row = [
+    now,
+    isChild ? '小児用' : '成人用',
+    d.name || '',
+    d.kana || '',
+    d.dob || '',
+    d.gender || '',
+    d.tel || '',
+    isChild ? (d.guardian || '') : '',
+    formatChecks(d.q1) + (d.q1_other ? ' / ' + d.q1_other : ''),
+    formatChecks(d.q3) + (d.q3_other ? ' / ' + d.q3_other : ''),
+    d.q4 || '',
+    d.q4_medicine || '',
+    isChild
+      ? formatChecks(d.q5)
+      : formatChecks(d.q5) + (d.q5_other ? ' / ' + d.q5_other : ''),
+    d.q8 || '',
+  ];
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: GOOGLE_SPREADSHEET_ID,
+    range: 'シート1!A:N',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [row] },
+  });
+  console.log(`スプレッドシート記録完了: ${d.name}`);
 }
 
 async function sendFormEmail(d) {
@@ -539,4 +580,5 @@ app.listen(PORT, () => {
   console.log(`Resend APIキー: ${RESEND_API_KEY ? '設定済み' : '未設定'}`);
   console.log(`印刷先プリンターID: ${PRINTNODE_PRINTER_ID || '未設定'}`);
   console.log(`PrintNode APIキー: ${PRINTNODE_API_KEY ? PRINTNODE_API_KEY.slice(0,6) + '...' : '未設定'}`);
+  console.log(`スプレッドシート: ${GOOGLE_SPREADSHEET_ID ? '設定済み' : '未設定'}`);
 });
