@@ -251,7 +251,14 @@ async function loadEditData(){
     let sd={};try{sd=JSON.parse(editManual.content||'{}');}catch(e){}
     coverImageName=sd.cover_image||null;
     if(coverImageName)document.getElementById('coverImageDrop').innerHTML=`<img src="/uploads/${coverImageName}" style="max-width:100%;max-height:200px;border-radius:4px">`;
-    steps=(sd.steps||[]).map(s=>({id:++stepCounter,title:s.title||'',imageName:s.image||null,imageType:s.image_type||'image',description:s.description||'',videoAnnotations:s.video_annotations||[]}));
+    steps=(sd.steps||[]).map(s=>{
+      const imgs=s.images||(s.image?[{name:s.image,type:s.image_type||'image'}]:[]);
+      const layout=s.image_layout||'single';
+      const n=layout==='2col'?2:layout==='4grid'?4:1;
+      while(imgs.length<n)imgs.push(null);
+      const images=imgs.slice(0,n);
+      return{id:++stepCounter,title:s.title||'',imageName:images[0]?.name||null,imageType:images[0]?.type||'image',images,imageLayout:layout,description:s.description||'',videoAnnotations:s.video_annotations||[]};
+    });
     renderSteps();
   }else{
     document.getElementById('typeTabs').classList.add('hidden');
@@ -275,7 +282,7 @@ function setForeColor(color){document.execCommand('foreColor',false,color);}
 function clearFmt(){document.execCommand('removeFormat',false,null);document.execCommand('unlink',false,null);}
 
 // ---- Steps ----
-function addStep(){steps.push({id:++stepCounter,title:'',imageName:null,imageType:'image',description:'',videoAnnotations:[]});renderSteps();setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);}
+function addStep(){steps.push({id:++stepCounter,title:'',imageName:null,imageType:'image',images:[],imageLayout:'single',description:'',videoAnnotations:[]});renderSteps();setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);}
 function removeStep(id){steps=steps.filter(s=>s.id!==id);renderSteps();}
 function updateStepField(id,field,value){const s=steps.find(s=>s.id===id);if(s)s[field]=value;}
 function moveStep(id,dir){
@@ -287,12 +294,65 @@ function moveStep(id,dir){
 
 async function uploadCoverImage(input){const file=input.files[0];if(!file)return;const form=new FormData();form.append('image',file);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('画像のアップロードに失敗しました');return;}const data=await res.json();coverImageName=data.filename;document.getElementById('coverImageDrop').innerHTML=`<img src="/uploads/${data.filename}" style="max-width:100%;max-height:200px;border-radius:4px">`;}
 
-async function uploadStepMedia(id,input){const file=input.files[0];if(!file)return;document.getElementById(`stepMediaDrop_${id}`).innerHTML=`<div style="color:var(--text-muted);font-size:13px">アップロード中...</div>`;const form=new FormData();form.append('image',file);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('アップロードに失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===id);if(step){step.imageName=data.filename;step.imageType=data.type;}refreshStepMediaDrop(id,step);}
+function slotCount(layout){return layout==='2col'?2:layout==='4grid'?4:1;}
 
-function refreshStepMediaDrop(id,step){const drop=document.getElementById(`stepMediaDrop_${id}`);if(!drop||!step)return;if(!step.imageName)drop.innerHTML=`<div style="color:var(--text-muted);font-size:13px">📷🎬 クリックして画像または動画を追加（任意）</div>`;else if(step.imageType==='video')drop.innerHTML=`<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%;max-height:300px;border-radius:4px"></video>`;else drop.innerHTML=`<img src="/uploads/${step.imageName}" style="max-width:100%;max-height:300px;border-radius:4px">`;const btns=document.getElementById(`stepMediaBtns_${id}`);if(btns)btns.innerHTML=buildMediaBtns(step);}
+function setStepLayout(id,layout){
+  const step=steps.find(s=>s.id===id);if(!step)return;
+  step.imageLayout=layout;
+  if(!step.images)step.images=[];
+  const n=slotCount(layout);
+  while(step.images.length<n)step.images.push(null);
+  step.images=step.images.slice(0,n);
+  step.imageName=step.images[0]?.name||null;
+  step.imageType=step.images[0]?.type||'image';
+  renderSteps();
+}
 
-function buildMediaBtns(step){if(!step.imageName)return'';let h=`<button type="button" onclick="clearStepMedia(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✕ 削除</button>`;if(step.imageType!=='video')h+=` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 画像に書き込む</button>`;else{h+=` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:12px">✂️ トリミング</button>`;h+=` <button type="button" onclick="openVideoAnnot(${step.id})" class="btn btn-primary btn-sm" style="font-size:12px">✏️ 動画にメモ</button>`;}return h;}
-function clearStepMedia(id){const step=steps.find(s=>s.id===id);if(!step)return;step.imageName=null;step.imageType='image';step.videoAnnotations=[];refreshStepMediaDrop(id,step);}
+async function uploadStepSlot(stepId,slotIdx,input){
+  const file=input.files[0];if(!file)return;
+  const step=steps.find(s=>s.id===stepId);if(!step)return;
+  const form=new FormData();form.append('image',file);
+  const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});
+  if(!res.ok){alert('アップロードに失敗しました');return;}
+  const data=await res.json();
+  if(!step.images)step.images=[];
+  while(step.images.length<=slotIdx)step.images.push(null);
+  step.images[slotIdx]={name:data.filename,type:data.type};
+  if(slotIdx===0){step.imageName=data.filename;step.imageType=data.type;}
+  renderSteps();
+}
+
+function clearStepSlot(stepId,slotIdx){
+  const step=steps.find(s=>s.id===stepId);if(!step)return;
+  if(step.images)step.images[slotIdx]=null;
+  if(slotIdx===0){step.imageName=null;step.imageType='image';step.videoAnnotations=[];}
+  renderSteps();
+}
+
+function buildSlots(step){
+  const n=slotCount(step.imageLayout||'single');
+  const maxH=step.imageLayout==='single'?'300px':'180px';
+  return Array.from({length:n},(_,i)=>{
+    const img=(step.images||[])[i];
+    let content;
+    if(!img){
+      content=`<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:8px 4px">📷🎬<br>タップして追加</div>`;
+    }else if(img.type==='video'){
+      content=`<video src="/uploads/${img.name}" controls playsinline style="max-width:100%;max-height:${maxH};border-radius:4px"></video>`;
+    }else{
+      content=`<img src="/uploads/${img.name}" style="max-width:100%;max-height:${maxH};border-radius:4px">`;
+    }
+    const singleBtns=step.imageLayout==='single'&&img?(img.type!=='video'
+      ?` <button type="button" onclick="openAnnotation(${step.id})" class="btn btn-primary btn-sm" style="font-size:11px;padding:2px 6px">✏️ 書き込む</button>`
+      :` <button type="button" onclick="openVideoTrim(${step.id})" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 6px">✂️</button><button type="button" onclick="openVideoAnnot(${step.id})" class="btn btn-primary btn-sm" style="font-size:11px;padding:2px 6px">✏️ メモ</button>`
+    ):'';
+    return `<div style="display:flex;flex-direction:column;gap:3px">
+      <div class="step-media-drop" style="min-height:64px;padding:6px" onclick="document.getElementById('stepSlotInput_${step.id}_${i}').click()">${content}</div>
+      <input type="file" id="stepSlotInput_${step.id}_${i}" accept="image/*,video/*" style="display:none" onchange="uploadStepSlot(${step.id},${i},this)">
+      ${img?`<div style="text-align:right"><button type="button" onclick="clearStepSlot(${step.id},${i})" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 6px">✕ 削除</button>${singleBtns}</div>`:''}
+    </div>`;
+  }).join('');
+}
 
 function renderSteps(){
   const container=document.getElementById('stepsList');
@@ -311,11 +371,13 @@ function renderSteps(){
         </div>
       </div>
       <div class="card-body">
-        <div class="step-media-drop" id="stepMediaDrop_${step.id}" onclick="document.getElementById('stepMediaInput_${step.id}').click()">
-          ${step.imageName?(step.imageType==='video'?`<video src="/uploads/${step.imageName}" controls playsinline style="max-width:100%;max-height:300px;border-radius:4px"></video>`:`<img src="/uploads/${step.imageName}" style="max-width:100%;max-height:300px;border-radius:4px">`):"<div style='color:var(--text-muted);font-size:13px'>📷🎬 クリックして画像または動画を追加（任意）</div>"}
+        <div style="margin-bottom:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--text-muted)">レイアウト:</span>
+          <button type="button" onclick="setStepLayout(${step.id},'single')" class="btn btn-sm ${step.imageLayout==='single'?'btn-primary':'btn-secondary'}" style="font-size:11px;padding:2px 10px">1枚</button>
+          <button type="button" onclick="setStepLayout(${step.id},'2col')" class="btn btn-sm ${step.imageLayout==='2col'?'btn-primary':'btn-secondary'}" style="font-size:11px;padding:2px 10px">2枚横並び</button>
+          <button type="button" onclick="setStepLayout(${step.id},'4grid')" class="btn btn-sm ${step.imageLayout==='4grid'?'btn-primary':'btn-secondary'}" style="font-size:11px;padding:2px 10px">4枚グリッド</button>
         </div>
-        <input type="file" id="stepMediaInput_${step.id}" accept="image/*,video/*" style="display:none" onchange="uploadStepMedia(${step.id},this)">
-        <div id="stepMediaBtns_${step.id}" style="text-align:right;margin-bottom:6px;min-height:28px">${buildMediaBtns(step)}</div>
+        <div style="display:grid;grid-template-columns:${step.imageLayout==='single'?'1fr':'1fr 1fr'};gap:8px;margin-bottom:6px">${buildSlots(step)}</div>
         <div class="text-sm text-muted mb-1" style="font-size:12px">画像: JPG/PNG など / 動画: MP4/MOV など（最大200MB）</div>
         <div class="fmt-toolbar">
           <button type="button" onmousedown="event.preventDefault();formatCmd('bold')"><b>B</b></button>
@@ -360,7 +422,7 @@ function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&qu
 let annotFabric=null,annotStepId=null,annotTool='draw',annotColor='#ef4444';
 function openAnnotation(stepId){const step=steps.find(s=>s.id===stepId);if(!step||!step.imageName||step.imageType==='video'){alert('画像を先にアップロードしてください');return;}annotStepId=stepId;document.getElementById('annotationModal').style.display='flex';const imgObj=new Image();imgObj.crossOrigin='anonymous';imgObj.onload=()=>{const maxW=Math.min(window.innerWidth*.85,840),maxH=Math.floor(window.innerHeight*.55);let w=imgObj.naturalWidth,h=imgObj.naturalHeight;const sc=Math.min(maxW/w,maxH/h,1);w=Math.round(w*sc);h=Math.round(h*sc);if(annotFabric){annotFabric.dispose();annotFabric=null;}annotFabric=new fabric.Canvas('annotCanvas',{width:w,height:h});fabric.Image.fromURL(imgObj.src,(fImg)=>{fImg.scaleToWidth(w);fImg.scaleToHeight(h);fImg.set({selectable:false,evented:false});annotFabric.setBackgroundImage(fImg,annotFabric.renderAll.bind(annotFabric));},{crossOrigin:'anonymous'});setAnnotTool('draw');};imgObj.src=`/uploads/${step.imageName}?t=${Date.now()}`;}
 function closeAnnotation(){document.getElementById('annotationModal').style.display='none';if(annotFabric){annotFabric.dispose();annotFabric=null;}annotStepId=null;}
-async function confirmAnnotation(){if(!annotFabric)return;const btn=document.getElementById('annotConfirmBtn');btn.disabled=true;btn.textContent='保存中...';try{const dataURL=annotFabric.toDataURL({format:'png',quality:1,multiplier:1});const blob=await(await fetch(dataURL)).blob();const form=new FormData();form.append('image',blob,`annotated_${Date.now()}.png`);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('保存に失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===annotStepId);if(step){step.imageName=data.filename;step.imageType='image';}refreshStepMediaDrop(annotStepId,step);closeAnnotation();}finally{btn.disabled=false;btn.textContent='✓ 確定して保存';}}
+async function confirmAnnotation(){if(!annotFabric)return;const btn=document.getElementById('annotConfirmBtn');btn.disabled=true;btn.textContent='保存中...';try{const dataURL=annotFabric.toDataURL({format:'png',quality:1,multiplier:1});const blob=await(await fetch(dataURL)).blob();const form=new FormData();form.append('image',blob,`annotated_${Date.now()}.png`);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('保存に失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===annotStepId);if(step){step.imageName=data.filename;step.imageType='image';if(!step.images)step.images=[];step.images[0]={name:data.filename,type:'image'};}closeAnnotation();renderSteps();}finally{btn.disabled=false;btn.textContent='✓ 確定して保存';}}
 function setAnnotTool(tool){annotTool=tool;document.querySelectorAll('#annotationModal button[id^="annotTool"]').forEach(b=>b.classList.remove('active'));const btn=document.getElementById('annotTool'+tool.charAt(0).toUpperCase()+tool.slice(1));if(btn)btn.classList.add('active');if(!annotFabric)return;annotFabric.isDrawingMode=false;annotFabric.selection=false;annotFabric.off('mouse:down');annotFabric.off('mouse:move');annotFabric.off('mouse:up');annotFabric.getObjects().forEach(o=>{if(o.selectable!==false)o.selectable=(tool==='select');});if(tool==='select'){annotFabric.selection=true;annotFabric.getObjects().forEach(o=>o.selectable=true);}else if(tool==='draw'){annotFabric.isDrawingMode=true;annotFabric.freeDrawingBrush.color=annotColor;annotFabric.freeDrawingBrush.width=parseInt(document.getElementById('brushSize').value);}else if(tool==='text'){annotFabric.on('mouse:down',opt=>{if(opt.target)return;const p=annotFabric.getPointer(opt.e);const txt=new fabric.IText('テキスト',{left:p.x,top:p.y,fontSize:22,fill:annotColor,fontWeight:'bold',editable:true,selectable:true});annotFabric.add(txt);annotFabric.setActiveObject(txt);txt.enterEditing();txt.selectAll();});}else if(tool==='rect'){let sx,sy,rect,dr=false;annotFabric.on('mouse:down',opt=>{if(opt.target)return;const p=annotFabric.getPointer(opt.e);sx=p.x;sy=p.y;dr=true;rect=new fabric.Rect({left:sx,top:sy,width:1,height:1,fill:'transparent',stroke:annotColor,strokeWidth:3,selectable:true});annotFabric.add(rect);});annotFabric.on('mouse:move',opt=>{if(!dr)return;const p=annotFabric.getPointer(opt.e);rect.set({width:Math.abs(p.x-sx),height:Math.abs(p.y-sy),left:Math.min(p.x,sx),top:Math.min(p.y,sy)});annotFabric.renderAll();});annotFabric.on('mouse:up',()=>dr=false);}else if(tool==='arrow'){let sx,sy,ln,hd,dr=false;annotFabric.on('mouse:down',opt=>{if(opt.target)return;const p=annotFabric.getPointer(opt.e);sx=p.x;sy=p.y;dr=true;ln=new fabric.Line([sx,sy,sx,sy],{stroke:annotColor,strokeWidth:3,selectable:false,evented:false});hd=new fabric.Triangle({width:16,height:16,fill:annotColor,left:sx,top:sy,angle:90,selectable:false,evented:false});annotFabric.add(ln);annotFabric.add(hd);});annotFabric.on('mouse:move',opt=>{if(!dr)return;const p=annotFabric.getPointer(opt.e);ln.set({x2:p.x,y2:p.y});hd.set({left:p.x,top:p.y,angle:Math.atan2(p.y-sy,p.x-sx)*180/Math.PI+90});annotFabric.renderAll();});annotFabric.on('mouse:up',()=>dr=false);}}
 function setAnnotColor(color,dotEl){annotColor=color;document.querySelectorAll('#annotationModal .color-dot').forEach(d=>d.classList.remove('selected'));if(dotEl)dotEl.classList.add('selected');if(annotFabric){if(annotFabric.isDrawingMode)annotFabric.freeDrawingBrush.color=color;const a=annotFabric.getActiveObject();if(a){if(a.type==='i-text'||a.type==='text')a.set('fill',color);else{a.set('stroke',color);if(a.fill!=='transparent')a.set('fill',color);}annotFabric.renderAll();}}}
 function setAnnotBrushSize(s){if(annotFabric&&annotFabric.freeDrawingBrush)annotFabric.freeDrawingBrush.width=parseInt(s);}
@@ -389,11 +451,11 @@ function openVideoTrim(stepId){const step=steps.find(s=>s.id===stepId);if(!step|
 function closeVideoTrim(){document.getElementById('videoTrimModal').style.display='none';if(trimRecorder&&trimRecorder.state==='recording')trimRecorder.stop();trimRecorder=null;trimChunks=[];trimStepId=null;}
 function onTrimStartChange(v){const ev=parseFloat(document.getElementById('trimEnd').value);if(parseFloat(v)>=ev){document.getElementById('trimStart').value=ev-.1;return;}document.getElementById('trimStartLabel').textContent=parseFloat(v).toFixed(1);document.getElementById('trimVideoEl').currentTime=parseFloat(v);}
 function onTrimEndChange(v){const sv=parseFloat(document.getElementById('trimStart').value);if(parseFloat(v)<=sv){document.getElementById('trimEnd').value=sv+.1;return;}document.getElementById('trimEndLabel').textContent=parseFloat(v).toFixed(1);}
-async function startVideoTrim(){const video=document.getElementById('trimVideoEl');const st=parseFloat(document.getElementById('trimStart').value);const et=parseFloat(document.getElementById('trimEnd').value);if(et-st<=0){alert('終了時刻は開始時刻より後にしてください');return;}if(!video.captureStream&&!video.mozCaptureStream){alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');return;}document.getElementById('trimConfirmBtn').disabled=true;document.getElementById('trimProgress').style.display='block';trimChunks=[];video.currentTime=st;await new Promise(r=>video.onseeked=r);const stream=video.captureStream?video.captureStream():video.mozCaptureStream();const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';trimRecorder=new MediaRecorder(stream,{mimeType:mime});trimRecorder.ondataavailable=e=>{if(e.data.size>0)trimChunks.push(e.data);};trimRecorder.onstop=async()=>{const blob=new Blob(trimChunks,{type:mime});const ext=mime.includes('mp4')?'.mp4':'.webm';const form=new FormData();form.append('image',blob,`trimmed_${Date.now()}${ext}`);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('保存に失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===trimStepId);if(step){step.imageName=data.filename;step.imageType='video';}refreshStepMediaDrop(trimStepId,step);closeVideoTrim();};trimRecorder.start();video.play();const iv=setInterval(()=>{if(video.currentTime>=et){clearInterval(iv);video.pause();trimRecorder.stop();}},100);}
+async function startVideoTrim(){const video=document.getElementById('trimVideoEl');const st=parseFloat(document.getElementById('trimStart').value);const et=parseFloat(document.getElementById('trimEnd').value);if(et-st<=0){alert('終了時刻は開始時刻より後にしてください');return;}if(!video.captureStream&&!video.mozCaptureStream){alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');return;}document.getElementById('trimConfirmBtn').disabled=true;document.getElementById('trimProgress').style.display='block';trimChunks=[];video.currentTime=st;await new Promise(r=>video.onseeked=r);const stream=video.captureStream?video.captureStream():video.mozCaptureStream();const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';trimRecorder=new MediaRecorder(stream,{mimeType:mime});trimRecorder.ondataavailable=e=>{if(e.data.size>0)trimChunks.push(e.data);};trimRecorder.onstop=async()=>{const blob=new Blob(trimChunks,{type:mime});const ext=mime.includes('mp4')?'.mp4':'.webm';const form=new FormData();form.append('image',blob,`trimmed_${Date.now()}${ext}`);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('保存に失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===trimStepId);if(step){step.imageName=data.filename;step.imageType='video';if(!step.images)step.images=[];step.images[0]={name:data.filename,type:'video'};}closeVideoTrim();renderSteps();};trimRecorder.start();video.play();const iv=setInterval(()=>{if(video.currentTime>=et){clearInterval(iv);video.pause();trimRecorder.stop();}},100);}
 
 // Save
 async function handleSubmit(e){e.preventDefault();const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='保存中...';const title=document.getElementById('title').value.trim();const description=document.getElementById('description').value.trim();const categoryId=document.getElementById('categorySelect').value;if(!title){showAlert('alert','タイトルを入力してください','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';return;}try{if(editId)await updateManual(title,description,categoryId);else await createManual(title,description,categoryId);}catch(err){showAlert('alert','予期せぬエラーが発生しました','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';}}
-function buildStepsContent(){return JSON.stringify({cover_image:coverImageName,steps:steps.map((s,i)=>({order:i+1,title:s.title,image:s.imageName,image_type:s.imageType,description:s.description,video_annotations:s.videoAnnotations||[]}))});}
+function buildStepsContent(){return JSON.stringify({cover_image:coverImageName,steps:steps.map((s,i)=>({order:i+1,title:s.title,image:s.imageName,image_type:s.imageType,images:s.images||[],image_layout:s.imageLayout||'single',description:s.description,video_annotations:s.videoAnnotations||[]}))});}
 async function createManual(title,description,categoryId){
   let res;
   if(currentType==='steps'){

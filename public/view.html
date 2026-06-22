@@ -92,7 +92,20 @@ function renderStepDesc(desc){
   return`<div class="step-desc">${e}</div>`;
 }
 
-function renderStepMedia(image,imageType,videoAnnotations){
+function renderStepMedia(image,imageType,videoAnnotations,images,imageLayout){
+  if(images&&imageLayout&&imageLayout!=='single'){
+    const valid=images.filter(Boolean);
+    if(valid.length>0){
+      const cols=imageLayout==='4grid'?'1fr 1fr':'1fr 1fr';
+      const slots=images.map(img=>{
+        if(!img)return`<div></div>`;
+        const isV=img.type==='video'||/\.(mp4|webm|mov|avi|m4v)$/i.test(img.name);
+        if(isV)return`<video src="/uploads/${img.name}" controls playsinline style="width:100%;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)"></video>`;
+        return`<img src="/uploads/${img.name}" style="width:100%;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)">`;
+      }).join('');
+      return`<div style="display:grid;grid-template-columns:${cols};gap:8px;margin-bottom:16px">${slots}</div>`;
+    }
+  }
   if(!image)return'';
   const isVideo=imageType==='video'||/\.(mp4|webm|mov|avi|m4v)$/i.test(image);
   if(isVideo){
@@ -179,7 +192,7 @@ async function loadManual(){
           </div>
         </div>
         <div class="card-body">
-          ${renderStepMedia(step.image,step.image_type,step.video_annotations)}
+          ${renderStepMedia(step.image,step.image_type,step.video_annotations,step.images,step.image_layout)}
           ${renderStepDesc(step.description)}
         </div>
       </div>`).join('');
