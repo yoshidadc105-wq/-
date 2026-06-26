@@ -1604,12 +1604,24 @@ function openModal(staffName) {
   }
   renderList('modalItems', d.itemsMap);
   renderList('modalCounseling', d.counselingMap);
-  renderList('modalTreatment', d.treatmentMap);
+  // 処置リスト：各項目の直下に自由記述を表示
+  (function() {
+    const ul = document.getElementById('modalTreatment');
+    const entries = Object.entries(d.treatmentMap || {});
+    const phrases = (d.freePhrases || []).filter(p => p && typeof p === 'object');
+    const byAction = {};
+    phrases.forEach(function(p) { if (!byAction[p.action]) byAction[p.action] = []; byAction[p.action].push(p); });
+    if (entries.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; return; }
+    ul.innerHTML = entries.map(function(e) {
+      var k = e[0], v = e[1];
+      var notes = (byAction[k] || []).map(function(p) {
+        return '<li style="font-size:11px;color:#64748b;padding:1px 0 1px 12px">└ ' + p.text + ' <span style="color:#94a3b8">' + p.date + '</span></li>';
+      }).join('');
+      return '<li>' + k + ': ' + v + '件</li>' + notes;
+    }).join('');
+  })();
   const ul = document.getElementById('modalPhrases');
-  if (ul) {
-    if (!d.freePhrases || d.freePhrases.length === 0) { ul.innerHTML = ''; }
-    else { ul.innerHTML = d.freePhrases.map(p => typeof p === 'string' ? '' : '<li style="font-size:12px;color:#475569;padding:2px 0"><span style="color:#64748b">└</span> <em>' + p.text + '</em> <span style="color:#94a3b8;font-size:11px">' + p.date + '</span></li>').join(''); }
-  }
+  if (ul) ul.innerHTML = '';
   const MEDAL = { gold:'🥇', silver:'🥈', bronze:'🥉' };
   const evalUl = document.getElementById('modalPeerEvals');
   if (evalUl) {
