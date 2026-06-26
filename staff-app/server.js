@@ -978,7 +978,7 @@ app.get('/dashboard', async (req, res) => {
       if (cat === 'treatment')  s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
       if (cat === 'review')     s.reviews++;
       if (r.patientNo) s.patients.add(r.patientNo);
-      if (r.freeText) s.freePhrases.push({ action: r.action, text: r.freeText, date: r.date });
+      if (r.otherText) s.freePhrases.push({ action: r.action, text: r.otherText, date: r.date });
     }
   }
 
