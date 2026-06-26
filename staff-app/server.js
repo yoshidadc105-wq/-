@@ -1074,7 +1074,8 @@ app.get('/dashboard', async (req, res) => {
 
     const stSetting = staffSettings.find(x => x.staffName === name) || {};
     const g = stSetting.goals || {};
-    const goalParts = enabledItems.map(item => {
+    const stDisabled = stSetting.disabledItems || [];
+    const goalParts = enabledItems.filter(item => !stDisabled.includes(item.name)).map(item => {
       const cur = s.actionMap[item.name] || 0;
       const target = g[item.name] || 0;
       if (!target) return null;
