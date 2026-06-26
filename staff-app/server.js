@@ -1554,6 +1554,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="modal-section">
       <h3>処置</h3>
       <ul id="modalTreatment"></ul>
+      <ul id="modalPhrases" style="margin-top:6px;padding-left:0;list-style:none"></ul>
     </div>
     <div class="modal-section">
       <h3>⭐ 受け取った評価</h3>
@@ -1605,8 +1606,10 @@ function openModal(staffName) {
   renderList('modalCounseling', d.counselingMap);
   renderList('modalTreatment', d.treatmentMap);
   const ul = document.getElementById('modalPhrases');
-  if (!d.freePhrases || d.freePhrases.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; }
-  else { ul.innerHTML = d.freePhrases.map(p => typeof p === 'string' ? '<li>' + p + '</li>' : '<li><strong>' + p.action + '</strong>：' + p.text + '<span style="color:#94a3b8;font-size:11px;margin-left:6px">' + p.date + '</span></li>').join(''); }
+  if (ul) {
+    if (!d.freePhrases || d.freePhrases.length === 0) { ul.innerHTML = ''; }
+    else { ul.innerHTML = d.freePhrases.map(p => typeof p === 'string' ? '' : '<li style="font-size:12px;color:#475569;padding:2px 0"><span style="color:#64748b">└</span> <em>' + p.text + '</em> <span style="color:#94a3b8;font-size:11px">' + p.date + '</span></li>').join(''); }
+  }
   const MEDAL = { gold:'🥇', silver:'🥈', bronze:'🥉' };
   const evalUl = document.getElementById('modalPeerEvals');
   if (evalUl) {
