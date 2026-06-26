@@ -959,7 +959,7 @@ app.get('/dashboard', async (req, res) => {
   const byStaff = {};
   for (const r of records) {
     if (!byStaff[r.staffName]) {
-      byStaff[r.staffName] = { count: 0, actionMap: {}, patients: new Set(), freePhrases: [], itemsMap: {}, counselingMap: {}, treatmentMap: {}, reviews: 0 };
+      byStaff[r.staffName] = { count: 0, actionMap: {}, patients: new Set(), freePhrases: [], itemsMap: {}, counselingMap: {}, treatmentMap: {}, treatmentCountMap: {}, reviews: 0 };
     }
     const s = byStaff[r.staffName];
     s.count++;
@@ -975,7 +975,7 @@ app.get('/dashboard', async (req, res) => {
       const label = r.action + (r.itemName ? `（${r.itemName}）` : '') + (r.otherText ? `（${r.otherText}）` : '');
       if (cat === 'item')    s.itemsMap[label] = (s.itemsMap[label] || 0) + 1;
       if (cat === 'counseling') s.counselingMap[r.action] = (s.counselingMap[r.action] || 0) + 1;
-      if (cat === 'treatment')  s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
+      if (cat === 'treatment') { s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1; if (r.countValue) s.treatmentCountMap[r.action] = (s.treatmentCountMap[r.action] || 0) + r.countValue; }
       if (cat === 'review')     s.reviews++;
       if (r.patientNo) s.patients.add(r.patientNo);
       if (r.otherText) s.freePhrases.push({ action: r.action, text: r.otherText, date: r.date });
@@ -1036,6 +1036,7 @@ app.get('/dashboard', async (req, res) => {
       itemsMap: s.itemsMap,
       counselingMap: s.counselingMap,
       treatmentMap: s.treatmentMap,
+      treatmentCountMap: s.treatmentCountMap,
       reviews: s.reviews,
       freePhrases: s.freePhrases,
       peerEvals: (s.peerEvals || []).map(r => ({ pointType: r.pointType, points: r.points, fromStaff: r.fromStaff, reason: r.reason, date: r.date })),
@@ -1612,12 +1613,14 @@ function openModal(staffName) {
     const byAction = {};
     phrases.forEach(function(p) { if (!byAction[p.action]) byAction[p.action] = []; byAction[p.action].push(p); });
     if (entries.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; return; }
+    var countMap = d.treatmentCountMap || {};
     ul.innerHTML = entries.map(function(e) {
       var k = e[0], v = e[1];
+      var countPart = countMap[k] ? '　<span style="color:#0f766e;font-size:11px;font-weight:700">(' + countMap[k] + '本)</span>' : '';
       var notes = (byAction[k] || []).map(function(p) {
         return '<li style="font-size:11px;color:#64748b;padding:1px 0 1px 12px">└ ' + p.text + ' <span style="color:#94a3b8">' + p.date + '</span></li>';
       }).join('');
-      return '<li>' + k + ': ' + v + '件</li>' + notes;
+      return '<li>' + k + ': ' + v + '件' + countPart + '</li>' + notes;
     }).join('');
   })();
   const ul = document.getElementById('modalPhrases');
