@@ -1766,10 +1766,21 @@ function buildPanel(panel, n) {
   Object.entries(groups).forEach(function(e) {
     goalDiv.innerHTML += makeGoalGroup(e[0], e[1].map(function(item){ return makeGoalInput(n, item.name, item.name, g[item.name]||0); }));
   });
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-top:8px';
   var saveBtn = document.createElement('button');
-  saveBtn.textContent = '保存'; saveBtn.style.cssText = 'margin-top:8px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+  saveBtn.textContent = '保存'; saveBtn.style.cssText = 'background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
   saveBtn.onclick = function(){ saveGoal(n, this); };
-  goalDiv.appendChild(saveBtn);
+  var clearBtn = document.createElement('button');
+  clearBtn.textContent = '全て0にリセット'; clearBtn.style.cssText = 'background:#fff;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+  (function(staffName, sb){ clearBtn.onclick = function(){
+    var row = this.closest('[data-staff-row]');
+    row.querySelectorAll('input[data-key]').forEach(function(i){ i.value = 0; });
+    saveGoal(staffName, sb);
+  }; })(n, saveBtn);
+  btnRow.appendChild(saveBtn);
+  btnRow.appendChild(clearBtn);
+  goalDiv.appendChild(btnRow);
   panel.appendChild(goalDiv);
 }
 async function saveGoal(staffName, btn) {
