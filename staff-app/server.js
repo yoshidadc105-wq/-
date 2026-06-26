@@ -964,7 +964,7 @@ app.get('/dashboard', async (req, res) => {
     const s = byStaff[r.staffName];
     s.count++;
     if (r.entryType === 'behavior') {
-      if (r.freeText) s.freePhrases.push(r.freeText);
+      if (r.freeText) s.freePhrases.push({ action: 'ポジティブな行動', text: r.freeText, date: r.date });
     } else if (r.entryType === 'peer_eval') {
       if (!s.peerEvals) s.peerEvals = [];
       s.peerEvals.push(r);
@@ -978,6 +978,7 @@ app.get('/dashboard', async (req, res) => {
       if (cat === 'treatment')  s.treatmentMap[r.action] = (s.treatmentMap[r.action] || 0) + 1;
       if (cat === 'review')     s.reviews++;
       if (r.patientNo) s.patients.add(r.patientNo);
+      if (r.freeText) s.freePhrases.push({ action: r.action, text: r.freeText, date: r.date });
     }
   }
 
@@ -1608,7 +1609,7 @@ function openModal(staffName) {
   renderList('modalTreatment', d.treatmentMap);
   const ul = document.getElementById('modalPhrases');
   if (!d.freePhrases || d.freePhrases.length === 0) { ul.innerHTML = '<li class="modal-empty">なし</li>'; }
-  else { ul.innerHTML = [...new Set(d.freePhrases)].map(p => '<li>' + p + '</li>').join(''); }
+  else { ul.innerHTML = d.freePhrases.map(p => typeof p === 'string' ? '<li>' + p + '</li>' : '<li><strong>' + p.action + '</strong>：' + p.text + '<span style="color:#94a3b8;font-size:11px;margin-left:6px">' + p.date + '</span></li>').join(''); }
   const MEDAL = { gold:'🥇', silver:'🥈', bronze:'🥉' };
   const evalUl = document.getElementById('modalPeerEvals');
   if (evalUl) {
@@ -1763,7 +1764,7 @@ function buildPanel(panel, n) {
   var groups = {};
   visibleItems.forEach(function(item){ if (!groups[item.group]) groups[item.group] = []; groups[item.group].push(item); });
   Object.entries(groups).forEach(function(e) {
-    goalDiv.innerHTML += makeGoalGroup(e[0], e[1].map(function(item){ return makeGoalInput(n, item.name, item.name, g[item.name]||10); }));
+    goalDiv.innerHTML += makeGoalGroup(e[0], e[1].map(function(item){ return makeGoalInput(n, item.name, item.name, g[item.name]||0); }));
   });
   var saveBtn = document.createElement('button');
   saveBtn.textContent = '保存'; saveBtn.style.cssText = 'margin-top:8px;background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
