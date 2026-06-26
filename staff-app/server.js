@@ -1556,10 +1556,6 @@ td{padding:11px 14px;vertical-align:middle}
       <ul id="modalTreatment"></ul>
     </div>
     <div class="modal-section">
-      <h3>行動・取り組みの記録</h3>
-      <ul id="modalPhrases"></ul>
-    </div>
-    <div class="modal-section">
       <h3>⭐ 受け取った評価</h3>
       <ul id="modalPeerEvals" style="font-size:12px"></ul>
     </div>
