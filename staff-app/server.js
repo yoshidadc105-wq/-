@@ -317,9 +317,12 @@ app.post('/admin/add-staff', async (req, res) => {
   if (password.length < 4) return res.status(400).json({ error: 'パスワードは4文字以上' });
   await addStaffName(staffName.trim());
   await upsertStaffAccount(staffName.trim(), hashPassword(password), email.trim().toLowerCase());
-  const allItems = await loadActionItems();
-  const defaultDisabled = allItems.filter(i => i.defaultHidden).map(i => i.name);
-  await saveStaffSetting(staffName.trim(), { disabledItems: defaultDisabled });
+  const existingSettings = (await loadStaffSettings()).find(s => s.staffName === staffName.trim());
+  if (!existingSettings || !existingSettings.disabledItems) {
+    const allItems = await loadActionItems();
+    const defaultDisabled = allItems.filter(i => i.defaultHidden).map(i => i.name);
+    await saveStaffSetting(staffName.trim(), { disabledItems: defaultDisabled });
+  }
   res.json({ ok: true });
 });
 
@@ -1415,6 +1418,7 @@ td{padding:11px 14px;vertical-align:middle}
       <button onclick="fixItemOrder()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">項目順番を更新</button>
       <button onclick="applyDefaultVisibility()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">全スタッフに表示設定を適用</button>
       <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
+      <button onclick="initGikoshi()" style="background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🔧 技工士初期設定（鈴木 愛夏）</button>
       <span id="fixCatMsg" style="font-size:11px"></span>
     </div>
     <div id="debugActionsResult" style="display:none;font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all"></div>
@@ -1676,6 +1680,20 @@ async function fixItemOrder() {
   } else { msg.style.color = '#dc2626'; msg.textContent = '失敗しました'; }
 }
 
+async function initGikoshi() {
+  const msg = document.getElementById('fixCatMsg');
+  if (!confirm('鈴木 愛夏を追加し、技工士用の項目を設定します。よろしいですか？')) return;
+  msg.style.color = '#0369a1'; msg.textContent = '処理中...';
+  const res = await adminFetch('/admin/init-gikoshi', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    msg.style.color = '#065f46';
+    msg.textContent = '完了：' + d.staffName + ' を追加し、技工士項目（' + d.enabledItems.join('・') + '）を設定しました';
+    setTimeout(function(){ location.reload(); }, 2000);
+  } else {
+    msg.style.color = '#dc2626'; msg.textContent = '失敗しました';
+  }
+}
 async function fixCategories() {
   const msg = document.getElementById('fixCatMsg');
   msg.style.color = '#92400e'; msg.textContent = '処理中...';
@@ -3002,6 +3020,34 @@ app.post('/admin/fix-item-order', async (req, res) => {
     }
   }
   res.json({ ok: true, updated });
+});
+
+// 技工士（鈴木 愛夏）初期設定エンドポイント
+const GIKOSHI_ITEMS = [
+  { id: 'g01', name: 'CAD CAM冠＋ワンデー', group: '技工', category: 'treatment', needsPatient: true, needsCount: true, builtin: false, defaultHidden: true, order: 201 },
+  { id: 'g02', name: 'アライナー', group: '技工', category: 'treatment', needsPatient: true, needsCount: true, builtin: false, defaultHidden: true, order: 202 },
+  { id: 'g03', name: 'ファン', group: '技工', category: 'treatment', needsPatient: true, needsCount: false, builtin: false, defaultHidden: true, order: 203 },
+  { id: 'g04', name: '義歯/修理', group: '技工', category: 'treatment', needsPatient: true, needsCount: false, builtin: false, defaultHidden: true, order: 204 },
+  { id: 'g05', name: '診療室の清掃', group: '院内貢献', category: 'team_support', needsPatient: false, needsFreeText: true, builtin: false, defaultHidden: true, order: 205 },
+  { id: 'g06', name: '待合室の清掃', group: '院内貢献', category: 'team_support', needsPatient: false, needsFreeText: true, builtin: false, defaultHidden: true, order: 206 },
+];
+app.post('/admin/init-gikoshi', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  // 技工士項目を追加（upsert by id）
+  if (actionItemsCol) {
+    for (const item of GIKOSHI_ITEMS) {
+      await actionItemsCol.updateOne({ id: item.id }, { $set: item }, { upsert: true });
+    }
+  }
+  // 鈴木 愛夏をスタッフ名に追加
+  const staffName = '鈴木 愛夏';
+  await addStaffName(staffName);
+  // 全項目を取得して技工士項目以外を無効に設定
+  const allItems = await loadActionItems();
+  const gikoshiNames = new Set(GIKOSHI_ITEMS.map(i => i.name));
+  const disabledItems = allItems.filter(i => !gikoshiNames.has(i.name)).map(i => i.name);
+  await saveStaffSetting(staffName, { disabledItems });
+  res.json({ ok: true, staffName, enabledItems: GIKOSHI_ITEMS.map(i => i.name), disabledCount: disabledItems.length });
 });
 
 app.get('/health', (_req, res) => res.send('OK'));
