@@ -789,6 +789,12 @@ const ACTION_CATEGORY = {
   'ポジティブな行動をした': 'team_support',
   'ファン患者を獲得した': 'fan',
 };
+const COUNT_UNIT = {
+  'シーラント': '本',
+  'アライナー': '枚',
+  'CAD CAM冠＋ワンデー': '個',
+};
+function countUnit(action) { return COUNT_UNIT[action] || '本'; }
 
 // スタッフ設定API
 app.get('/api/staff-settings', async (req, res) => {
@@ -1111,7 +1117,7 @@ app.get('/dashboard', async (req, res) => {
   }).join('');
 
   const detailRows = records.slice().reverse().slice(0, 100).map(r => {
-    const countPart = r.countValue ? `　${r.countValue}${r.action === 'シーラント' ? '本' : '件'}` : '';
+    const countPart = r.countValue ? `　${r.countValue}${countUnit(r.action)}` : '';
     const actionLabel = r.action ? `<span class="badge badge-gray">${esc(r.action)}${countPart}${r.itemName ? `（${esc(r.itemName)}）` : ''}${r.otherText ? `（${esc(r.otherText)}）` : ''}</span>` : '-';
     const entryBadge = r.entryType === 'behavior' ? '<span class="badge badge-blue" style="margin-right:4px">行動</span>' : '';
     return `
@@ -1141,7 +1147,7 @@ app.get('/dashboard', async (req, res) => {
     const cnt = actionTotals[item.name] || 0;
     const color = kpiColors[idx % kpiColors.length];
     const totalCount = actionCountTotals[item.name];
-    const countLine = totalCount ? `<div class="kpi-sub" style="margin-top:2px">合計 ${totalCount}本</div>` : '';
+    const countLine = totalCount ? `<div class="kpi-sub" style="margin-top:2px">合計 ${totalCount}${countUnit(item.name)}</div>` : '';
     return `<div class="kpi-card ${color}">
       <div class="kpi-label">${esc(item.name)}</div>
       <div class="kpi-value">${cnt}</div>
@@ -1571,6 +1577,7 @@ td{padding:11px 14px;vertical-align:middle}
 <script>
 const STAFF_DATA = ${JSON.stringify(staffDataObj)};
 const MONTH_DATA = ${JSON.stringify(monthData)};
+const COUNT_UNIT_JS = ${JSON.stringify(COUNT_UNIT)};
 const ADMIN_AUTH = 'Basic ' + btoa(':' + ${JSON.stringify(ADMIN_PASSWORD)});
 function adminFetch(url, opts) {
   opts = opts || {};
@@ -1620,7 +1627,7 @@ function openModal(staffName) {
     var countMap = d.treatmentCountMap || {};
     ul.innerHTML = entries.map(function(e) {
       var k = e[0], v = e[1];
-      var countPart = countMap[k] ? '　<span style="color:#0f766e;font-size:11px;font-weight:700">(' + countMap[k] + '本)</span>' : '';
+      var countPart = countMap[k] ? '　<span style="color:#0f766e;font-size:11px;font-weight:700">(' + countMap[k] + (COUNT_UNIT_JS[k]||'本') + ')</span>' : '';
       var notes = (byAction[k] || []).map(function(p) {
         return '<li style="font-size:11px;color:#64748b;padding:1px 0 1px 12px">└ ' + p.text + ' <span style="color:#94a3b8">' + p.date + '</span></li>';
       }).join('');
@@ -2605,7 +2612,7 @@ app.get('/my-stats', async (req, res) => {
     const diffHtml = diff > 0 ? `<span style="color:#34d399;font-size:11px;font-weight:700">▲${diff}</span>`
                    : diff < 0 ? `<span style="color:#f87171;font-size:11px;font-weight:700">▼${Math.abs(diff)}</span>`
                    : `<span style="color:#64748b;font-size:11px">→</span>`;
-    const countSumHtml = countSum ? `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">合計 ${countSum}本</div>` : '';
+    const countSumHtml = countSum ? `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">合計 ${countSum}${countUnit(label)}</div>` : '';
     return `<div class="ring-card${achieved?' ring-achieved':''}">
       <div class="ring-wrap">
         <svg width="88" height="88" viewBox="0 0 88 88">
@@ -2882,7 +2889,7 @@ function showDetail(dateStr, records) {
       txt = (MEDAL[r.pointType]||'⭐') + ' ' + (r.fromStaff||'') + 'から評価　' + (r.reason||'');
     } else {
       txt = r.action;
-      if (r.countValue) txt += '　' + r.countValue + (r.action === 'シーラント' ? '本' : '件');
+      if (r.countValue) txt += '　' + r.countValue + countUnit(r.action);
       if (r.patientNo) txt += '　患者番号：' + r.patientNo;
       if (r.itemName) txt += '　' + r.itemName;
     }
