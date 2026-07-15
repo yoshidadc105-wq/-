@@ -298,7 +298,8 @@
     document.getElementById('patientNoWrap').classList.toggle('hidden', !needsPatient);
     document.getElementById('itemNameWrap').classList.toggle('hidden', !ITEM_NAME_ACTIONS.has(val));
     document.getElementById('countWrap').classList.toggle('hidden', !needsCount);
-    document.getElementById('countLabel').textContent = (val === 'シーラント' ? '本数' : '件数');
+    const COUNT_LABELS = { 'シーラント': '本数', 'アライナー': '枚数', 'CAD CAM冠＋ワンデー': '個数' };
+    document.getElementById('countLabel').textContent = COUNT_LABELS[val] || '件数';
     document.getElementById('typeWrap').classList.toggle('hidden', !typeOpts);
     document.getElementById('freeTextWrap').classList.toggle('hidden', !needsFreeText);
 
