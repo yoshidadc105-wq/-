@@ -2650,14 +2650,18 @@ app.get('/my-stats', async (req, res) => {
     holidayPoints = workedHolidayDays.length * 15;
     const absences = await attendanceRecordsCol.find({ staffName: name, type: 'yukyuu' }).toArray();
     const nowJst = new Date(Date.now() + 9*60*60*1000);
-    const startMonth = new Date('2026-08-01');
-    for (let m = new Date(startMonth); ; m.setUTCMonth(m.getUTCMonth() + 1)) {
-      const monthStart = m.toISOString().slice(0, 7) + '-01';
-      const nextM = new Date(m); nextM.setUTCMonth(nextM.getUTCMonth() + 1);
-      const monthEnd = new Date(nextM - 1).toISOString().slice(0, 10);
-      if (monthEnd >= nowJst.toISOString().slice(0, 10)) break;
-      const hasAbsence = absences.some(r => r.date >= monthStart && r.date <= monthEnd);
+    const todayStr = nowJst.toISOString().slice(0, 10);
+    // 締め日: 11日～翌10日。最初の期間は2026-08-11～2026-09-10
+    for (let y = 2026, mo = 8; ; ) {
+      const pad = n => String(n).padStart(2, '0');
+      const periodStart = `${y}-${pad(mo)}-11`;
+      const nextY = mo === 12 ? y + 1 : y;
+      const nextMo = mo === 12 ? 1 : mo + 1;
+      const periodEnd = `${nextY}-${pad(nextMo)}-10`;
+      if (periodEnd >= todayStr) break; // 期間がまだ終わっていなければ集計しない
+      const hasAbsence = absences.some(r => r.date >= periodStart && r.date <= periodEnd);
       if (!hasAbsence) { kankinPoints += 10; kankinMonths++; }
+      mo = nextMo; y = nextY;
     }
   }
   const totalBonusPoints = holidayPoints + kankinPoints;
