@@ -279,6 +279,12 @@
   }
   // 0:00〜9:00 は前日扱い
   if (jstH < 9 || (jstH === 9 && jstMin === 0)) jst.setUTCDate(jst.getUTCDate() - 1);
+  // 木曜18:45以降 → 水曜扱い、日曜18:45以降 → 土曜扱い
+  const dowAfterMidnight = jst.getUTCDay(); // 前日補正後の曜日
+  if (totalMin >= 18 * 60 + 45) {
+    if (dowAfterMidnight === 4) jst.setUTCDate(jst.getUTCDate() - 1); // 木→水
+    if (dowAfterMidnight === 0) jst.setUTCDate(jst.getUTCDate() - 1); // 日→土
+  }
   const y = jst.getUTCFullYear(), mo = jst.getUTCMonth() + 1, d = jst.getUTCDate();
   const today = y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
   const weekdays = ['日','月','火','水','木','金','土'];
