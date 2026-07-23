@@ -15,7 +15,6 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Noto Sans JP', sans-serif; background: #071020; color: #e2e8f0; font-size: 15px; line-height: 1.6; min-height: 100vh; }
 
-    /* ヘッダー */
     header { background: linear-gradient(135deg, #071020 0%, #0f2d3d 100%); padding: 0; border-bottom: 1px solid rgba(255,255,255,.08); }
     .header-inner { max-width: 560px; margin: 0 auto; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .header-left { display: flex; align-items: center; gap: 12px; }
@@ -26,16 +25,14 @@
 
     .container { max-width: 560px; margin: 0 auto; padding: 20px 16px 80px; }
 
-    /* カード */
     .card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 20px; margin-bottom: 14px; }
     .card-title { font-size: 11px; font-weight: 700; color: #2aab96; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
     .card-title::before { content: ''; display: block; width: 3px; height: 14px; background: linear-gradient(180deg, #2aab96, #34d399); border-radius: 2px; }
 
     .form-group { margin-bottom: 14px; }
     label { display: block; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.6); margin-bottom: 5px; }
-    .required::after { content: "必須"; font-size: 10px; color: #fff; background: linear-gradient(135deg,#ef4444,#f87171); border-radius: 3px; padding: 1px 5px; margin-left: 6px; font-weight: 600; }
 
-    input[type="text"], select {
+    input[type="text"], input[type="number"], select {
       width: 100%; border: 1.5px solid rgba(255,255,255,.1); border-radius: 10px; padding: 11px 14px;
       font-size: 15px; font-family: inherit; outline: none; transition: border .2s, box-shadow .2s;
       background: rgba(255,255,255,.06); color: #e2e8f0;
@@ -43,10 +40,28 @@
     input:focus, select:focus { border-color: #2aab96; background: rgba(42,171,150,.08); box-shadow: 0 0 0 3px rgba(42,171,150,.15); }
     input[readonly] { background: rgba(255,255,255,.04); color: rgba(255,255,255,.5); cursor: default; border-color: rgba(255,255,255,.06); }
     select option { background: #0d2233; color: #e2e8f0; }
-    select optgroup { color: #64748b; }
 
     .patient-check { font-size: 12px; margin-top: 4px; min-height: 18px; color: #2aab96; }
-    .hidden { display: none; }
+    .hidden { display: none !important; }
+
+    /* チェックリスト行 */
+    .item-row { border-bottom: 1px solid rgba(255,255,255,.06); padding: 10px 0; }
+    .item-row:last-child { border-bottom: none; }
+    .item-row-main { display: flex; align-items: center; gap: 10px; }
+    .item-row-main input[type="checkbox"] { width: 22px; height: 22px; accent-color: #2aab96; flex-shrink: 0; cursor: pointer; }
+    .item-row-label { flex: 1; font-size: 14px; font-weight: 500; cursor: pointer; user-select: none; }
+    .inline-count { width: 80px !important; padding: 6px 10px !important; font-size: 13px !important; flex-shrink: 0; }
+    .count-unit { font-size: 12px; color: rgba(255,255,255,.5); white-space: nowrap; }
+    .item-sub { margin-top: 8px; margin-left: 32px; display: flex; flex-direction: column; gap: 6px; }
+    .item-sub input[type="text"] { font-size: 13px; padding: 8px 12px; }
+
+    /* ソロ行 */
+    .solo-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.06); padding: 10px 0; }
+    .solo-row:last-child { border-bottom: none; }
+    .solo-label { flex: 1; font-size: 14px; font-weight: 500; }
+    .solo-input { flex: 1; font-size: 13px !important; padding: 8px 12px !important; }
+    .solo-btn { background: linear-gradient(135deg,#0f766e,#2aab96); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
+    .solo-btn:disabled { background: rgba(255,255,255,.1); color: rgba(255,255,255,.3); cursor: not-allowed; }
 
     .submit-btn {
       display: block; width: 100%;
@@ -55,13 +70,12 @@
       font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer;
       transition: opacity .2s, transform .1s;
       box-shadow: 0 4px 20px rgba(42,171,150,.4);
-      letter-spacing: .05em;
+      letter-spacing: .05em; margin-top: 14px;
     }
     .submit-btn:hover { opacity: .9; }
     .submit-btn:active { transform: scale(.98); }
     .submit-btn:disabled { background: rgba(255,255,255,.1); color: rgba(255,255,255,.3); box-shadow: none; cursor: not-allowed; }
 
-    /* 成功メッセージ */
     .success-msg { display: none; text-align: center; padding: 48px 20px; }
     .success-icon { width: 80px; height: 80px; background: linear-gradient(135deg, #0f766e, #34d399); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 38px; margin: 0 auto 20px; box-shadow: 0 0 30px rgba(52,211,153,.5); animation: pop-in .4s cubic-bezier(.34,1.56,.64,1); }
     @keyframes pop-in { 0%{transform:scale(0)} 100%{transform:scale(1)} }
@@ -69,11 +83,9 @@
     .success-msg p { color: rgba(255,255,255,.6); font-size: 14px; }
     .again-btn { display: inline-block; margin-top: 24px; background: linear-gradient(135deg, #0f766e, #2aab96); color: #fff; border: none; border-radius: 30px; padding: 12px 36px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; box-shadow: 0 4px 16px rgba(42,171,150,.4); }
 
-    /* 実績リンク */
     .stats-link { display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(42,171,150,.12); color: #2aab96; border: 1px solid rgba(42,171,150,.3); border-radius: 12px; padding: 14px; font-size: 14px; font-weight: 700; text-decoration: none; transition: background .2s; margin-top: 16px; }
     .stats-link:hover { background: rgba(42,171,150,.2); }
 
-    /* パスワードモーダル */
     .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
     .modal-box { background: #0d2233; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 28px; max-width: 360px; width: 94%; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
     .modal-box h2 { font-size: 17px; font-weight: 700; color: #2aab96; margin-bottom: 18px; }
@@ -84,8 +96,9 @@
     .modal-btns button { flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .modal-cancel { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.7); }
     .modal-ok { background: linear-gradient(135deg,#0f766e,#2aab96); color: #fff; border: none; }
-
     .hdr-btn { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; white-space: nowrap; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f766e; color: #fff; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; z-index: 3000; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.4); transition: opacity .3s; }
+    .toast.error { background: #dc2626; }
   </style>
 </head>
 <body>
@@ -108,66 +121,45 @@
     <div class="success-icon">✓</div>
     <h2>登録しました</h2>
     <p id="successText"></p>
-    <button class="again-btn" onclick="resetForm()">続けて入力する</button>
+    <button class="again-btn" onclick="resetAll()">続けて入力する</button>
   </div>
 
-  <form id="mainForm">
+  <div id="mainContent">
+    <!-- 日付・スタッフ -->
     <div class="card">
       <div class="card-title">基本情報</div>
-      <div class="form-group">
-        <label class="required">日付</label>
-        <input type="text" id="dateInput" name="date" required readonly />
-      </div>
-      <div class="form-group">
-        <label class="required">スタッフ名</label>
-        <input type="text" id="staffNameInput" name="staffName" readonly style="color:#2aab96;font-weight:700;" />
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">実施内容</div>
-      <div class="form-group">
-        <label class="required">内容を選択</label>
-        <select name="action" id="actionSelect" required onchange="onActionChange()">
-          <option value="">選択してください</option>
-        </select>
-      </div>
-
-      <div class="form-group hidden" id="patientNoWrap">
-        <label class="required">患者番号</label>
-        <input type="text" name="patientNo" id="patientNo" placeholder="例：1234" autocomplete="off" maxlength="10" />
-        <div class="patient-check" id="patientCheck"></div>
-      </div>
-
-      <div class="form-group hidden" id="itemNameWrap">
-        <label id="itemNameLabel">商品名</label>
-        <input type="text" name="itemName" placeholder="例：電動歯ブラシ、ホワイトニングジェルなど" />
-      </div>
-
-      <div class="form-group hidden" id="countWrap">
-        <label class="required" id="countLabel">件数</label>
-        <input type="number" name="countValue" id="countValue" min="1" max="99" placeholder="例：3" style="width:100px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;color:#e2e8f0;font-size:15px;font-family:inherit;outline:none" />
-      </div>
-
-      <div class="form-group hidden" id="typeWrap">
-        <label class="required">種類</label>
-        <select name="otherText" id="typeSelect">
-          <option value="">選択してください</option>
-        </select>
-      </div>
-
-      <div class="form-group hidden" id="freeTextWrap">
-        <label class="required">具体的な内容</label>
-        <input type="text" name="otherText" id="freeTextInput" placeholder="具体的にどんな行動をしたか..." maxlength="200" />
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label>日付</label>
+          <input type="text" id="dateInput" readonly />
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label>スタッフ名</label>
+          <input type="text" id="staffNameInput" readonly style="color:#2aab96;font-weight:700;" />
+        </div>
       </div>
     </div>
 
-    <button type="submit" class="submit-btn" id="submitBtn">登録する</button>
-  </form>
+    <!-- 患者の記録 -->
+    <div class="card" id="patientCard">
+      <div class="card-title">患者の記録</div>
+      <div class="form-group">
+        <label>カルテ番号</label>
+        <input type="text" id="sharedPatientNo" placeholder="例：1234" autocomplete="off" maxlength="10" />
+        <div class="patient-check" id="sharedPatientCheck"></div>
+      </div>
+      <div id="patientItemList"></div>
+      <button class="submit-btn" id="submitPatientBtn" onclick="submitPatientItems()">患者を登録する</button>
+    </div>
 
-  <a href="/my-stats" class="stats-link">
-    📊 自分の実績・目標達成状況を見る
-  </a>
+    <!-- 個人記録（患者番号なし） -->
+    <div class="card" id="soloCard" style="display:none">
+      <div class="card-title">個人の記録（患者番号なし）</div>
+      <div id="soloItemList"></div>
+    </div>
+
+    <a href="/my-stats" class="stats-link">📊 自分の実績・目標達成状況を見る</a>
+  </div>
 
 </div>
 
@@ -189,11 +181,217 @@
 
 <script>
   let loggedInStaff = null;
-  let PATIENT_ACTIONS = new Set();
-  let ITEM_NAME_ACTIONS = new Set();
-  let COUNT_ACTIONS = new Set();
-  let TYPE_ACTIONS = {};
-  let FREE_TEXT_ACTIONS = new Set();
+  let currentDate = '';
+  let allVisibleItems = [];
+
+  const COUNT_LABELS = { 'シーラント': '本数', 'アライナー': '枚数', 'CAD CAM冠＋ワンデー': '個数' };
+
+  // 日付・時間制限
+  const now = new Date();
+  const jstMs = now.getTime() + 9 * 60 * 60 * 1000;
+  const jst = new Date(jstMs);
+  const jstH = jst.getUTCHours(), jstMin = jst.getUTCMinutes();
+  const totalMin = jstH * 60 + jstMin;
+  const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
+              || totalMin >= 18 * 60 + 45
+              || totalMin <= 9 * 60;
+  if (!isOpen) {
+    document.getElementById('mainContent').innerHTML =
+      '<div style="text-align:center;padding:48px 24px;color:#e2e8f0">' +
+      '<div style="font-size:48px;margin-bottom:16px">🔒</div>' +
+      '<div style="font-size:18px;font-weight:700;margin-bottom:8px">入力時間外です</div>' +
+      '<div style="font-size:14px;color:rgba(255,255,255,.5)">入力可能時間：13:30〜14:25 / 18:45〜翌9:00</div>' +
+      '<a href="/my-stats" style="display:inline-block;margin-top:20px;color:#2aab96;text-decoration:none;font-size:14px">📊 実績を見る</a></div>';
+  }
+  if (jstH < 9 || (jstH === 9 && jstMin === 0)) jst.setUTCDate(jst.getUTCDate() - 1);
+  const dowAfterMidnight = jst.getUTCDay();
+  if (totalMin >= 18 * 60 + 45) {
+    if (dowAfterMidnight === 4) jst.setUTCDate(jst.getUTCDate() - 1);
+    if (dowAfterMidnight === 0) jst.setUTCDate(jst.getUTCDate() - 1);
+  }
+  const y = jst.getUTCFullYear(), mo = jst.getUTCMonth() + 1, d = jst.getUTCDate();
+  currentDate = y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  const weekdays = ['日','月','火','水','木','金','土'];
+  const wd = weekdays[jst.getUTCDay()];
+  const todayDisplay = y + '年' + mo + '月' + d + '日（' + wd + '）';
+  const dateEl = document.getElementById('dateInput');
+  if (dateEl) { dateEl.value = currentDate; dateEl.closest('.form-group') && (dateEl.closest('.form-group').querySelector('label').textContent = '日付　' + todayDisplay); }
+
+  function showToast(msg, isError) {
+    const t = document.createElement('div');
+    t.className = 'toast' + (isError ? ' error' : '');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 2500);
+  }
+
+  function buildForm(items) {
+    allVisibleItems = items;
+    const patientItems = items.filter(function(i) { return i.needsPatient; });
+    const soloItems = items.filter(function(i) { return !i.needsPatient && i.id !== 'i18'; });
+
+    // 患者セクション
+    const list = document.getElementById('patientItemList');
+    list.innerHTML = '';
+    if (patientItems.length === 0) {
+      document.getElementById('patientCard').style.display = 'none';
+    } else {
+      patientItems.forEach(function(item) {
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        const unit = COUNT_LABELS[item.name] || '件数';
+        const countHtml = item.needsCount
+          ? '<input type="number" class="inline-count" min="1" max="999" placeholder="' + unit.replace('数','') + '" data-count-for="' + item.name + '" style="width:70px;padding:5px 8px;font-size:13px;border:1.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#e2e8f0;font-family:inherit;outline:none">' +
+            '<span class="count-unit">' + unit + '</span>'
+          : '';
+        row.innerHTML = '<div class="item-row-main">' +
+          '<input type="checkbox" class="item-checkbox" id="chk_' + item.name + '" value="' + item.name + '">' +
+          '<label class="item-row-label" for="chk_' + item.name + '">' + item.name + '</label>' +
+          countHtml +
+          '</div>';
+        if (item.showItemName) {
+          const sub = document.createElement('div');
+          sub.className = 'item-sub hidden';
+          sub.dataset.subFor = item.name;
+          sub.innerHTML = '<input type="text" class="item-name-input" placeholder="商品名を入力..." maxlength="100">';
+          row.appendChild(sub);
+        }
+        list.appendChild(row);
+        // チェックで商品名欄を表示
+        const chk = row.querySelector('.item-checkbox');
+        if (item.showItemName) {
+          chk.addEventListener('change', function() {
+            row.querySelector('[data-sub-for]').classList.toggle('hidden', !this.checked);
+          });
+        }
+      });
+    }
+
+    // ソロセクション
+    const soloList = document.getElementById('soloItemList');
+    soloList.innerHTML = '';
+    if (soloItems.length > 0) {
+      document.getElementById('soloCard').style.display = '';
+      soloItems.forEach(function(item) {
+        const row = document.createElement('div');
+        row.className = 'solo-row';
+        if (item.needsFreeText) {
+          row.innerHTML = '<div style="width:100%">' +
+            '<div style="font-size:14px;font-weight:500;margin-bottom:6px">' + item.name + '</div>' +
+            '<div style="display:flex;gap:8px">' +
+            '<input type="text" class="solo-input" placeholder="具体的な内容を入力..." maxlength="200" style="flex:1;font-size:13px;padding:8px 12px;border:1.5px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.06);color:#e2e8f0;font-family:inherit;outline:none">' +
+            '<button class="solo-btn" onclick="submitSolo(\'' + item.name + '\', this)">登録</button>' +
+            '</div></div>';
+        } else {
+          row.innerHTML =
+            '<span class="solo-label">' + item.name + '</span>' +
+            '<button class="solo-btn" onclick="submitSolo(\'' + item.name + '\', this)">登録</button>';
+        }
+        soloList.appendChild(row);
+      });
+    }
+  }
+
+  async function submitSolo(itemName, btn) {
+    btn.disabled = true; btn.textContent = '登録中...';
+    const row = btn.closest('.solo-row');
+    const freeInput = row ? row.querySelector('.solo-input') : null;
+    const freeText = freeInput ? freeInput.value.trim() : '';
+    const item = allVisibleItems.find(function(i) { return i.name === itemName; });
+    if (item && item.needsFreeText && !freeText) {
+      showToast('具体的な内容を入力してください', true);
+      btn.disabled = false; btn.textContent = '登録';
+      return;
+    }
+    const data = { date: currentDate, staffName: loggedInStaff, patientNo: '', action: itemName, entryType: 'patient', otherText: freeText };
+    try {
+      const res = await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (res.ok) {
+        showToast('「' + itemName + '」を登録しました ✓');
+        if (freeInput) freeInput.value = '';
+      } else if (res.status === 409) {
+        const err = await res.json();
+        showToast(err.message || '重複しています', true);
+      } else {
+        showToast('登録に失敗しました', true);
+      }
+    } catch(e) { showToast('通信エラー', true); }
+    btn.disabled = false; btn.textContent = '登録';
+  }
+
+  async function submitPatientItems() {
+    const patientNo = document.getElementById('sharedPatientNo').value.trim();
+    const checkedBoxes = document.querySelectorAll('#patientItemList .item-checkbox:checked');
+    if (!patientNo) { showToast('カルテ番号を入力してください', true); return; }
+    if (checkedBoxes.length === 0) { showToast('少なくとも1つの項目を選択してください', true); return; }
+
+    const btn = document.getElementById('submitPatientBtn');
+    btn.disabled = true; btn.textContent = '登録中...';
+
+    let successNames = [], errors = [];
+    for (const chk of checkedBoxes) {
+      const itemName = chk.value;
+      const row = chk.closest('.item-row');
+      const countInput = row.querySelector('[data-count-for="' + itemName + '"]');
+      const itemNameInput = row.querySelector('.item-name-input');
+      const item = allVisibleItems.find(function(i) { return i.name === itemName; });
+      if (item && item.needsCount && countInput && !countInput.value) {
+        errors.push(itemName + '：' + (COUNT_LABELS[itemName] || '件数') + 'を入力してください');
+        continue;
+      }
+      const data = {
+        date: currentDate,
+        staffName: loggedInStaff,
+        patientNo: patientNo,
+        action: itemName,
+        entryType: 'patient',
+        countValue: countInput && countInput.value ? countInput.value : null,
+        itemName: itemNameInput ? itemNameInput.value.trim() : '',
+        otherText: '',
+      };
+      try {
+        const res = await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (res.ok) {
+          successNames.push(itemName);
+        } else if (res.status === 409) {
+          const err = await res.json();
+          errors.push(err.message || itemName + '：重複');
+        } else {
+          errors.push(itemName + '：登録失敗');
+        }
+      } catch(e) { errors.push(itemName + '：通信エラー'); }
+    }
+
+    btn.disabled = false; btn.textContent = '患者を登録する';
+
+    if (successNames.length > 0) {
+      if (errors.length > 0) {
+        showToast(successNames.join('・') + ' を登録。エラー：' + errors.join(' / '), true);
+      } else {
+        document.getElementById('mainContent').style.display = 'none';
+        document.getElementById('successText').textContent = '患者 ' + patientNo + ' に「' + successNames.join('・') + '」を記録しました。';
+        document.getElementById('successMsg').style.display = 'block';
+        window.scrollTo(0, 0);
+      }
+    } else if (errors.length > 0) {
+      showToast(errors.join(' / '), true);
+    }
+  }
+
+  function resetAll() {
+    document.getElementById('sharedPatientNo').value = '';
+    document.getElementById('sharedPatientCheck').textContent = '';
+    document.querySelectorAll('#patientItemList .item-checkbox').forEach(function(c) {
+      c.checked = false;
+      var sub = c.closest('.item-row').querySelector('[data-sub-for]');
+      if (sub) sub.classList.add('hidden');
+    });
+    document.querySelectorAll('#patientItemList [data-count-for]').forEach(function(i) { i.value = ''; });
+    document.querySelectorAll('#patientItemList .item-name-input').forEach(function(i) { i.value = ''; });
+    document.getElementById('mainContent').style.display = '';
+    document.getElementById('successMsg').style.display = 'none';
+    window.scrollTo(0, 0);
+  }
 
   async function initAuth() {
     try {
@@ -202,6 +400,8 @@
       if (!data.staffName) { location.href = '/staff-login'; return; }
       loggedInStaff = data.staffName;
     } catch { location.href = '/staff-login'; return; }
+
+    document.getElementById('staffNameInput').value = loggedInStaff;
 
     const hu = document.getElementById('headerUser');
     const nameSpan = document.createElement('span');
@@ -217,169 +417,36 @@
     logoutLink.textContent = 'ログアウト';
     hu.appendChild(nameSpan); hu.appendChild(pwBtn); hu.appendChild(logoutLink);
 
-    document.getElementById('staffNameInput').value = loggedInStaff;
-
     try {
       const [settingsRes, itemsRes] = await Promise.all([fetch('/api/staff-settings'), fetch('/api/action-items')]);
       const settings = await settingsRes.json();
       const allItems = await itemsRes.json();
-      const s = settings.find(x => x.staffName === loggedInStaff);
-      // 評価者はすぐ評価画面へ
+      const s = settings.find(function(x) { return x.staffName === loggedInStaff; });
       if (s && s.isEvaluator) { location.href = '/peer-eval'; return; }
       const disabled = (s && s.disabledItems) || [];
-      const visibleItems = allItems.filter(item => !disabled.includes(item.name) && item.id !== 'i18');
-      PATIENT_ACTIONS = new Set(visibleItems.filter(i => i.needsPatient).map(i => i.name));
-      ITEM_NAME_ACTIONS = new Set(visibleItems.filter(i => i.showItemName).map(i => i.name));
-      COUNT_ACTIONS = new Set(visibleItems.filter(i => i.needsCount).map(i => i.name));
-      visibleItems.filter(i => i.typeOptions && i.typeOptions.length).forEach(i => { TYPE_ACTIONS[i.name] = i.typeOptions; });
-      FREE_TEXT_ACTIONS = new Set(visibleItems.filter(i => i.needsFreeText).map(i => i.name));
-      const sel = document.getElementById('actionSelect');
-      const groups = {};
-      const groupOrder = [];
-      visibleItems.forEach(item => {
-        if (!groups[item.group]) { groups[item.group] = []; groupOrder.push(item.group); }
-        groups[item.group].push(item);
+      const visibleItems = allItems.filter(function(item) { return !disabled.includes(item.name) && item.id !== 'i18'; });
+
+      // グループ順でソート
+      const FIXED_GROUP_ORDER = ['処置', '技工', '物品', 'アポ管理', 'チームサポート', 'ファン獲得', 'カウンセリング', '口コミ', '行動', '院内貢献', 'その他'];
+      visibleItems.sort(function(a, b) {
+        var gi = function(g) { var i = FIXED_GROUP_ORDER.indexOf(g); return i >= 0 ? i : 999; };
+        var gd = gi(a.group) - gi(b.group);
+        return gd !== 0 ? gd : (a.order||999) - (b.order||999);
       });
-      const FIXED_GROUP_ORDER = ['処置', '物品', 'アポ管理', 'チームサポート', 'ファン獲得', 'カウンセリング', '口コミ', '行動', 'その他'];
-      const sortedGroups = [
-        ...FIXED_GROUP_ORDER.filter(g => groups[g]),
-        ...groupOrder.filter(g => !FIXED_GROUP_ORDER.includes(g))
-      ];
-      sortedGroups.forEach(grp => {
-        const og = document.createElement('optgroup');
-        og.label = '── ' + grp + ' ──';
-        groups[grp].forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.name;
-          opt.textContent = item.name;
-          og.appendChild(opt);
-        });
-        sel.appendChild(og);
-      });
+
+      buildForm(visibleItems);
     } catch(e) { console.error(e); }
   }
 
-  // 日付セット＆時間制限（日本時間 13:30〜14:25 / 18:45〜翌9:00のみ入力可）
-  const now = new Date();
-  const jstMs = now.getTime() + 9 * 60 * 60 * 1000;
-  const jst = new Date(jstMs);
-  const jstH = jst.getUTCHours(), jstMin = jst.getUTCMinutes();
-  const totalMin = jstH * 60 + jstMin;
-  const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
-              || totalMin >= 18 * 60 + 45
-              || totalMin <= 9 * 60;
-  if (!isOpen) {
-    document.querySelector('.card').style.display = 'none';
-    const lockDiv = document.createElement('div');
-    lockDiv.style.cssText = 'text-align:center;padding:48px 24px;color:#e2e8f0';
-    lockDiv.innerHTML = '<div style="font-size:48px;margin-bottom:16px">🔒</div>' +
-      '<div style="font-size:18px;font-weight:700;margin-bottom:8px">入力時間外です</div>' +
-      '<div style="font-size:14px;color:rgba(255,255,255,.5)">入力可能時間：13:30〜14:25 / 18:45〜翌9:00</div>';
-    document.querySelector('.container') ? document.querySelector('.container').prepend(lockDiv) : document.body.prepend(lockDiv);
-  }
-  // 0:00〜9:00 は前日扱い
-  if (jstH < 9 || (jstH === 9 && jstMin === 0)) jst.setUTCDate(jst.getUTCDate() - 1);
-  // 木曜18:45以降 → 水曜扱い、日曜18:45以降 → 土曜扱い
-  const dowAfterMidnight = jst.getUTCDay(); // 前日補正後の曜日
-  if (totalMin >= 18 * 60 + 45) {
-    if (dowAfterMidnight === 4) jst.setUTCDate(jst.getUTCDate() - 1); // 木→水
-    if (dowAfterMidnight === 0) jst.setUTCDate(jst.getUTCDate() - 1); // 日→土
-  }
-  const y = jst.getUTCFullYear(), mo = jst.getUTCMonth() + 1, d = jst.getUTCDate();
-  const today = y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-  const weekdays = ['日','月','火','水','木','金','土'];
-  const wd = weekdays[jst.getUTCDay()];
-  const todayDisplay = y + '年' + mo + '月' + d + '日（' + wd + '）';
-  document.getElementById('dateInput').value = today;
-  const dateLabel = document.getElementById('dateInput').closest('.form-group').querySelector('label');
-  if (dateLabel) dateLabel.textContent = '日付　今日：' + todayDisplay;
-
-  function onActionChange() {
-    const val = document.getElementById('actionSelect').value;
-    const needsPatient = PATIENT_ACTIONS.has(val);
-    const needsCount = COUNT_ACTIONS.has(val);
-    const typeOpts = TYPE_ACTIONS[val];
-    const needsFreeText = FREE_TEXT_ACTIONS.has(val);
-
-    document.getElementById('patientNoWrap').classList.toggle('hidden', !needsPatient);
-    document.getElementById('itemNameWrap').classList.toggle('hidden', !ITEM_NAME_ACTIONS.has(val));
-    document.getElementById('countWrap').classList.toggle('hidden', !needsCount);
-    const COUNT_LABELS = { 'シーラント': '本数', 'アライナー': '枚数', 'CAD CAM冠＋ワンデー': '個数' };
-    document.getElementById('countLabel').textContent = COUNT_LABELS[val] || '件数';
-    document.getElementById('typeWrap').classList.toggle('hidden', !typeOpts);
-    document.getElementById('freeTextWrap').classList.toggle('hidden', !needsFreeText);
-
-    if (ITEM_NAME_ACTIONS.has(val)) {
-      document.getElementById('itemNameLabel').textContent = val.includes('すすめ') ? 'すすめた商品名' : '販売した商品名';
-    }
-    if (typeOpts) {
-      const sel = document.getElementById('typeSelect');
-      sel.innerHTML = '<option value="">選択してください</option>';
-      typeOpts.forEach(function(o) { var opt = document.createElement('option'); opt.value = o; opt.textContent = o; sel.appendChild(opt); });
-    }
-    document.getElementById('typeSelect').required = !!typeOpts;
-    document.getElementById('freeTextInput').required = needsFreeText;
-    document.getElementById('countValue').required = needsCount;
-
-    if (!needsPatient) { document.getElementById('patientNo').value = ''; document.getElementById('patientCheck').textContent = ''; }
-    document.getElementById('patientNo').required = needsPatient;
-    if (!needsCount) document.getElementById('countValue').value = '';
-    if (!typeOpts && !needsFreeText) document.getElementById('freeTextInput') && (document.getElementById('freeTextInput').value = '');
-  }
-
   let checkTimer;
-  document.getElementById('patientNo').addEventListener('input', function() {
+  document.getElementById('sharedPatientNo').addEventListener('input', function() {
     clearTimeout(checkTimer);
     const val = this.value.trim();
-    if (!val) { document.getElementById('patientCheck').textContent = ''; return; }
-    checkTimer = setTimeout(async () => {
+    if (!val) { document.getElementById('sharedPatientCheck').textContent = ''; return; }
+    checkTimer = setTimeout(async function() {
       try { await fetch('/api/check-patient/' + encodeURIComponent(val)); } catch {}
     }, 500);
   });
-
-  document.getElementById('mainForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true; btn.textContent = '登録中...';
-    const fd = new FormData(this);
-    const data = {};
-    for (const [k, v] of fd.entries()) data[k] = v;
-    data.staffName = loggedInStaff;
-    data.entryType = 'patient';
-    const actionName = data.action;
-    try {
-      const res = await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (res.status === 409) { const err = await res.json(); alert(err.message); btn.disabled = false; btn.textContent = '登録する'; return; }
-      if (res.ok) {
-        document.getElementById('mainForm').style.display = 'none';
-        document.getElementById('successText').textContent = '「' + actionName + '」を記録しました。';
-        document.getElementById('successMsg').style.display = 'block';
-        window.scrollTo(0, 0);
-      } else {
-        let msg = '登録に失敗しました（' + res.status + '）';
-        try { const e = await res.json(); if (e.error) msg += '：' + e.error; } catch {}
-        alert(msg); btn.disabled = false; btn.textContent = '登録する';
-      }
-    } catch(err) { alert('通信エラー：' + err.message); btn.disabled = false; btn.textContent = '登録する'; }
-  });
-
-  function resetForm() {
-    const f = document.getElementById('mainForm');
-    f.reset();
-    document.getElementById('dateInput').value = today;
-    document.getElementById('staffNameInput').value = loggedInStaff;
-    document.getElementById('patientNoWrap').classList.add('hidden');
-    document.getElementById('itemNameWrap').classList.add('hidden');
-    document.getElementById('countWrap').classList.add('hidden');
-    document.getElementById('typeWrap').classList.add('hidden');
-    document.getElementById('freeTextWrap').classList.add('hidden');
-    document.getElementById('patientCheck').textContent = '';
-    f.style.display = '';
-    document.getElementById('successMsg').style.display = 'none';
-    document.getElementById('submitBtn').disabled = false;
-    document.getElementById('submitBtn').textContent = '登録する';
-    window.scrollTo(0, 0);
-  }
 
   function closePwModal() {
     document.getElementById('pwModal').style.display = 'none';
