@@ -836,10 +836,9 @@ app.post('/submit', async (req, res) => {
   const jstH = new Date(jstMs).getUTCHours();
   const jstMin = new Date(jstMs).getUTCMinutes();
   const totalMin = jstH * 60 + jstMin;
-  const isOpen = true; // 時間制限一時解除中
-  // const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
-  //             || totalMin >= 18 * 60 + 45
-  //             || totalMin <= 9 * 60;
+  const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
+              || totalMin >= 18 * 60 + 45
+              || totalMin <= 9 * 60;
   if (!isOpen) return res.status(403).json({ error: 'time_restricted', message: '入力可能時間外です（13:30〜14:25 / 18:45〜翌9:00）' });
   // セッションからスタッフ名を取得（フロントが送るstaffNameより優先）
   const sessionStaff = getStaffFromReq(req);

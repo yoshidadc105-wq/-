@@ -192,10 +192,9 @@
   const jst = new Date(jstMs);
   const jstH = jst.getUTCHours(), jstMin = jst.getUTCMinutes();
   const totalMin = jstH * 60 + jstMin;
-  const isOpen = true; // 時間制限一時解除中
-  // const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
-  //             || totalMin >= 18 * 60 + 45
-  //             || totalMin <= 9 * 60;
+  const isOpen = (totalMin >= 13 * 60 + 30 && totalMin <= 14 * 60 + 25)
+              || totalMin >= 18 * 60 + 45
+              || totalMin <= 9 * 60;
   if (!isOpen) {
     document.getElementById('mainContent').innerHTML =
       '<div style="text-align:center;padding:48px 24px;color:#e2e8f0">' +
