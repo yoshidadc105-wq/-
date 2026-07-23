@@ -978,10 +978,10 @@ app.post('/admin/init-bonus-days', async (req, res) => {
     const r = await bonusDaysCol.updateOne({ date: h.date }, { $set: { date: h.date, name: h.name, active: true } }, { upsert: true });
     if (r.upsertedCount > 0) count++;
   }
-  // 土曜日を生成（2025-08-01〜2026-12-31）
-  const satStart = new Date('2025-08-01');
+  // 土曜日を生成（2026-08-01〜2027-12-31）
+  const satStart = new Date('2026-08-01');
   while (satStart.getUTCDay() !== 6) satStart.setUTCDate(satStart.getUTCDate() + 1);
-  for (let d = new Date(satStart); d <= new Date('2026-12-31'); d.setUTCDate(d.getUTCDate() + 7)) {
+  for (let d = new Date(satStart); d <= new Date('2027-12-31'); d.setUTCDate(d.getUTCDate() + 7)) {
     const dateStr = d.toISOString().slice(0, 10);
     if (!holidayDates.has(dateStr)) {
       const r = await bonusDaysCol.updateOne({ date: dateStr }, { $set: { date: dateStr, name: '土曜日', active: true } }, { upsert: true });
@@ -2295,6 +2295,75 @@ async function deleteStaffRecords(name) {
   if (res.ok) { alert(name + ' のデータを削除しました。ページを更新します。'); location.reload(); }
   else alert('削除に失敗しました。');
 }
+
+// ===== 出勤・欠勤管理 =====
+async function initBonusDays() {
+  const msg = document.getElementById('initBonusMsg');
+  msg.textContent = '生成中...';
+  const res = await adminFetch('/admin/init-bonus-days', { method: 'POST' });
+  const data = await res.json();
+  if (res.ok) { msg.style.color = '#059669'; msg.textContent = data.count + '件追加しました'; loadBonusDaysList(); }
+  else { msg.style.color = '#dc2626'; msg.textContent = '失敗しました'; }
+}
+async function loadBonusDaysList() {
+  const el = document.getElementById('bonusDaysList');
+  if (!el) return;
+  const res = await fetch('/api/bonus-days');
+  const days = await res.json();
+  const today = new Date().toISOString().slice(0, 10);
+  const recent = days.filter(d => d.date >= today).slice(0, 20);
+  if (!recent.length) { el.innerHTML = '<span style="color:#94a3b8">データなし。初期データ生成ボタンで追加してください。</span>'; return; }
+  el.innerHTML = recent.map(d =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9">'
+    + '<span style="color:' + (d.active ? '#059669' : '#94a3b8') + '">' + (d.active ? '●' : '○') + '</span>'
+    + '<span style="flex:1">' + d.date + ' ' + d.name + '</span>'
+    + '<button onclick="deleteBonusDay(\\'' + d.date + '\\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">削除</button>'
+    + '</div>'
+  ).join('');
+}
+async function deleteBonusDay(date) {
+  if (!confirm(date + ' を削除しますか？')) return;
+  await adminFetch('/admin/bonus-days/' + encodeURIComponent(date), { method: 'DELETE' });
+  loadBonusDaysList();
+}
+async function addAttendance() {
+  const staffName = document.getElementById('attStaffName').value;
+  const date = document.getElementById('attDate').value;
+  const type = document.getElementById('attType').value;
+  const note = document.getElementById('attNote').value;
+  const msg = document.getElementById('attMsg');
+  if (!staffName || !date) { msg.style.color='#dc2626'; msg.textContent='スタッフと日付を選択してください'; return; }
+  const res = await adminFetch('/admin/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, date, type, note }) });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent='登録しました'; loadAttendanceList(); setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
+}
+async function loadAttendanceList() {
+  const el = document.getElementById('attendanceList');
+  if (!el) return;
+  const res = await adminFetch('/api/attendance-records');
+  const records = await res.json();
+  if (!records.length) { el.innerHTML = '<span style="color:#94a3b8">登録なし</span>'; return; }
+  const typeLabel = { holiday_off: '休日休み', absence: '欠勤', yukyuu: '有給' };
+  el.innerHTML = records.slice(0, 50).map(r =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9">'
+    + '<span style="flex:1">' + r.date + ' ' + r.staffName + ' <span style="color:#6366f1">[' + (typeLabel[r.type]||r.type) + ']</span>' + (r.note ? ' ' + r.note : '') + '</span>'
+    + '<button onclick="deleteAttendance(\\'' + r._id + '\\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">削除</button>'
+    + '</div>'
+  ).join('');
+}
+async function deleteAttendance(id) {
+  await adminFetch('/admin/attendance/' + id, { method: 'DELETE' });
+  loadAttendanceList();
+}
+(async function loadAttStaffOptions() {
+  const res = await fetch('/api/staff-names');
+  const names = await res.json();
+  const sel = document.getElementById('attStaffName');
+  if (!sel) return;
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+})();
+loadBonusDaysList();
+loadAttendanceList();
 <\/script>
 </body>
 </html>`);
@@ -2570,6 +2639,52 @@ app.get('/my-stats', async (req, res) => {
       </div>
       <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.5">${esc(r.reason)}</div>
     </div>`).join('');
+  // ===== ボーナスポイント計算 =====
+  const today = new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10);
+  let holidayPoints = 0, workedHolidayDays = [];
+  let kankinPoints = 0, kankinMonths = 0;
+  if (bonusDaysCol && attendanceRecordsCol) {
+    const bonusDays = await bonusDaysCol.find({ active: true, date: { $lte: today } }).toArray();
+    const staffExceptions = await attendanceRecordsCol.find({ staffName: name, type: 'holiday_off' }).toArray();
+    const exceptionDates = new Set(staffExceptions.map(r => r.date));
+    workedHolidayDays = bonusDays.filter(d => !exceptionDates.has(d.date));
+    holidayPoints = workedHolidayDays.length * 15;
+    const absences = await attendanceRecordsCol.find({ staffName: name, type: 'absence' }).toArray();
+    const nowJst = new Date(Date.now() + 9*60*60*1000);
+    const startMonth = new Date('2026-08-01');
+    for (let m = new Date(startMonth); ; m.setUTCMonth(m.getUTCMonth() + 1)) {
+      const monthStart = m.toISOString().slice(0, 7) + '-01';
+      const nextM = new Date(m); nextM.setUTCMonth(nextM.getUTCMonth() + 1);
+      const monthEnd = new Date(nextM - 1).toISOString().slice(0, 10);
+      if (monthEnd >= nowJst.toISOString().slice(0, 10)) break;
+      const hasAbsence = absences.some(r => r.date >= monthStart && r.date <= monthEnd);
+      if (!hasAbsence) { kankinPoints += 10; kankinMonths++; }
+    }
+  }
+  const totalBonusPoints = holidayPoints + kankinPoints;
+  const holidayDaysList = workedHolidayDays.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const bonusHtml = `<div class="card" style="margin-bottom:16px">
+    <div class="card-header">🎁 ボーナスポイント</div>
+    <div style="padding:14px 16px">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:12px 14px">
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">🗓 土曜・祝日出勤ポイント</div>
+          <div style="font-size:18px;font-weight:700;color:#a5b4fc">${workedHolidayDays.length}日 × 15pt = <span style="color:#c4b5fd">${holidayPoints}pt</span></div>
+          ${holidayDaysList.length ? `<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:6px">${holidayDaysList.map(d=>d.date+' '+d.name).join('、')}</div>` : ''}
+        </div>
+        <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px 14px">
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">🏆 皆勤ポイント</div>
+          <div style="font-size:18px;font-weight:700;color:#6ee7b7">${kankinMonths}ヶ月 × 10pt = <span style="color:#34d399">${kankinPoints}pt</span></div>
+        </div>
+        <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:12px 14px">
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">✨ 合計ボーナスポイント</div>
+          <div style="font-size:22px;font-weight:900;color:#fbbf24">${totalBonusPoints}pt</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  // ===== /ボーナスポイント計算 =====
+
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
   const rawGoals = ((settings.find(s => s.staffName === name) || {}).goals) || {};
@@ -2935,6 +3050,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
     </div>
     <div style="padding:4px 0">${evalHtml}</div>
   </div>
+
+  <!-- ボーナスポイント -->
+  ${bonusHtml}
 
   <div class="card" id="calCard">
     <div class="card-header">📅 記録カレンダー</div>
