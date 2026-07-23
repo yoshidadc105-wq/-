@@ -20,6 +20,8 @@ let staffNamesCol = null;
 let staffSettingsCol = null;
 let staffAccountsCol = null;
 let actionItemsCol = null;
+let bonusDaysCol = null;
+let attendanceRecordsCol = null;
 if (MONGODB_URI) {
   const client = new MongoClient(MONGODB_URI);
   client.connect()
@@ -29,6 +31,8 @@ if (MONGODB_URI) {
       staffSettingsCol = client.db('nobinobi').collection('staff_settings');
       staffAccountsCol = client.db('nobinobi').collection('staff_accounts');
       actionItemsCol = client.db('nobinobi').collection('action_items');
+      bonusDaysCol = client.db('nobinobi').collection('bonus_days');
+      attendanceRecordsCol = client.db('nobinobi').collection('attendance_records');
       console.log('MongoDB接続成功');
     })
     .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
@@ -860,7 +864,9 @@ app.post('/submit', async (req, res) => {
   if (!d.action) return res.status(400).json({ error: 'invalid data' });
   const patientNo = (d.patientNo || '').trim();
   const records = await loadDB();
-  if (patientNo && records.some(r =>
+  // 物販系（showItemName=true）は重複チェックをスキップ
+  const skipDup = ['物品を販売した（購入）','物品をすすめた（未購入）'].includes(d.action);
+  if (!skipDup && patientNo && records.some(r =>
     r.entryType !== 'behavior' &&
     r.patientNo === patientNo &&
     r.action === d.action &&
@@ -886,6 +892,106 @@ app.post('/submit', async (req, res) => {
   res.status(200).json({ ok: true });
 });
 
+// ===== 出勤・欠勤ボーナスポイント API =====
+
+const JAPAN_HOLIDAYS_2025_2026 = [
+  { date: '2025-08-11', name: '山の日' },
+  { date: '2025-09-15', name: '敬老の日' },
+  { date: '2025-09-23', name: '秋分の日' },
+  { date: '2025-10-13', name: 'スポーツの日' },
+  { date: '2025-11-03', name: '文化の日' },
+  { date: '2025-11-23', name: '勤労感謝の日' },
+  { date: '2025-11-24', name: '振替休日' },
+  { date: '2026-01-01', name: '元日' },
+  { date: '2026-01-12', name: '成人の日' },
+  { date: '2026-02-11', name: '建国記念の日' },
+  { date: '2026-02-23', name: '天皇誕生日' },
+  { date: '2026-03-20', name: '春分の日' },
+  { date: '2026-04-29', name: '昭和の日' },
+  { date: '2026-05-03', name: '憲法記念日' },
+  { date: '2026-05-04', name: 'みどりの日' },
+  { date: '2026-05-05', name: 'こどもの日' },
+  { date: '2026-05-06', name: '振替休日' },
+  { date: '2026-07-20', name: '海の日' },
+  { date: '2026-08-11', name: '山の日' },
+];
+
+app.get('/api/bonus-days', async (req, res) => {
+  if (!bonusDaysCol) return res.json([]);
+  const days = await bonusDaysCol.find({}).sort({ date: 1 }).toArray();
+  res.json(days);
+});
+
+app.post('/admin/bonus-days', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!bonusDaysCol) return res.status(503).json({ error: 'DB not connected' });
+  const { date, name } = req.body;
+  if (!date || !name) return res.status(400).json({ error: 'date and name required' });
+  await bonusDaysCol.updateOne({ date }, { $set: { date, name, active: true } }, { upsert: true });
+  res.json({ ok: true });
+});
+
+app.delete('/admin/bonus-days/:date', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!bonusDaysCol) return res.status(503).json({ error: 'DB not connected' });
+  const date = req.params.date;
+  await bonusDaysCol.updateOne({ date }, { $set: { active: false } });
+  res.json({ ok: true });
+});
+
+app.post('/admin/attendance', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!attendanceRecordsCol) return res.status(503).json({ error: 'DB not connected' });
+  const { staffName, date, type, note } = req.body;
+  if (!staffName || !date || !type) return res.status(400).json({ error: 'staffName, date, type required' });
+  const doc = { staffName, date, type, note: note || '', createdAt: new Date().toISOString() };
+  const result = await attendanceRecordsCol.insertOne(doc);
+  res.json({ ok: true, id: result.insertedId });
+});
+
+app.delete('/admin/attendance/:id', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!attendanceRecordsCol) return res.status(503).json({ error: 'DB not connected' });
+  const { ObjectId } = require('mongodb');
+  try {
+    await attendanceRecordsCol.deleteOne({ _id: new ObjectId(req.params.id) });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'invalid id' });
+  }
+});
+
+app.get('/api/attendance-records', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!attendanceRecordsCol) return res.json([]);
+  const records = await attendanceRecordsCol.find({}).sort({ date: -1 }).toArray();
+  res.json(records);
+});
+
+app.post('/admin/init-bonus-days', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!bonusDaysCol) return res.status(503).json({ error: 'DB not connected' });
+  let count = 0;
+  const holidayDates = new Set(JAPAN_HOLIDAYS_2025_2026.map(h => h.date));
+  // 祝日を登録
+  for (const h of JAPAN_HOLIDAYS_2025_2026) {
+    const r = await bonusDaysCol.updateOne({ date: h.date }, { $set: { date: h.date, name: h.name, active: true } }, { upsert: true });
+    if (r.upsertedCount > 0) count++;
+  }
+  // 土曜日を生成（2025-08-01〜2026-12-31）
+  const satStart = new Date('2025-08-01');
+  while (satStart.getUTCDay() !== 6) satStart.setUTCDate(satStart.getUTCDate() + 1);
+  for (let d = new Date(satStart); d <= new Date('2026-12-31'); d.setUTCDate(d.getUTCDate() + 7)) {
+    const dateStr = d.toISOString().slice(0, 10);
+    if (!holidayDates.has(dateStr)) {
+      const r = await bonusDaysCol.updateOne({ date: dateStr }, { $set: { date: dateStr, name: '土曜日', active: true } }, { upsert: true });
+      if (r.upsertedCount > 0) count++;
+    }
+  }
+  res.json({ ok: true, count });
+});
+
+// ===== /dashboard-login =====
 app.get('/dashboard-login', (req, res) => {
   if (getAdminFromReq(req)) return res.redirect('/dashboard');
   res.send(`<!DOCTYPE html>
@@ -1484,6 +1590,52 @@ td{padding:11px 14px;vertical-align:middle}
       </tr></thead>
       <tbody id="staffTableBody"></tbody>
     </table>
+    </div>
+  </div>
+
+  <!-- 出勤・欠勤管理 -->
+  <div class="section-header"><h2>📅 出勤・欠勤管理</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:760px">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <button onclick="initBonusDays()" style="background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🗓 初期データ生成（土曜・祝日）</button>
+      <span id="initBonusMsg" style="font-size:12px;color:#0f766e"></span>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">土曜・祝日ボーナス日一覧（直近20件）</div>
+      <div id="bonusDaysList" style="font-size:12px;max-height:240px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px"></div>
+    </div>
+    <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">休み登録（個別スタッフ）</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">スタッフ</label>
+          <select id="attStaffName" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+            <option value="">選択...</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">日付</label>
+          <input type="date" id="attDate" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none" />
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">種別</label>
+          <select id="attType" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+            <option value="holiday_off">休日休み（ボーナス対象外）</option>
+            <option value="absence">欠勤（皆勤対象外）</option>
+            <option value="yukyuu">有給（皆勤に影響なし）</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">備考</label>
+          <input type="text" id="attNote" placeholder="任意" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;width:120px" />
+        </div>
+        <button onclick="addAttendance()" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">登録</button>
+      </div>
+      <div id="attMsg" style="font-size:12px;margin-top:8px;min-height:16px;"></div>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">登録済み休み一覧</div>
+      <div id="attendanceList" style="font-size:12px;max-height:240px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px"></div>
     </div>
   </div>
 
