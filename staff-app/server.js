@@ -2651,10 +2651,12 @@ app.get('/my-stats', async (req, res) => {
     const absences = await attendanceRecordsCol.find({ staffName: name, type: 'yukyuu' }).toArray();
     const nowJst = new Date(Date.now() + 9*60*60*1000);
     const todayStr = nowJst.toISOString().slice(0, 10);
-    // 締め日: 11日～翌10日。最初の期間は2026-08-11～2026-09-10
+    // 締め日: 11日～翌10日。最初の期間のみ2026-08-01～2026-09-10
+    let firstPeriod = true;
     for (let y = 2026, mo = 8; ; ) {
       const pad = n => String(n).padStart(2, '0');
-      const periodStart = `${y}-${pad(mo)}-11`;
+      const periodStart = firstPeriod ? `${y}-${pad(mo)}-01` : `${y}-${pad(mo)}-11`;
+      firstPeriod = false;
       const nextY = mo === 12 ? y + 1 : y;
       const nextMo = mo === 12 ? 1 : mo + 1;
       const periodEnd = `${nextY}-${pad(nextMo)}-10`;
