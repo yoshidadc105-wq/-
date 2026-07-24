@@ -1246,7 +1246,7 @@ app.get('/dashboard', async (req, res) => {
       </tr>`;
   }).join('');
 
-  const detailRows = records.slice().reverse().slice(0, 100).map(r => {
+  const detailRows = records.slice(0, 200).map(r => {
     const countPart = r.countValue ? `　${r.countValue}${countUnit(r.action)}` : '';
     const actionLabel = r.action ? `<span class="badge badge-gray">${esc(r.action)}${countPart}${r.itemName ? `（${esc(r.itemName)}）` : ''}${r.otherText ? `（${esc(r.otherText)}）` : ''}</span>` : '-';
     const entryBadge = r.entryType === 'behavior' ? '<span class="badge badge-blue" style="margin-right:4px">行動</span>' : '';
