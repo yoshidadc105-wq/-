@@ -516,6 +516,31 @@ app.post('/staff-login', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/change-password', (req, res) => {
+  const staffName = getStaffFromReq(req);
+  if (!staffName) return res.redirect('/staff-login');
+  res.send(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>パスワード変更</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#1e293b;border-radius:16px;padding:32px;width:100%;max-width:360px}h1{font-size:18px;font-weight:700;margin-bottom:24px;text-align:center}
+label{display:block;font-size:13px;color:#94a3b8;margin-bottom:6px}
+input{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:15px;margin-bottom:16px}
+button{width:100%;background:#2aab96;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:600;cursor:pointer}
+#msg{margin-top:12px;font-size:13px;text-align:center}a{display:block;text-align:center;margin-top:16px;color:#94a3b8;font-size:13px;text-decoration:none}</style></head>
+<body><div class="card"><h1>🔑 パスワード変更</h1>
+<label>現在のパスワード</label><input type="password" id="cur" autocomplete="current-password">
+<label>新しいパスワード</label><input type="password" id="nw" autocomplete="new-password">
+<button onclick="go()">変更する</button>
+<div id="msg"></div>
+<a href="/my-stats">← 実績を見る</a></div>
+<script>async function go(){const msg=document.getElementById('msg');const cur=document.getElementById('cur').value;const nw=document.getElementById('nw').value;
+if(!cur||!nw){msg.style.color='#ef4444';msg.textContent='両方入力してください';return;}
+const r=await fetch('/staff-change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cur,newPassword:nw})});
+const d=await r.json();if(d.ok){msg.style.color='#34d399';msg.textContent='変更しました！';document.getElementById('cur').value='';document.getElementById('nw').value='';}
+else{msg.style.color='#ef4444';msg.textContent=d.error||'エラー';}}
+</script></body></html>`);
+});
+
 app.post('/staff-change-password', async (req, res) => {
   const staffName = getStaffFromReq(req);
   if (!staffName) return res.status(401).json({ error: 'ログインが必要です' });

@@ -201,7 +201,8 @@
       '<div style="font-size:48px;margin-bottom:16px">🔒</div>' +
       '<div style="font-size:18px;font-weight:700;margin-bottom:8px">入力時間外です</div>' +
       '<div style="font-size:14px;color:rgba(255,255,255,.5)">入力可能時間：13:30〜14:25 / 18:45〜翌9:00</div>' +
-      '<a href="/my-stats" style="display:inline-block;margin-top:20px;color:#2aab96;text-decoration:none;font-size:14px">📊 実績を見る</a></div>';
+      '<a href="/my-stats" style="display:inline-block;margin-top:20px;color:#2aab96;text-decoration:none;font-size:14px">📊 実績を見る</a>' +
+      '<br><a href="/change-password" style="display:inline-block;margin-top:12px;color:#94a3b8;text-decoration:none;font-size:13px">🔑 パスワード変更</a></div>';
   }
   if (jstH < 9 || (jstH === 9 && jstMin === 0)) jst.setUTCDate(jst.getUTCDate() - 1);
   const dowAfterMidnight = jst.getUTCDay();
