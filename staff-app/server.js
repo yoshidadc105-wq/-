@@ -1505,7 +1505,7 @@ td{padding:11px 14px;vertical-align:middle}
     <input type="date" id="hTo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
     <button onclick="filterHistory()" class="btn-primary">絞り込む</button>
     <button onclick="clearHistory()" class="btn-reset">クリア</button>
-    <span id="hCount" style="font-size:12px;color:#64748b"></span>
+    <span id="hCount" style="font-size:12px;color:#64748b">${records.length}件</span>
   </div>
   <div class="table-card">
     <div class="table-scroll">
@@ -1534,7 +1534,8 @@ td{padding:11px 14px;vertical-align:middle}
       tr.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
-    document.getElementById('hCount').textContent = shown + '件表示中';
+    var total = document.querySelectorAll('#historyBody tr').length;
+    document.getElementById('hCount').textContent = shown + '件 / ' + total + '件中';
   }
   function clearHistory() {
     document.getElementById('hStaff').value = '';
@@ -1555,6 +1556,7 @@ td{padding:11px 14px;vertical-align:middle}
       <button onclick="applyDefaultVisibility()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">全スタッフに表示設定を適用</button>
       <button onclick="debugActions()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">📋 アクション確認</button>
       <button onclick="initGikoshi()" style="background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🔧 技工士初期設定（鈴木 愛夏）</button>
+      <button onclick="fixDefaultHidden()" style="background:#be185d;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🔧 新規デフォルトOFF修正</button>
       <span id="fixCatMsg" style="font-size:11px"></span>
     </div>
     <div id="debugActionsResult" style="display:none;font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all"></div>
@@ -1873,6 +1875,18 @@ async function initGikoshi() {
     msg.style.color = '#065f46';
     msg.textContent = '完了：' + d.staffName + ' を追加し、技工士項目（' + d.enabledItems.join('・') + '）を設定しました';
     setTimeout(function(){ location.reload(); }, 2000);
+  } else {
+    msg.style.color = '#dc2626'; msg.textContent = '失敗しました';
+  }
+}
+async function fixDefaultHidden() {
+  const msg = document.getElementById('fixCatMsg');
+  msg.style.color = '#0369a1'; msg.textContent = '処理中...';
+  const res = await adminFetch('/admin/fix-default-hidden', { method: 'POST' });
+  if (res.ok) {
+    const d = await res.json();
+    msg.style.color = '#065f46';
+    msg.textContent = '完了：' + d.modified + '件の項目をデフォルトOFFに設定しました（新規スタッフに適用）';
   } else {
     msg.style.color = '#dc2626'; msg.textContent = '失敗しました';
   }
@@ -3353,6 +3367,14 @@ app.post('/admin/init-gikoshi', async (req, res) => {
   const disabledItems = allItems.filter(i => !gikoshiNames.has(i.name)).map(i => i.name);
   await saveStaffSetting(staffName, { disabledItems });
   res.json({ ok: true, staffName, enabledItems: GIKOSHI_ITEMS.map(i => i.name), disabledCount: disabledItems.length });
+});
+
+app.post('/admin/fix-default-hidden', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const targets = ['インプラント決定', 'ワンデーセット', 'ジルコニアセット', 'ノンクラスプデンチャーセット', 'ノンクラスプトライデンチャーセット'];
+  if (!actionItemsCol) return res.status(503).json({ error: 'DB not connected' });
+  const result = await actionItemsCol.updateMany({ name: { $in: targets } }, { $set: { defaultHidden: true } });
+  res.json({ ok: true, matched: result.matchedCount, modified: result.modifiedCount });
 });
 
 app.get('/health', (_req, res) => res.send('OK'));
