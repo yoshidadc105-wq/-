@@ -76,6 +76,19 @@
 let manualId=null,currentUser=null,manualData=null,selectedCategoryId=undefined,allCategories=[];
 const isMobile=window.innerWidth<=768||/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+async function dlManual(e){
+  const btn=e.currentTarget;const orig=btn.textContent;btn.disabled=true;btn.textContent='⏳';
+  const url=`/uploads/${manualData.file_path}`;
+  try{
+    const res=await fetch(url);const blob=await res.blob();
+    const blobUrl=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=blobUrl;a.download=manualData.file_name||'manual.pdf';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),60000);
+  }catch(_){window.open(url,'_blank','noopener noreferrer');}
+  finally{btn.disabled=false;btn.textContent=orig;}
+}
+
 async function init(){
   const p=new URLSearchParams(window.location.search);
   manualId=p.get('id');if(!manualId){window.location.href='/';return;}
@@ -162,7 +175,7 @@ async function loadManual(){
   let bodyHtml='';
   if(manualData.type==='pdf'){
     const adminBtns=isAdmin?`
-      <a href="${pdfUrl}" download="${manualData.file_name}" class="btn btn-secondary btn-sm">⬇ ダウンロード</a>
+      <button onclick="dlManual(event)" class="btn btn-secondary btn-sm">⬇ ダウンロード</button>
       <a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a>
       <button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button>
       <button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button>`:'';

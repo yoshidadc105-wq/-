@@ -178,8 +178,28 @@ document.title = title;
 
 const fileUrl = '/uploads/' + file;
 const dlBtn = document.getElementById('dlBtn');
-dlBtn.href = fileUrl;
-dlBtn.download = title + '.pdf';
+dlBtn.href = '#';
+dlBtn.addEventListener('click', async function(e){
+  e.preventDefault();
+  const orig = dlBtn.textContent;
+  dlBtn.textContent = '⏳';
+  try {
+    const res = await fetch(fileUrl);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = title + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch(_) {
+    window.open(fileUrl, '_blank', 'noopener noreferrer');
+  } finally {
+    dlBtn.textContent = orig;
+  }
+});
 
 if (embedded) {
   document.getElementById('pdfHeader').style.display = 'none';
