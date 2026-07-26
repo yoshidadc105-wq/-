@@ -177,7 +177,9 @@ document.getElementById('pdfTitle').textContent = title;
 document.title = title;
 
 const fileUrl = '/uploads/' + file;
-document.getElementById('dlBtn').href = fileUrl;
+const dlBtn = document.getElementById('dlBtn');
+dlBtn.href = fileUrl;
+dlBtn.download = title + '.pdf';
 
 if (embedded) {
   document.getElementById('pdfHeader').style.display = 'none';
