@@ -355,6 +355,19 @@ app.post('/admin/reset-all-passwords', async (req, res) => {
   res.json({ ok: true, count: names.length });
 });
 
+app.delete('/admin/record/:id', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const id = req.params.id;
+  if (mongoCol) {
+    await mongoCol.deleteOne({ id });
+  } else {
+    const all = await loadDB();
+    const filtered = all.filter(r => r.id !== id);
+    fs.writeFileSync(DB_FILE, JSON.stringify(filtered, null, 2));
+  }
+  res.json({ ok: true });
+});
+
 app.delete('/admin/all-records', async (req, res) => {
   if (!checkAuth(req, res)) return;
   if (mongoCol) {
@@ -1257,6 +1270,7 @@ app.get('/dashboard', async (req, res) => {
         <td style="color:#64748b">${esc(r.patientNo) || '-'}</td>
         <td>${entryBadge}${actionLabel}</td>
         <td style="font-size:12px;color:#475569">${esc(r.freeText) || '-'}</td>
+        <td><button onclick="deleteRecord('${esc(r.id)}',this)" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit">削除</button></td>
       </tr>`;
   }).join('');
 
@@ -1511,13 +1525,25 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="table-scroll">
     <table id="historyTable">
       <thead><tr>
-        <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th>
+        <th>日付</th><th>スタッフ</th><th>患者番号</th><th>実施内容</th><th>自由記入</th><th></th>
       </tr></thead>
       <tbody id="historyBody">${detailRows || '<tr><td colspan="5" class="empty">まだデータがありません</td></tr>'}</tbody>
     </table>
     </div>
   </div>
   <script>
+  async function deleteRecord(id, btn) {
+    if (!confirm('このレコードを削除しますか？')) return;
+    btn.disabled = true; btn.textContent = '...';
+    const res = await adminFetch('/admin/record/' + id, { method: 'DELETE' });
+    if (res.ok) {
+      btn.closest('tr').remove();
+      var total = document.querySelectorAll('#historyBody tr').length;
+      document.getElementById('hCount').textContent = total + '件';
+    } else {
+      btn.disabled = false; btn.textContent = '削除'; alert('削除に失敗しました');
+    }
+  }
   function filterHistory() {
     var staff = document.getElementById('hStaff').value;
     var from = document.getElementById('hFrom').value;
