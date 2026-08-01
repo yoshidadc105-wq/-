@@ -1683,7 +1683,10 @@ td{padding:11px 14px;vertical-align:middle}
       <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">患者番号</label>
         <input type="text" id="mrPatient" placeholder="例：6137" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
       <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">項目名</label>
-        <input type="text" id="mrAction" placeholder="例：シーラント" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
+        <select id="mrAction" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+          <option value="">選択してください</option>
+          ${allActionNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+        </select></div>
       <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">数量（任意）</label>
         <input type="number" id="mrCount" placeholder="例：2" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
       <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">備考（任意）</label>
