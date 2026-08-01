@@ -1659,6 +1659,29 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
   </div>
 
+  <!-- 手動記録登録 -->
+  <div class="section-header"><h2>✏️ 手動記録登録（管理者用）</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:600px;margin-bottom:24px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">スタッフ</label>
+        <select id="mrStaff" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+          ${allStaffNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+        </select></div>
+      <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">日付</label>
+        <input type="date" id="mrDate" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc" value="${new Date(Date.now()+9*3600000).toISOString().slice(0,10)}"></div>
+      <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">患者番号</label>
+        <input type="text" id="mrPatient" placeholder="例：6137" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
+      <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">項目名</label>
+        <input type="text" id="mrAction" placeholder="例：シーラント" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
+      <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">数量（任意）</label>
+        <input type="number" id="mrCount" placeholder="例：2" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
+      <div><label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px">備考（任意）</label>
+        <input type="text" id="mrNote" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc"></div>
+    </div>
+    <button onclick="submitManualRecord()" style="background:#2aab96;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">登録する</button>
+    <span id="mrMsg" style="font-size:12px;margin-left:10px"></span>
+  </div>
+
   <!-- 出勤・欠勤管理 -->
   <div class="section-header"><h2>📅 出勤・欠勤管理</h2><div class="section-line"></div></div>
   <div class="mgmt-card" style="max-width:760px">
@@ -1919,6 +1942,22 @@ async function initGikoshi() {
   } else {
     msg.style.color = '#dc2626'; msg.textContent = '失敗しました';
   }
+}
+async function submitManualRecord() {
+  const msg = document.getElementById('mrMsg');
+  const body = {
+    staffName: document.getElementById('mrStaff').value,
+    date: document.getElementById('mrDate').value,
+    patientNo: document.getElementById('mrPatient').value,
+    action: document.getElementById('mrAction').value,
+    countValue: document.getElementById('mrCount').value || null,
+    otherText: document.getElementById('mrNote').value
+  };
+  if (!body.staffName || !body.date || !body.action) { msg.style.color='#dc2626'; msg.textContent='スタッフ・日付・項目名は必須です'; return; }
+  msg.style.color='#64748b'; msg.textContent='登録中...';
+  const res = await adminFetch('/admin/manual-record', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (res.ok) { msg.style.color='#065f46'; msg.textContent='登録しました！'; document.getElementById('mrPatient').value=''; document.getElementById('mrAction').value=''; document.getElementById('mrCount').value=''; document.getElementById('mrNote').value=''; }
+  else { const d=await res.json(); msg.style.color='#dc2626'; msg.textContent=d.error||'失敗しました'; }
 }
 async function fixDefaultHidden() {
   const msg = document.getElementById('fixCatMsg');
