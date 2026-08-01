@@ -98,16 +98,27 @@ router.put('/users/:id', requireAdmin, (req, res) => {
 
 // ユーザー削除
 router.delete('/users/:id', requireAdmin, (req, res) => {
-  const { id } = req.params;
+  const userId = parseInt(req.params.id);
 
-  if (parseInt(id) === req.session.userId) {
+  if (userId === req.session.userId) {
     return res.status(400).json({ error: '自分のアカウントは削除できません' });
   }
 
   const db = getDb();
-  const result = db.prepare('DELETE FROM users WHERE id = ?').run(id);
-  if (result.changes === 0) return res.status(404).json({ error: 'ユーザーが見つかりません' });
-  res.json({ message: 'ユーザーを削除しました' });
+  const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!existing) return res.status(404).json({ error: 'ユーザーが見つかりません' });
+
+  try {
+    const adminId = req.session.userId;
+    // 外部キー制約を解消してから削除
+    db.prepare('UPDATE manuals SET created_by = ? WHERE created_by = ?').run(adminId, userId);
+    db.prepare('UPDATE manuals SET updated_by = ? WHERE updated_by = ?').run(adminId, userId);
+    db.prepare('DELETE FROM view_history WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+    res.json({ message: 'ユーザーを削除しました' });
+  } catch (e) {
+    res.status(500).json({ error: '削除に失敗しました: ' + e.message });
+  }
 });
 
 // 統計情報
