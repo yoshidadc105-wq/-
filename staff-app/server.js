@@ -1274,7 +1274,7 @@ app.get('/dashboard', async (req, res) => {
       </tr>`;
   }).join('');
 
-  const detailRows = records.slice(0, 200).map(r => {
+  const detailRows = allRecords.slice(0, 300).map(r => {
     const countPart = r.countValue ? `　${r.countValue}${countUnit(r.action)}` : '';
     const actionLabel = r.action ? `<span class="badge badge-gray">${esc(r.action)}${countPart}${r.itemName ? `（${esc(r.itemName)}）` : ''}${r.otherText ? `（${esc(r.otherText)}）` : ''}</span>` : '-';
     const entryBadge = r.entryType === 'behavior' ? '<span class="badge badge-blue" style="margin-right:4px">行動</span>' : '';
@@ -1534,7 +1534,7 @@ td{padding:11px 14px;vertical-align:middle}
     <input type="date" id="hTo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
     <button onclick="filterHistory()" class="btn-primary">絞り込む</button>
     <button onclick="clearHistory()" class="btn-reset">クリア</button>
-    <span id="hCount" style="font-size:12px;color:#64748b">${records.length}件</span>
+    <span id="hCount" style="font-size:12px;color:#64748b">${allRecords.length}件</span>
   </div>
   <div class="table-card">
     <div class="table-scroll">
