@@ -355,6 +355,23 @@ app.post('/admin/reset-all-passwords', async (req, res) => {
   res.json({ ok: true, count: names.length });
 });
 
+app.post('/admin/manual-record', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, date, patientNo, action, countValue, otherText } = req.body;
+  if (!staffName || !date || !action) return res.status(400).json({ error: 'invalid' });
+  const record = {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    entryType: 'patient',
+    date, staffName, patientNo: patientNo || '',
+    action, actionCategory: ACTION_CATEGORY[action] || 'treatment',
+    itemName: '', countValue: countValue ? (parseInt(countValue) || null) : null,
+    otherText: otherText || ''
+  };
+  await saveRecord(record);
+  res.json({ ok: true, id: record.id });
+});
+
 app.delete('/admin/record/:id', async (req, res) => {
   if (!checkAuth(req, res)) return;
   const id = req.params.id;
@@ -901,8 +918,8 @@ app.post('/submit', async (req, res) => {
   if (!d.action) return res.status(400).json({ error: 'invalid data' });
   const patientNo = (d.patientNo || '').trim();
   const records = await loadDB();
-  // 物販系（showItemName=true）は重複チェックをスキップ
-  const skipDup = ['物品を販売した（購入）','物品をすすめた（未購入）'].includes(d.action);
+  // 重複チェックをスキップする項目
+  const skipDup = ['物品を販売した（購入）','物品をすすめた（未購入）','P検','レントゲン（CT・パノラマ／臼歯デンタル）','シーラント'].includes(d.action);
   if (!skipDup && patientNo && records.some(r =>
     r.entryType !== 'behavior' &&
     r.patientNo === patientNo &&
