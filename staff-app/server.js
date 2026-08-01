@@ -1532,6 +1532,8 @@ td{padding:11px 14px;vertical-align:middle}
     <input type="date" id="hFrom" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
     <span style="color:#cbd5e1">—</span>
     <input type="date" id="hTo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+    <label>内容</label>
+    <input type="text" id="hKeyword" placeholder="例：シーラント" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc;width:140px">
     <button onclick="filterHistory()" class="btn-primary">絞り込む</button>
     <button onclick="clearHistory()" class="btn-reset">クリア</button>
     <span id="hCount" style="font-size:12px;color:#64748b">${allRecords.length}件</span>
@@ -1563,6 +1565,7 @@ td{padding:11px 14px;vertical-align:middle}
     var staff = document.getElementById('hStaff').value;
     var from = document.getElementById('hFrom').value;
     var to = document.getElementById('hTo').value;
+    var keyword = document.getElementById('hKeyword').value.trim();
     var rows = document.querySelectorAll('#historyBody tr');
     var shown = 0;
     rows.forEach(function(tr) {
@@ -1571,7 +1574,8 @@ td{padding:11px 14px;vertical-align:middle}
       var date = tds[0].textContent.trim();
       var s = tds[1].querySelector('strong');
       var sName = s ? s.textContent.trim() : tds[1].textContent.trim();
-      var ok = (!staff || sName === staff) && (!from || date >= from) && (!to || date <= to);
+      var content = tds[3] ? tds[3].textContent.trim() : '';
+      var ok = (!staff || sName === staff) && (!from || date >= from) && (!to || date <= to) && (!keyword || content.includes(keyword));
       tr.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
@@ -1582,6 +1586,7 @@ td{padding:11px 14px;vertical-align:middle}
     document.getElementById('hStaff').value = '';
     document.getElementById('hFrom').value = '';
     document.getElementById('hTo').value = '';
+    document.getElementById('hKeyword').value = '';
     document.querySelectorAll('#historyBody tr').forEach(function(tr){ tr.style.display=''; });
     document.getElementById('hCount').textContent = '';
   }
