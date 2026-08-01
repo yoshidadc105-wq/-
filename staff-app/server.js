@@ -1215,6 +1215,7 @@ app.get('/dashboard', async (req, res) => {
   // 全スタッフ名（フィルター選択肢用）
   const allStaffNames = [...new Set(allRecords.map(r => r.staffName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
   const staffOptions = allStaffNames.map(n => `<option value="${esc(n)}"${staffFilter === n ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  const allActionNames = [...new Set(allRecords.map(r => r.action).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
 
   const staffSettings = await loadStaffSettings();
 
@@ -1535,7 +1536,10 @@ td{padding:11px 14px;vertical-align:middle}
     <span style="color:#cbd5e1">—</span>
     <input type="date" id="hTo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
     <label>内容</label>
-    <input type="text" id="hKeyword" placeholder="例：シーラント" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc;width:140px">
+    <select id="hKeyword" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#f8fafc">
+      <option value="">すべて</option>
+      ${allActionNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+    </select>
     <button onclick="filterHistory()" class="btn-primary">絞り込む</button>
     <button onclick="clearHistory()" class="btn-reset">クリア</button>
     <span id="hCount" style="font-size:12px;color:#64748b">${allRecords.length}件</span>
