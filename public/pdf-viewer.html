@@ -432,11 +432,10 @@ async function loadPDF() {
           overlay.style.height = height + 'px';
           overlay.title = url;
           if (isMobile) {
-            // touchstartでpreventDefaultしてロングプレス時のテキスト選択を防ぐ
             overlay.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
             overlay.addEventListener('touchend', (e) => { e.preventDefault(); showUrlSheet(url); });
           } else {
-            overlay.addEventListener('click', () => openRedirect(url));
+            overlay.addEventListener('click', () => showUrlSheet(url));
           }
           canvasBox.appendChild(overlay);
         }
