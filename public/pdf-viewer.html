@@ -183,7 +183,8 @@
 </div>
 <div id="urlSheet" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5)" onclick="closeUrlSheet()">
   <div onclick="event.stopPropagation()" style="position:absolute;bottom:0;left:0;right:0;background:white;border-radius:16px 16px 0 0;padding:20px 16px">
-    <div id="urlSheetLabel" style="font-size:12px;color:#475569;word-break:break-all;margin-bottom:16px;line-height:1.6;border:1px solid #e2e8f0;border-radius:6px;padding:10px;background:#f8fafc;-webkit-user-select:all;user-select:all"></div>
+    <p style="font-size:12px;color:#94a3b8;margin-bottom:6px">PDF内のURL</p>
+    <textarea id="urlSheetInput" readonly rows="3" style="width:100%;font-size:12px;padding:10px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#334155;resize:none;font-family:monospace;margin-bottom:12px;box-sizing:border-box;-webkit-user-select:all;user-select:all"></textarea>
     <button id="urlCopyBtn" onclick="copyUrlSheet()" style="width:100%;padding:14px;background:#3b6fd4;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">📋 URLをコピー</button>
     <button onclick="openUrlSheet()" style="width:100%;padding:14px;background:#f1f5f9;color:#1e293b;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">🔗 開く</button>
     <button onclick="closeUrlSheet()" style="width:100%;padding:14px;background:white;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:15px;cursor:pointer">キャンセル</button>
@@ -204,21 +205,26 @@ const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window
 let urlSheetCurrent = '';
 function showUrlSheet(url) {
   urlSheetCurrent = url;
-  document.getElementById('urlSheetLabel').textContent = url;
+  document.getElementById('urlSheetInput').value = url;
   document.getElementById('urlCopyBtn').textContent = '📋 URLをコピー';
   document.getElementById('urlSheet').style.display = '';
 }
 function closeUrlSheet() { document.getElementById('urlSheet').style.display = 'none'; }
 async function copyUrlSheet() {
-  try {
-    await navigator.clipboard.writeText(urlSheetCurrent);
-    document.getElementById('urlCopyBtn').textContent = '✓ コピーしました';
-  } catch(_) {
-    const el = document.getElementById('urlSheetLabel');
-    const r = document.createRange(); r.selectNodeContents(el);
-    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-    document.getElementById('urlCopyBtn').textContent = '長押しでコピーできます';
+  const btn = document.getElementById('urlCopyBtn');
+  const ta = document.getElementById('urlSheetInput');
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  let ok = false;
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(urlSheetCurrent); ok = true; } catch(_) {}
   }
+  if (!ok) {
+    try { ok = document.execCommand('copy'); } catch(_) {}
+  }
+  btn.textContent = ok ? '✓ コピーしました' : '上のURLを長押し → コピー';
+  if (ok) setTimeout(() => { btn.textContent = '📋 URLをコピー'; }, 2000);
 }
 function openUrlSheet() { closeUrlSheet(); openRedirect(urlSheetCurrent); }
 
