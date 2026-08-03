@@ -81,7 +81,25 @@
       background: rgba(59,111,212,0.06);
       border-bottom: 1px solid rgba(59,111,212,0.5);
       box-sizing: border-box;
+      z-index: 2;
     }
+    .textLayer {
+      position: absolute;
+      left: 0; top: 0;
+      overflow: hidden;
+      line-height: 1;
+      z-index: 1;
+    }
+    .textLayer span {
+      color: transparent;
+      position: absolute;
+      white-space: pre;
+      cursor: text;
+      transform-origin: 0% 0%;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .textLayer span::selection { background: rgba(59,111,212,.35); }
     .pdf-status {
       color: white;
       text-align: center;
@@ -163,6 +181,14 @@
 <div class="pdf-footer" id="pdfFooter" style="display:none">
   <button class="check-btn" id="checkBtn" onclick="toggleCheck()"></button>
 </div>
+<div id="urlSheet" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5)" onclick="closeUrlSheet()">
+  <div onclick="event.stopPropagation()" style="position:absolute;bottom:0;left:0;right:0;background:white;border-radius:16px 16px 0 0;padding:20px 16px">
+    <div id="urlSheetLabel" style="font-size:12px;color:#475569;word-break:break-all;margin-bottom:16px;line-height:1.6;border:1px solid #e2e8f0;border-radius:6px;padding:10px;background:#f8fafc;-webkit-user-select:all;user-select:all"></div>
+    <button id="urlCopyBtn" onclick="copyUrlSheet()" style="width:100%;padding:14px;background:#3b6fd4;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">📋 URLをコピー</button>
+    <button onclick="openUrlSheet()" style="width:100%;padding:14px;background:#f1f5f9;color:#1e293b;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">🔗 開く</button>
+    <button onclick="closeUrlSheet()" style="width:100%;padding:14px;background:white;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:15px;cursor:pointer">キャンセル</button>
+  </div>
+</div>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -172,6 +198,29 @@ const file = params.get('file') || '';
 const title = params.get('title') || 'PDF';
 const backId = params.get('id') || '';
 const embedded = params.get('embedded') === '1';
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+// URL action sheet
+let urlSheetCurrent = '';
+function showUrlSheet(url) {
+  urlSheetCurrent = url;
+  document.getElementById('urlSheetLabel').textContent = url;
+  document.getElementById('urlCopyBtn').textContent = '📋 URLをコピー';
+  document.getElementById('urlSheet').style.display = '';
+}
+function closeUrlSheet() { document.getElementById('urlSheet').style.display = 'none'; }
+async function copyUrlSheet() {
+  try {
+    await navigator.clipboard.writeText(urlSheetCurrent);
+    document.getElementById('urlCopyBtn').textContent = '✓ コピーしました';
+  } catch(_) {
+    const el = document.getElementById('urlSheetLabel');
+    const r = document.createRange(); r.selectNodeContents(el);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    document.getElementById('urlCopyBtn').textContent = '長押しでコピーできます';
+  }
+}
+function openUrlSheet() { closeUrlSheet(); openRedirect(urlSheetCurrent); }
 
 document.getElementById('pdfTitle').textContent = title;
 document.title = title;
@@ -325,9 +374,23 @@ async function loadPDF() {
 
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
 
+      const displayVp = page.getViewport({ scale: containerWidth / naturalVp.width });
+      const displayH = Math.round(containerWidth * naturalVp.height / naturalVp.width);
+
+      // テキストレイヤー（文字選択・コピー用）
+      try {
+        const textContent = await page.getTextContent();
+        const textDiv = document.createElement('div');
+        textDiv.className = 'textLayer';
+        textDiv.style.width = containerWidth + 'px';
+        textDiv.style.height = displayH + 'px';
+        canvasBox.appendChild(textDiv);
+        pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textDiv, viewport: displayVp });
+      } catch(_) {}
+
+      // リンクオーバーレイ
       const annotations = await page.getAnnotations();
       if (annotations.length > 0) {
-        const displayVp = page.getViewport({ scale: containerWidth / naturalVp.width });
         for (const ann of annotations) {
           if (ann.subtype !== 'Link') continue;
           const url = ann.url || (ann.action && ann.action.url);
@@ -344,7 +407,9 @@ async function loadPDF() {
           overlay.style.width = width + 'px';
           overlay.style.height = height + 'px';
           overlay.title = url;
-          overlay.addEventListener('click', () => openRedirect(url));
+          overlay.addEventListener('click', () => {
+            if (isMobile) { showUrlSheet(url); } else { openRedirect(url); }
+          });
           canvasBox.appendChild(overlay);
         }
       }
