@@ -82,6 +82,8 @@
       border-bottom: 1px solid rgba(59,111,212,0.5);
       box-sizing: border-box;
       z-index: 2;
+      -webkit-user-select: none;
+      user-select: none;
     }
     .textLayer {
       position: absolute;
@@ -429,9 +431,13 @@ async function loadPDF() {
           overlay.style.width = width + 'px';
           overlay.style.height = height + 'px';
           overlay.title = url;
-          overlay.addEventListener('click', () => {
-            if (isMobile) { showUrlSheet(url); } else { openRedirect(url); }
-          });
+          if (isMobile) {
+            // touchstartでpreventDefaultしてロングプレス時のテキスト選択を防ぐ
+            overlay.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
+            overlay.addEventListener('touchend', (e) => { e.preventDefault(); showUrlSheet(url); });
+          } else {
+            overlay.addEventListener('click', () => openRedirect(url));
+          }
           canvasBox.appendChild(overlay);
         }
       }
