@@ -270,10 +270,11 @@ async function openRedirect(url) {
     const res = await fetch('/api/url-redirects/resolve?url=' + encodeURIComponent(url));
     if (res.ok) {
       const data = await res.json();
+      const dest = '/view.html?id=' + data.manual_id + (backId ? '&back=' + backId : '');
       if (embedded) {
-        window.parent.location.href = '/view.html?id=' + data.manual_id;
+        window.parent.location.href = dest;
       } else {
-        location.href = '/view.html?id=' + data.manual_id;
+        location.href = dest;
       }
       return;
     }

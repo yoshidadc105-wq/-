@@ -98,6 +98,12 @@ async function dlManual(e){
 async function init(){
   const p=new URLSearchParams(window.location.search);
   manualId=p.get('id');if(!manualId){window.location.href='/';return;}
+  const backId=p.get('back');
+  if(backId){
+    const btn=document.getElementById('backBtn');
+    btn.href='/view.html?id='+backId;
+    btn.textContent='← 元のマニュアルに戻る';
+  }
   currentUser=await loadCurrentUser();if(!currentUser)return;
   initNavbar(currentUser);
   await loadManual();
