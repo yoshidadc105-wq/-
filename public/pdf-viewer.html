@@ -184,7 +184,7 @@
 <div id="urlSheet" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5)" onclick="closeUrlSheet()">
   <div onclick="event.stopPropagation()" style="position:absolute;bottom:0;left:0;right:0;background:white;border-radius:16px 16px 0 0;padding:20px 16px">
     <p style="font-size:12px;color:#94a3b8;margin-bottom:6px">PDF内のURL</p>
-    <textarea id="urlSheetInput" rows="3" style="width:100%;font-size:12px;padding:10px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#334155;resize:none;font-family:monospace;margin-bottom:12px;box-sizing:border-box"></textarea>
+    <textarea id="urlSheetInput" readonly rows="3" style="width:100%;font-size:12px;padding:10px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#334155;resize:none;font-family:monospace;margin-bottom:12px;box-sizing:border-box;-webkit-user-select:text;user-select:text"></textarea>
     <button id="urlCopyBtn" onclick="copyUrlSheet()" style="width:100%;padding:14px;background:#3b6fd4;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">📋 URLをコピー</button>
     <button id="urlShareBtn" onclick="shareUrl()" style="display:none;width:100%;padding:14px;background:#0ea5e9;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">📤 共有する</button>
     <button onclick="openUrlSheet()" style="width:100%;padding:14px;background:#f1f5f9;color:#1e293b;border:none;border-radius:8px;font-size:15px;font-weight:600;margin-bottom:8px;cursor:pointer">🔗 開く</button>
@@ -206,39 +206,38 @@ const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window
 let urlSheetCurrent = '';
 function showUrlSheet(url) {
   urlSheetCurrent = url;
-  const ta = document.getElementById('urlSheetInput');
-  ta.value = url;
+  document.getElementById('urlSheetInput').value = url;
   document.getElementById('urlCopyBtn').textContent = '📋 URLをコピー';
   document.getElementById('urlShareBtn').style.display = navigator.share ? '' : 'none';
   document.getElementById('urlSheet').style.display = '';
-  setTimeout(() => { ta.focus(); ta.select(); ta.setSelectionRange(0, url.length); }, 80);
 }
 function closeUrlSheet() { document.getElementById('urlSheet').style.display = 'none'; }
 function copyUrlSheet() {
   const btn = document.getElementById('urlCopyBtn');
-  const ta = document.getElementById('urlSheetInput');
-  // readonlyを一時解除してfocus/selectを確実に行う
-  ta.removeAttribute('readonly');
-  ta.focus();
-  ta.select();
-  ta.setSelectionRange(0, urlSheetCurrent.length);
-  // execCommandを先に試す（同期的 = ユーザージェスチャーを確実に保持）
-  let ok = false;
-  try { ok = document.execCommand('copy'); } catch(_) {}
-  ta.setAttribute('readonly', '');
-  if (ok) {
-    btn.textContent = '✓ コピーしました';
-    setTimeout(() => { btn.textContent = '📋 URLをコピー'; }, 2000);
+  const url = urlSheetCurrent;
+  // Clipboard API（最優先 — モダンブラウザ・iOS13.4+・HTTPS環境で動作）
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url)
+      .then(() => { btn.textContent = '✓ コピーしました'; setTimeout(() => { btn.textContent = '📋 URLをコピー'; }, 2000); })
+      .catch(() => _legacyCopy(url, btn));
     return;
   }
-  // Fallback: Clipboard API（async、iOSなど）
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(urlSheetCurrent)
-      .then(() => { btn.textContent = '✓ コピーしました'; setTimeout(() => { btn.textContent = '📋 URLをコピー'; }, 2000); })
-      .catch(() => { btn.textContent = '上のURLを長押し → コピー'; });
-  } else {
-    btn.textContent = '上のURLを長押し → コピー';
-  }
+  _legacyCopy(url, btn);
+}
+function _legacyCopy(url, btn) {
+  // 画面外の一時inputを作ってコピー（見えているtextareaは触らない）
+  const el = document.createElement('input');
+  el.value = url;
+  el.style.cssText = 'position:fixed;top:0;left:0;width:2em;height:2em;opacity:0.01;font-size:16px;border:none;outline:none;';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  el.setSelectionRange(0, url.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch(_) {}
+  document.body.removeChild(el);
+  btn.textContent = ok ? '✓ コピーしました' : '上のURLを長押し → コピー';
+  if (ok) setTimeout(() => { btn.textContent = '📋 URLをコピー'; }, 2000);
 }
 async function shareUrl() {
   try { await navigator.share({ url: urlSheetCurrent }); } catch(_) {}
