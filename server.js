@@ -54,6 +54,15 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 全APIエラーをJSONで返す（HTML返却を防止）
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (req.path.startsWith('/api/')) {
+    return res.status(err.status || err.statusCode || 500).json({ error: err.message || '予期せぬエラーが発生しました' });
+  }
+  next(err);
+});
+
 app.listen(PORT, () => {
   console.log('マニュアルシステム起動: port=' + PORT);
 });

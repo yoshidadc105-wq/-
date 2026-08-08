@@ -25,7 +25,8 @@ const upload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
+    const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+    if (isPdf) cb(null, true);
     else cb(new Error('PDFファイルのみアップロードできます'));
   }
 });
@@ -34,7 +35,8 @@ const uploadMany = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
+    const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+    if (isPdf) cb(null, true);
     else cb(new Error('PDFファイルのみアップロードできます'));
   }
 });
@@ -153,15 +155,22 @@ router.post('/text', requireLogin, (req, res) => {
 });
 
 // PDFマニュアルアップロード
-router.post('/pdf', requireLogin, upload.single('pdf'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'PDFファイルを選択してください' });
-  const { title, description, category_id } = req.body;
-  const fixedName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
-  const manualTitle = title || path.parse(fixedName).name;
-  const db = getDb();
-  const result = db.prepare(`INSERT INTO manuals (title, description, type, file_path, file_name, file_size, category_id, created_by, updated_by) VALUES (?, ?, 'pdf', ?, ?, ?, ?, ?, ?)`)
-    .run(manualTitle, description || null, req.file.filename, req.file.originalname, req.file.size, category_id || null, req.session.userId, req.session.userId);
-  res.status(201).json({ id: result.lastInsertRowid, message: 'PDFをアップロードしました' });
+router.post('/pdf', requireLogin, (req, res) => {
+  upload.single('pdf')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'PDFファイルを選択してください' });
+    const { title, description, category_id } = req.body;
+    const fixedName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const manualTitle = title || path.parse(fixedName).name;
+    try {
+      const db = getDb();
+      const result = db.prepare(`INSERT INTO manuals (title, description, type, file_path, file_name, file_size, category_id, created_by, updated_by) VALUES (?, ?, 'pdf', ?, ?, ?, ?, ?, ?)`)
+        .run(manualTitle, description || null, req.file.filename, req.file.originalname, req.file.size, category_id || null, req.session.userId, req.session.userId);
+      res.status(201).json({ id: result.lastInsertRowid, message: 'PDFをアップロードしました' });
+    } catch (e) {
+      res.status(500).json({ error: '保存に失敗しました: ' + e.message });
+    }
+  });
 });
 
 // マニュアル更新（管理者のみ）
@@ -240,21 +249,28 @@ router.post('/steps', requireLogin, (req, res) => {
 });
 
 // PDF一括アップロード
-router.post('/bulk-pdf', requireLogin, uploadMany.array('pdfs', 200), (req, res) => {
-  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'PDFファイルを選択してください' });
-  const { category_id } = req.body;
-  const db = getDb();
-  const insert = db.prepare(`INSERT INTO manuals (title, type, file_path, file_name, file_size, category_id, created_by, updated_by) VALUES (?, 'pdf', ?, ?, ?, ?, ?, ?)`);
-  const results = [];
-  for (const file of req.files) {
-    const raw = file.originalname;
-    const asUtf8 = Buffer.from(raw, 'latin1').toString('utf8');
-    const fixedName = asUtf8.includes('�') ? raw : asUtf8;
-    const title = path.parse(fixedName).name;
-    const result = insert.run(title, file.filename, fixedName, file.size, category_id || null, req.session.userId, req.session.userId);
-    results.push({ id: result.lastInsertRowid, title });
-  }
-  res.status(201).json({ message: `${results.length}件のPDFを登録しました`, results });
+router.post('/bulk-pdf', requireLogin, (req, res) => {
+  uploadMany.array('pdfs', 200)(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'PDFファイルを選択してください' });
+    const { category_id } = req.body;
+    try {
+      const db = getDb();
+      const insert = db.prepare(`INSERT INTO manuals (title, type, file_path, file_name, file_size, category_id, created_by, updated_by) VALUES (?, 'pdf', ?, ?, ?, ?, ?, ?)`);
+      const results = [];
+      for (const file of req.files) {
+        const raw = file.originalname;
+        const asUtf8 = Buffer.from(raw, 'latin1').toString('utf8');
+        const fixedName = asUtf8.includes('�') ? raw : asUtf8;
+        const title = path.parse(fixedName).name;
+        const result = insert.run(title, file.filename, fixedName, file.size, category_id || null, req.session.userId, req.session.userId);
+        results.push({ id: result.lastInsertRowid, title });
+      }
+      res.status(201).json({ message: `${results.length}件のPDFを登録しました`, results });
+    } catch (e) {
+      res.status(500).json({ error: '保存に失敗しました: ' + e.message });
+    }
+  });
 });
 
 module.exports = router;
