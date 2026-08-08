@@ -1217,6 +1217,55 @@ app.get('/dashboard', async (req, res) => {
   const staffOptions = allStaffNames.map(n => `<option value="${esc(n)}"${staffFilter === n ? ' selected' : ''}>${esc(n)}</option>`).join('');
   const allActionNames = [...new Set(allRecords.map(r => r.action).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
 
+  // ===== 全スタッフのボーナスポイント計算 =====
+  const bonusTable = [];
+  if (bonusDaysCol && attendanceRecordsCol) {
+    const today = new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10);
+    const bonusDays = await bonusDaysCol.find({ active: true, date: { $lte: today } }).toArray();
+    const allExceptions = await attendanceRecordsCol.find({}).toArray();
+    const nowJst = new Date(Date.now() + 9*60*60*1000);
+    const todayStr = nowJst.toISOString().slice(0, 10);
+    const staffNamesList = await loadStaffNames();
+    for (const sName of staffNamesList) {
+      const exceptions = allExceptions.filter(r => r.staffName === sName && ['holiday_off','absence'].includes(r.type));
+      const exceptionDates = new Set(exceptions.map(r => r.date));
+      const worked = bonusDays.filter(d => !exceptionDates.has(d.date));
+      const hPts = worked.length * 15;
+      const absences = allExceptions.filter(r => r.staffName === sName && r.type === 'yukyuu');
+      let kPts = 0, kMonths = 0;
+      for (let y = 2026, mo = 8; ; ) {
+        const pad = n => String(n).padStart(2, '0');
+        const periodStart = `${y}-${pad(mo)}-11`;
+        const nextY = mo === 12 ? y + 1 : y; const nextMo = mo === 12 ? 1 : mo + 1;
+        const periodEnd = `${nextY}-${pad(nextMo)}-10`;
+        if (periodEnd >= todayStr) break;
+        if (!absences.some(r => r.date >= periodStart && r.date <= periodEnd)) { kPts += 10; kMonths++; }
+        mo = nextMo; y = nextY;
+      }
+      bonusTable.push({ name: sName, holidayDays: worked.length, hPts, kMonths, kPts, total: hPts + kPts });
+    }
+  }
+  const bonusTableHtml = bonusTable.length === 0 ? '<p style="color:#64748b;font-size:13px">データなし（初期データ生成が必要です）</p>' :
+    `<table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#f1f5f9">
+        <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e2e8f0">スタッフ</th>
+        <th style="padding:8px 12px;text-align:center;border-bottom:1px solid #e2e8f0">土曜・祝日出勤</th>
+        <th style="padding:8px 12px;text-align:center;border-bottom:1px solid #e2e8f0">出勤ポイント</th>
+        <th style="padding:8px 12px;text-align:center;border-bottom:1px solid #e2e8f0">皆勤月数</th>
+        <th style="padding:8px 12px;text-align:center;border-bottom:1px solid #e2e8f0">皆勤ポイント</th>
+        <th style="padding:8px 12px;text-align:center;border-bottom:1px solid #e2e8f0;font-weight:700">合計</th>
+      </tr></thead>
+      <tbody>${bonusTable.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
+        <td style="padding:8px 12px;font-weight:600">${esc(r.name)}</td>
+        <td style="padding:8px 12px;text-align:center;color:#6366f1">${r.holidayDays}日</td>
+        <td style="padding:8px 12px;text-align:center;color:#6366f1">${r.hPts}pt</td>
+        <td style="padding:8px 12px;text-align:center;color:#059669">${r.kMonths}ヶ月</td>
+        <td style="padding:8px 12px;text-align:center;color:#059669">${r.kPts}pt</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:#d97706">${r.total}pt</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  // ===== /全スタッフのボーナスポイント計算 =====
+
   const staffSettings = await loadStaffSettings();
 
   // ONになっているアイテムをグループ別にまとめてカラム定義を作る
@@ -1694,6 +1743,12 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
     <button onclick="submitManualRecord()" style="background:#2aab96;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">登録する</button>
     <span id="mrMsg" style="font-size:12px;margin-left:10px"></span>
+  </div>
+
+  <!-- ボーナスポイント一覧 -->
+  <div class="section-header"><h2>🎁 ボーナスポイント一覧</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:760px;margin-bottom:24px;overflow-x:auto">
+    ${bonusTableHtml}
   </div>
 
   <!-- 出勤・欠勤管理 -->
