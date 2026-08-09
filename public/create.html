@@ -43,6 +43,12 @@
     .color-dot{width:22px;height:22px;border-radius:50%;border:2px solid #ccc;cursor:pointer;display:inline-block}
     .color-dot.selected{border:3px solid #333}
     .trim-panel{background:white;border-radius:8px;width:95vw;max-width:700px;padding:20px;display:flex;flex-direction:column;gap:14px}
+    #clipboardPanel{position:fixed;right:0;top:56px;width:260px;bottom:0;background:var(--card-bg,white);border-left:1px solid var(--border);overflow-y:auto;z-index:20;display:none;flex-direction:column;box-shadow:-2px 0 8px rgba(0,0,0,.1)}
+    #clipboardPanel.active{display:flex}
+    #clipPanelHead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card-bg,white);position:sticky;top:0;z-index:1;flex-shrink:0}
+    #clipboardList{padding:10px 14px;flex:1}
+    body.steps-mode{padding-right:260px}
+    @media(max-width:900px){#clipboardPanel{display:none!important}body.steps-mode{padding-right:0}}
   </style>
 </head>
 <body>
@@ -92,20 +98,6 @@
       </div></div>
       <div id="stepsList"></div>
       <div class="mb-2"><button type="button" onclick="addStep()" class="btn btn-secondary w-full" style="font-size:15px;padding:12px">＋ ステップを追加</button></div>
-      <div id="clipboardSection">
-        <div id="clipboardHeader" onclick="toggleClipboardPanel()">
-          <span style="font-weight:700;font-size:14px">📋 クリップボード <span id="clipboardCount" style="font-weight:400;font-size:12px;color:var(--text-muted)">(0)</span></span>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button type="button" id="clipClearBtn" onclick="event.stopPropagation();clearAllClipboard()" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;display:none">全て削除</button>
-            <span id="clipboardToggleIcon" style="font-size:12px;color:var(--text-muted)">▲</span>
-          </div>
-        </div>
-        <div id="clipboardBody" style="padding:10px 14px;border-top:1px solid var(--border)"
-          ondragenter="clipDragEnter(event)" ondragleave="clipDragLeave()" ondragover="clipDragOver(event)" ondrop="clipDrop(event)">
-          <div class="clipboard-drop-zone" id="clipDropZone">📋 ステップの「📋」をここにドラッグ、またはクリックで追加</div>
-          <div id="clipboardList"></div>
-        </div>
-      </div>
     </div>
     <div class="flex gap-2">
       <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">保存する</button>
@@ -220,13 +212,22 @@
   </div>
 </div>
 
+<div id="clipboardPanel">
+  <div id="clipPanelHead">
+    <span style="font-weight:700;font-size:13px">📋 クリップボード <span id="clipboardCount" style="font-weight:400;color:var(--text-muted)">(0)</span></span>
+    <button type="button" id="clipClearBtn" onclick="clearAllClipboard()" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 6px;display:none">全て削除</button>
+  </div>
+  <div id="clipboardList" style="padding:10px;flex:1;overflow-y:auto">
+  </div>
+</div>
+
 <script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
 <script src="/js/common.js"></script>
 <script>
 let currentUser=null,editId=null,currentType='pdf',editManual=null,quill=null;
 let coverImageName=null,steps=[],stepCounter=0;
 let sortableInstance=null;
-let clipboard=[],clipSortable=null,clipboardPanelOpen=true;
+let clipboard=[],clipSortable=null;
 const CLIPBOARD_KEY='manualStepClipboard';
 
 async function init(){
@@ -300,6 +301,8 @@ function switchType(type,tabEl){
   document.getElementById('textSection').classList.toggle('hidden',type!=='rich_text');
   document.getElementById('pdfSection').classList.toggle('hidden',type!=='pdf');
   document.getElementById('stepsSection').classList.toggle('hidden',type!=='steps');
+  document.getElementById('clipboardPanel').classList.toggle('active', type==='steps');
+  document.body.classList.toggle('steps-mode', type==='steps');
 }
 function toggleReplaceMode(checked){const area=document.getElementById('uploadArea');area.onclick=checked?()=>document.getElementById('pdfFile').click():null;area.style.cursor=checked?'pointer':'default';}
 function formatCmd(cmd){document.execCommand(cmd,false,null);}
@@ -392,7 +395,7 @@ function renderSteps(){
         <div style="display:flex;gap:4px;align-items:center">
           <button type="button" onclick="moveStep(${step.id},-1)" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:14px" title="上に移動">↑</button>
           <button type="button" onclick="moveStep(${step.id},1)" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:14px" title="下に移動">↓</button>
-          <span draggable="true" ondragstart="clipDragStart(event,${step.id})" onclick="addToClipboard(${step.id})" class="btn btn-secondary btn-sm" title="クリックまたはドラッグでクリップボードに追加" style="padding:3px 8px;cursor:grab;user-select:none">📋</span>
+          <button type="button" onclick="addToClipboard(${step.id})" class="btn btn-secondary btn-sm" title="クリップボードに追加" style="padding:3px 8px">📋</button>
           <button type="button" onclick="removeStep(${step.id})" class="btn btn-danger btn-sm">削除</button>
         </div>
       </div>
@@ -432,10 +435,19 @@ function renderSteps(){
       animation:150,
       handle:'.drag-handle',
       ghostClass:'step-card-ghost',
-      onEnd:()=>{
-        const newOrder=Array.from(container.querySelectorAll('.step-card')).map(el=>parseInt(el.dataset.stepId));
-        steps=newOrder.map(id=>steps.find(s=>s.id===id)).filter(Boolean);
-        container.querySelectorAll('.step-card').forEach((card,i)=>{const b=card.querySelector('.step-number-badge');if(b)b.textContent=`STEP ${i+1}`;});
+      group:{name:'steps',pull:'clone',put:['clipboard']},
+      onAdd:(evt)=>{
+        // clipboard item was dropped into steps list
+        const clipId=parseInt(evt.item.dataset.clipId);
+        evt.item.remove();
+        if(!isNaN(clipId))insertFromClipboard(clipId);
+      },
+      onEnd:(evt)=>{
+        if(evt.from===container&&evt.to===container){
+          const newOrder=Array.from(container.querySelectorAll('.step-card')).map(el=>parseInt(el.dataset.stepId));
+          steps=newOrder.map(id=>steps.find(s=>s.id===id)).filter(Boolean);
+          container.querySelectorAll('.step-card').forEach((card,i)=>{const b=card.querySelector('.step-number-badge');if(b)b.textContent=`STEP ${i+1}`;});
+        }
       }
     });
   }
@@ -508,9 +520,8 @@ function addToClipboard(stepId){
   clipboard.unshift(item);
   saveClipboardStorage();
   renderClipboard();
-  if(!clipboardPanelOpen)toggleClipboardPanel();
-  const sec=document.getElementById('clipboardSection');
-  if(sec){sec.style.outline='2px solid var(--primary)';setTimeout(()=>sec.style.outline='',600);}
+  document.getElementById('clipboardPanel').classList.add('active');
+  document.body.classList.add('steps-mode');
 }
 
 function insertFromClipboard(clipId){
@@ -543,32 +554,8 @@ function addCoverToClipboard(){
   clipboard.unshift(item);
   saveClipboardStorage();
   renderClipboard();
-  if(!clipboardPanelOpen)toggleClipboardPanel();
-  const sec=document.getElementById('clipboardSection');
-  if(sec){sec.style.outline='2px solid var(--primary)';setTimeout(()=>sec.style.outline='',600);}
-}
-
-// Drag & drop: ステップ → クリップボード
-function clipDragStart(event,stepId){
-  event.dataTransfer.setData('text/plain',String(stepId));
-  event.dataTransfer.effectAllowed='copy';
-}
-let clipDragEnterCount=0;
-function clipDragEnter(event){
-  event.preventDefault();clipDragEnterCount++;
-  document.getElementById('clipDropZone').classList.add('drag-over');
-  if(!clipboardPanelOpen)toggleClipboardPanel();
-}
-function clipDragLeave(){
-  clipDragEnterCount--;
-  if(clipDragEnterCount<=0){clipDragEnterCount=0;document.getElementById('clipDropZone').classList.remove('drag-over');}
-}
-function clipDragOver(event){event.preventDefault();event.dataTransfer.dropEffect='copy';}
-function clipDrop(event){
-  event.preventDefault();clipDragEnterCount=0;
-  document.getElementById('clipDropZone').classList.remove('drag-over');
-  const stepId=parseInt(event.dataTransfer.getData('text/plain'));
-  if(!isNaN(stepId))addToClipboard(stepId);
+  document.getElementById('clipboardPanel').classList.add('active');
+  document.body.classList.add('steps-mode');
 }
 
 function removeFromClipboard(clipId){
@@ -582,14 +569,6 @@ function clearAllClipboard(){
   clipboard=[];
   saveClipboardStorage();
   renderClipboard();
-}
-
-function toggleClipboardPanel(){
-  clipboardPanelOpen=!clipboardPanelOpen;
-  const body=document.getElementById('clipboardBody');
-  const icon=document.getElementById('clipboardToggleIcon');
-  if(body)body.style.display=clipboardPanelOpen?'':'none';
-  if(icon)icon.textContent=clipboardPanelOpen?'▲':'▼';
 }
 
 function renderClipboard(){
@@ -631,17 +610,25 @@ function renderClipboard(){
     </div>`;
   }).join('');
 
-  // クリップボード内の並び替え
   if(typeof Sortable!=='undefined'){
     if(clipSortable)clipSortable.destroy();
     clipSortable=Sortable.create(listEl,{
       animation:150,
       handle:'.drag-handle',
       ghostClass:'clipboard-item-ghost',
-      onEnd:()=>{
-        const newOrder=Array.from(listEl.querySelectorAll('.clipboard-item')).map(el=>parseInt(el.dataset.clipId));
-        clipboard=newOrder.map(id=>clipboard.find(c=>c.clipId===id)).filter(Boolean);
-        saveClipboardStorage();
+      group:{name:'clipboard',pull:'clone',put:['steps']},
+      onAdd:(evt)=>{
+        // step card was dropped into clipboard
+        const stepId=parseInt(evt.item.dataset.stepId);
+        evt.item.remove();
+        if(!isNaN(stepId))addToClipboard(stepId);
+      },
+      onEnd:(evt)=>{
+        if(evt.from===listEl&&evt.to===listEl){
+          const newOrder=Array.from(listEl.querySelectorAll('.clipboard-item')).map(el=>parseInt(el.dataset.clipId));
+          clipboard=newOrder.map(id=>clipboard.find(c=>c.clipId===id)).filter(Boolean);
+          saveClipboardStorage();
+        }
       }
     });
   }
