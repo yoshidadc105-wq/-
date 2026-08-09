@@ -24,6 +24,14 @@
     .drag-handle:hover{color:var(--primary)}
     .drag-handle:active{cursor:grabbing}
     .step-card-ghost{opacity:.4;background:#e8f0fe;border:2px dashed var(--primary)}
+    #clipboardSection{background:var(--card-bg,white);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px}
+    #clipboardHeader{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;border-radius:var(--radius)}
+    #clipboardHeader:hover{background:var(--primary-light)}
+    .clipboard-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--bg,#f9f9f9)}
+    .clipboard-thumb{width:64px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f3f4f6}
+    .clipboard-item-ghost{opacity:.4;background:#e8f0fe!important;border:2px dashed var(--primary)!important}
+    .clipboard-drop-zone{border:2px dashed var(--border);border-radius:6px;text-align:center;padding:10px;font-size:12px;color:var(--text-muted);margin-bottom:6px;transition:.15s}
+    .clipboard-drop-zone.drag-over{border-color:var(--primary);background:var(--primary-light);color:var(--primary)}
     #annotationModal,#videoAnnotModal,#videoTrimModal{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);flex-direction:column;align-items:center;justify-content:center}
     #videoAnnotModal{z-index:9100}
     .annot-panel{background:white;border-radius:8px;width:95vw;max-width:900px;max-height:95vh;display:flex;flex-direction:column;overflow:hidden}
@@ -84,6 +92,19 @@
       </div></div>
       <div id="stepsList"></div>
       <div class="mb-2"><button type="button" onclick="addStep()" class="btn btn-secondary w-full" style="font-size:15px;padding:12px">＋ ステップを追加</button></div>
+      <div id="clipboardSection">
+        <div id="clipboardHeader" onclick="toggleClipboardPanel()">
+          <span style="font-weight:700;font-size:14px">📋 クリップボード <span id="clipboardCount" style="font-weight:400;font-size:12px;color:var(--text-muted)">(0)</span></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button type="button" id="clipClearBtn" onclick="event.stopPropagation();clearAllClipboard()" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px;display:none">全て削除</button>
+            <span id="clipboardToggleIcon" style="font-size:12px;color:var(--text-muted)">▲</span>
+          </div>
+        </div>
+        <div id="clipboardBody" style="padding:10px 14px;border-top:1px solid var(--border)">
+          <div class="clipboard-drop-zone" id="clipDropZone">ステップカードの「📋」ボタンでここに追加できます</div>
+          <div id="clipboardList"></div>
+        </div>
+      </div>
     </div>
     <div class="flex gap-2">
       <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">保存する</button>
@@ -204,6 +225,8 @@
 let currentUser=null,editId=null,currentType='pdf',editManual=null,quill=null;
 let coverImageName=null,steps=[],stepCounter=0;
 let sortableInstance=null;
+let clipboard=[],clipSortable=null,clipboardPanelOpen=true;
+const CLIPBOARD_KEY='manualStepClipboard';
 
 async function init(){
   currentUser=await loadCurrentUser();
@@ -220,6 +243,7 @@ async function init(){
   area.addEventListener('dragleave',()=>area.classList.remove('dragover'));
   area.addEventListener('drop',e=>{e.preventDefault();area.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf'){document.getElementById('pdfFile').files=e.dataTransfer.files;document.getElementById('fileNameDisplay').textContent=`選択: ${f.name}`;}else showAlert('alert','PDFファイルのみ対応しています','error');});
   document.getElementById('manualForm').addEventListener('submit',handleSubmit);
+  loadClipboard();
 }
 
 async function loadCategories(){
@@ -367,6 +391,7 @@ function renderSteps(){
         <div style="display:flex;gap:4px;align-items:center">
           <button type="button" onclick="moveStep(${step.id},-1)" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:14px" title="上に移動">↑</button>
           <button type="button" onclick="moveStep(${step.id},1)" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:14px" title="下に移動">↓</button>
+          <button type="button" onclick="addToClipboard(${step.id})" class="btn btn-secondary btn-sm" title="クリップボードに追加" style="padding:3px 8px">📋</button>
           <button type="button" onclick="removeStep(${step.id})" class="btn btn-danger btn-sm">削除</button>
         </div>
       </div>
@@ -452,6 +477,126 @@ function closeVideoTrim(){document.getElementById('videoTrimModal').style.displa
 function onTrimStartChange(v){const ev=parseFloat(document.getElementById('trimEnd').value);if(parseFloat(v)>=ev){document.getElementById('trimStart').value=ev-.1;return;}document.getElementById('trimStartLabel').textContent=parseFloat(v).toFixed(1);document.getElementById('trimVideoEl').currentTime=parseFloat(v);}
 function onTrimEndChange(v){const sv=parseFloat(document.getElementById('trimStart').value);if(parseFloat(v)<=sv){document.getElementById('trimEnd').value=sv+.1;return;}document.getElementById('trimEndLabel').textContent=parseFloat(v).toFixed(1);}
 async function startVideoTrim(){const video=document.getElementById('trimVideoEl');const st=parseFloat(document.getElementById('trimStart').value);const et=parseFloat(document.getElementById('trimEnd').value);if(et-st<=0){alert('終了時刻は開始時刻より後にしてください');return;}if(!video.captureStream&&!video.mozCaptureStream){alert('お使いのブラウザは動画トリミングに対応していません。\nスマートフォンの動画編集アプリでトリミングしてからアップロードしてください。');return;}document.getElementById('trimConfirmBtn').disabled=true;document.getElementById('trimProgress').style.display='block';trimChunks=[];video.currentTime=st;await new Promise(r=>video.onseeked=r);const stream=video.captureStream?video.captureStream():video.mozCaptureStream();const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';trimRecorder=new MediaRecorder(stream,{mimeType:mime});trimRecorder.ondataavailable=e=>{if(e.data.size>0)trimChunks.push(e.data);};trimRecorder.onstop=async()=>{const blob=new Blob(trimChunks,{type:mime});const ext=mime.includes('mp4')?'.mp4':'.webm';const form=new FormData();form.append('image',blob,`trimmed_${Date.now()}${ext}`);const res=await fetch('/api/manuals/step-image',{method:'POST',body:form});if(!res.ok){alert('保存に失敗しました');return;}const data=await res.json();const step=steps.find(s=>s.id===trimStepId);if(step){step.imageName=data.filename;step.imageType='video';if(!step.images)step.images=[];step.images[0]={name:data.filename,type:'video'};}closeVideoTrim();renderSteps();};trimRecorder.start();video.play();const iv=setInterval(()=>{if(video.currentTime>=et){clearInterval(iv);video.pause();trimRecorder.stop();}},100);}
+
+// Clipboard
+function loadClipboard(){
+  try{clipboard=JSON.parse(localStorage.getItem(CLIPBOARD_KEY)||'[]');}catch{clipboard=[];}
+  renderClipboard();
+}
+function saveClipboardStorage(){localStorage.setItem(CLIPBOARD_KEY,JSON.stringify(clipboard));}
+
+function addToClipboard(stepId){
+  const step=steps.find(s=>s.id===stepId);if(!step)return;
+  const item={
+    clipId:Date.now(),
+    title:step.title,
+    imageName:step.imageName,
+    imageType:step.imageType,
+    images:(step.images||[]).map(img=>img?{...img}:null),
+    imageLayout:step.imageLayout||'single',
+    description:step.description,
+    videoAnnotations:(step.videoAnnotations||[]).map(a=>({...a}))
+  };
+  clipboard.unshift(item);
+  saveClipboardStorage();
+  renderClipboard();
+  // パネルが閉じていれば開く
+  if(!clipboardPanelOpen)toggleClipboardPanel();
+  // 軽いフラッシュで知らせる
+  const sec=document.getElementById('clipboardSection');
+  if(sec){sec.style.transition='outline .1s';sec.style.outline='2px solid var(--primary)';setTimeout(()=>sec.style.outline='',600);}
+}
+
+function insertFromClipboard(clipId){
+  const item=clipboard.find(c=>c.clipId===clipId);if(!item)return;
+  const newStep={
+    id:++stepCounter,
+    title:item.title,
+    imageName:item.imageName,
+    imageType:item.imageType,
+    images:(item.images||[]).map(img=>img?{...img}:null),
+    imageLayout:item.imageLayout||'single',
+    description:item.description,
+    videoAnnotations:(item.videoAnnotations||[]).map(a=>({...a}))
+  };
+  steps.push(newStep);
+  renderSteps();
+  setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);
+}
+
+function removeFromClipboard(clipId){
+  clipboard=clipboard.filter(c=>c.clipId!==clipId);
+  saveClipboardStorage();
+  renderClipboard();
+}
+
+function clearAllClipboard(){
+  if(!confirm('クリップボードを全て削除しますか？'))return;
+  clipboard=[];
+  saveClipboardStorage();
+  renderClipboard();
+}
+
+function toggleClipboardPanel(){
+  clipboardPanelOpen=!clipboardPanelOpen;
+  const body=document.getElementById('clipboardBody');
+  const icon=document.getElementById('clipboardToggleIcon');
+  if(body)body.style.display=clipboardPanelOpen?'':'none';
+  if(icon)icon.textContent=clipboardPanelOpen?'▲':'▼';
+}
+
+function renderClipboard(){
+  const countEl=document.getElementById('clipboardCount');
+  const listEl=document.getElementById('clipboardList');
+  const clearBtn=document.getElementById('clipClearBtn');
+  if(!listEl)return;
+  if(countEl)countEl.textContent=`(${clipboard.length})`;
+  if(clearBtn)clearBtn.style.display=clipboard.length?'':'none';
+
+  if(!clipboard.length){
+    listEl.innerHTML='<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px 0">ステップの 📋 ボタンで追加できます</div>';
+    return;
+  }
+  listEl.innerHTML=clipboard.map((item)=>{
+    let thumb;
+    if(item.imageName){
+      if(item.imageType==='video'){
+        thumb=`<video src="/uploads/${item.imageName}" class="clipboard-thumb" style="flex-shrink:0"></video>`;
+      }else{
+        thumb=`<img src="/uploads/${item.imageName}" class="clipboard-thumb" style="flex-shrink:0">`;
+      }
+    }else{
+      thumb=`<div class="clipboard-thumb" style="display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📷</div>`;
+    }
+    return `<div class="clipboard-item" data-clip-id="${item.clipId}">
+      <div class="drag-handle" style="font-size:16px;padding:2px 4px" title="ドラッグして並び替え">☰</div>
+      ${thumb}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(item.title||'（タイトルなし）')}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${item.imageLayout==='2col'?'2枚横並び':item.imageLayout==='4grid'?'4枚グリッド':'1枚'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
+        <button type="button" onclick="insertFromClipboard(${item.clipId})" class="btn btn-primary btn-sm" style="font-size:11px;padding:2px 8px;white-space:nowrap">＋ 挿入</button>
+        <button type="button" onclick="removeFromClipboard(${item.clipId})" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // クリップボード内の並び替え
+  if(typeof Sortable!=='undefined'){
+    if(clipSortable)clipSortable.destroy();
+    clipSortable=Sortable.create(listEl,{
+      animation:150,
+      handle:'.drag-handle',
+      ghostClass:'clipboard-item-ghost',
+      onEnd:()=>{
+        const newOrder=Array.from(listEl.querySelectorAll('.clipboard-item')).map(el=>parseInt(el.dataset.clipId));
+        clipboard=newOrder.map(id=>clipboard.find(c=>c.clipId===id)).filter(Boolean);
+        saveClipboardStorage();
+      }
+    });
+  }
+}
 
 // Save
 async function handleSubmit(e){e.preventDefault();const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='保存中...';const title=document.getElementById('title').value.trim();const description=document.getElementById('description').value.trim();const categoryId=document.getElementById('categorySelect').value;if(!title){showAlert('alert','タイトルを入力してください','error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';return;}try{if(editId)await updateManual(title,description,categoryId);else await createManual(title,description,categoryId);}catch(err){showAlert('alert','エラー: '+err.message,'error');btn.disabled=false;btn.textContent=editId?'更新する':'保存する';}}
