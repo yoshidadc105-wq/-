@@ -100,8 +100,9 @@
             <span id="clipboardToggleIcon" style="font-size:12px;color:var(--text-muted)">▲</span>
           </div>
         </div>
-        <div id="clipboardBody" style="padding:10px 14px;border-top:1px solid var(--border)">
-          <div class="clipboard-drop-zone" id="clipDropZone">ステップカードの「📋」ボタンでここに追加できます</div>
+        <div id="clipboardBody" style="padding:10px 14px;border-top:1px solid var(--border)"
+          ondragenter="clipDragEnter(event)" ondragleave="clipDragLeave()" ondragover="clipDragOver(event)" ondrop="clipDrop(event)">
+          <div class="clipboard-drop-zone" id="clipDropZone">📋 ステップの「📋」をここにドラッグ、またはクリックで追加</div>
           <div id="clipboardList"></div>
         </div>
       </div>
@@ -391,7 +392,7 @@ function renderSteps(){
         <div style="display:flex;gap:4px;align-items:center">
           <button type="button" onclick="moveStep(${step.id},-1)" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:14px" title="上に移動">↑</button>
           <button type="button" onclick="moveStep(${step.id},1)" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:14px" title="下に移動">↓</button>
-          <button type="button" onclick="addToClipboard(${step.id})" class="btn btn-secondary btn-sm" title="クリップボードに追加" style="padding:3px 8px">📋</button>
+          <button type="button" draggable="true" ondragstart="clipDragStart(event,${step.id})" onclick="addToClipboard(${step.id})" class="btn btn-secondary btn-sm" title="クリックまたはドラッグでクリップボードに追加" style="padding:3px 8px;cursor:grab">📋</button>
           <button type="button" onclick="removeStep(${step.id})" class="btn btn-danger btn-sm">削除</button>
         </div>
       </div>
@@ -485,6 +486,13 @@ function loadClipboard(){
 }
 function saveClipboardStorage(){localStorage.setItem(CLIPBOARD_KEY,JSON.stringify(clipboard));}
 
+function clipImgs(imgs, fallbackName, fallbackType){
+  // images配列が空でもimageName(旧形式)があれば画像を保持する
+  const mapped=(imgs||[]).map(img=>img?{...img}:null);
+  if(!mapped.some(Boolean)&&fallbackName){return [{name:fallbackName,type:fallbackType||'image'}];}
+  return mapped;
+}
+
 function addToClipboard(stepId){
   const step=steps.find(s=>s.id===stepId);if(!step)return;
   const item={
@@ -492,7 +500,7 @@ function addToClipboard(stepId){
     title:step.title,
     imageName:step.imageName,
     imageType:step.imageType,
-    images:(step.images||[]).map(img=>img?{...img}:null),
+    images:clipImgs(step.images,step.imageName,step.imageType),
     imageLayout:step.imageLayout||'single',
     description:step.description,
     videoAnnotations:(step.videoAnnotations||[]).map(a=>({...a}))
@@ -500,11 +508,9 @@ function addToClipboard(stepId){
   clipboard.unshift(item);
   saveClipboardStorage();
   renderClipboard();
-  // パネルが閉じていれば開く
   if(!clipboardPanelOpen)toggleClipboardPanel();
-  // 軽いフラッシュで知らせる
   const sec=document.getElementById('clipboardSection');
-  if(sec){sec.style.transition='outline .1s';sec.style.outline='2px solid var(--primary)';setTimeout(()=>sec.style.outline='',600);}
+  if(sec){sec.style.outline='2px solid var(--primary)';setTimeout(()=>sec.style.outline='',600);}
 }
 
 function insertFromClipboard(clipId){
@@ -514,7 +520,7 @@ function insertFromClipboard(clipId){
     title:item.title,
     imageName:item.imageName,
     imageType:item.imageType,
-    images:(item.images||[]).map(img=>img?{...img}:null),
+    images:clipImgs(item.images,item.imageName,item.imageType),
     imageLayout:item.imageLayout||'single',
     description:item.description,
     videoAnnotations:(item.videoAnnotations||[]).map(a=>({...a}))
@@ -522,6 +528,29 @@ function insertFromClipboard(clipId){
   steps.push(newStep);
   renderSteps();
   setTimeout(()=>{const c=document.querySelectorAll('.step-card');if(c.length)c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'});},50);
+}
+
+// Drag & drop: ステップ → クリップボード
+function clipDragStart(event,stepId){
+  event.dataTransfer.setData('text/plain',String(stepId));
+  event.dataTransfer.effectAllowed='copy';
+}
+let clipDragEnterCount=0;
+function clipDragEnter(event){
+  event.preventDefault();clipDragEnterCount++;
+  document.getElementById('clipDropZone').classList.add('drag-over');
+  if(!clipboardPanelOpen)toggleClipboardPanel();
+}
+function clipDragLeave(){
+  clipDragEnterCount--;
+  if(clipDragEnterCount<=0){clipDragEnterCount=0;document.getElementById('clipDropZone').classList.remove('drag-over');}
+}
+function clipDragOver(event){event.preventDefault();event.dataTransfer.dropEffect='copy';}
+function clipDrop(event){
+  event.preventDefault();clipDragEnterCount=0;
+  document.getElementById('clipDropZone').classList.remove('drag-over');
+  const stepId=parseInt(event.dataTransfer.getData('text/plain'));
+  if(!isNaN(stepId))addToClipboard(stepId);
 }
 
 function removeFromClipboard(clipId){
