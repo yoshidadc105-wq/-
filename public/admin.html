@@ -787,14 +787,28 @@ async function deleteCategory(id, name) {
 }
 
 // ── URLリンク管理 ──
+async function loadAllManuals() {
+  // 全マニュアルをページネーションで取得
+  let page = 1, fetched = [];
+  while (true) {
+    const res = await fetch(`/api/manuals?limit=200&page=${page}`);
+    if (!res.ok) break;
+    const data = await res.json();
+    const items = data.manuals || [];
+    fetched = fetched.concat(items);
+    if (fetched.length >= data.total || items.length === 0) break;
+    page++;
+  }
+  return fetched;
+}
+
 async function loadUrlRedirects() {
-  const [redirectsRes, manualsRes] = await Promise.all([
+  const [redirectsRes, allManualsArr] = await Promise.all([
     fetch('/api/url-redirects'),
-    fetch('/api/manuals?limit=1000')
+    loadAllManuals()
   ]);
   const redirects = await redirectsRes.json();
-  const manualsData = await manualsRes.json();
-  allManualsList = manualsData.manuals || [];
+  allManualsList = allManualsArr;
   renderUrlManualSelect(allManualsList);
 
   const tbody = document.getElementById('urlTableBody');
@@ -827,10 +841,17 @@ function renderUrlManualSelect(manuals) {
   sel.innerHTML = manuals.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
 }
 
+let _urlSearchTimer = null;
 function filterUrlManuals() {
-  const q = normalizeStr(document.getElementById('urlSearch').value);
-  const filtered = !q ? allManualsList : allManualsList.filter(m => normalizeStr(m.title).includes(q));
-  renderUrlManualSelect(filtered);
+  clearTimeout(_urlSearchTimer);
+  const q = document.getElementById('urlSearch').value.trim();
+  if (!q) { renderUrlManualSelect(allManualsList); return; }
+  _urlSearchTimer = setTimeout(async () => {
+    const res = await fetch(`/api/manuals?search=${encodeURIComponent(q)}&limit=100`);
+    if (!res.ok) return;
+    const data = await res.json();
+    renderUrlManualSelect(data.manuals || []);
+  }, 250);
 }
 
 function startEditUrl(id, oldUrl, manualId) {
