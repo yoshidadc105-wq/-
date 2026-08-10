@@ -814,14 +814,22 @@ async function loadUrlRedirects() {
   `).join('');
 }
 
+function normalizeStr(s) {
+  return s.toLowerCase().replace(/[　 ]+/g, ' ').trim();
+}
+
 function renderUrlManualSelect(manuals) {
   const sel = document.getElementById('urlManualId');
+  if (manuals.length === 0) {
+    sel.innerHTML = '<option value="" disabled>該当するマニュアルがありません</option>';
+    return;
+  }
   sel.innerHTML = manuals.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
 }
 
 function filterUrlManuals() {
-  const q = document.getElementById('urlSearch').value.toLowerCase();
-  const filtered = allManualsList.filter(m => m.title.toLowerCase().includes(q));
+  const q = normalizeStr(document.getElementById('urlSearch').value);
+  const filtered = !q ? allManualsList : allManualsList.filter(m => normalizeStr(m.title).includes(q));
   renderUrlManualSelect(filtered);
 }
 
@@ -901,12 +909,12 @@ function showScanAlert(msg, type) {
 }
 
 function filterScanSelect(input) {
-  const q = input.value.toLowerCase();
+  const q = normalizeStr(input.value);
   const sel = input.parentElement.querySelector('select.scan-manual-sel');
   const currentVal = sel.value;
   sel.innerHTML = '<option value="">—— 選択してください ——</option>' +
     allManualsList
-      .filter(m => !q || m.title.toLowerCase().includes(q))
+      .filter(m => !q || normalizeStr(m.title).includes(q))
       .map(m => `<option value="${m.id}"${String(m.id) === currentVal ? ' selected' : ''}>${htmlEsc(m.title)}</option>`)
       .join('');
 }
