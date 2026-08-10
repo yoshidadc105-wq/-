@@ -788,18 +788,9 @@ async function deleteCategory(id, name) {
 
 // ── URLリンク管理 ──
 async function loadAllManuals() {
-  // 全マニュアルをページネーションで取得
-  let page = 1, fetched = [];
-  while (true) {
-    const res = await fetch(`/api/manuals?limit=200&page=${page}`);
-    if (!res.ok) break;
-    const data = await res.json();
-    const items = data.manuals || [];
-    fetched = fetched.concat(items);
-    if (fetched.length >= data.total || items.length === 0) break;
-    page++;
-  }
-  return fetched;
+  const res = await fetch('/api/admin/manuals-for-url');
+  if (!res.ok) return [];
+  return await res.json();
 }
 
 async function loadUrlRedirects() {
@@ -810,6 +801,8 @@ async function loadUrlRedirects() {
   const redirects = await redirectsRes.json();
   allManualsList = allManualsArr;
   renderUrlManualSelect(allManualsList);
+  const searchEl = document.getElementById('urlSearch');
+  if (searchEl) searchEl.placeholder = `マニュアル名で検索…（全${allManualsList.length}件）`;
 
   const tbody = document.getElementById('urlTableBody');
   if (redirects.length === 0) {
@@ -847,10 +840,10 @@ function filterUrlManuals() {
   const q = document.getElementById('urlSearch').value.trim();
   if (!q) { renderUrlManualSelect(allManualsList); return; }
   _urlSearchTimer = setTimeout(async () => {
-    const res = await fetch(`/api/manuals?search=${encodeURIComponent(q)}&limit=100`);
+    const res = await fetch(`/api/admin/manuals-for-url?q=${encodeURIComponent(q)}`);
     if (!res.ok) return;
     const data = await res.json();
-    renderUrlManualSelect(data.manuals || []);
+    renderUrlManualSelect(data);
   }, 250);
 }
 

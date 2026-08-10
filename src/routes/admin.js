@@ -121,6 +121,21 @@ router.delete('/users/:id', requireAdmin, (req, res) => {
   }
 });
 
+// URL登録用マニュアル全件取得（管理者のみ）
+router.get('/manuals-for-url', requireAdmin, (req, res) => {
+  const db = getDb();
+  const { q } = req.query;
+  let sql = 'SELECT id, title, type FROM manuals WHERE is_deleted = 0';
+  const params = [];
+  if (q && q.trim()) {
+    sql += ' AND title LIKE ?';
+    params.push(`%${q.trim()}%`);
+  }
+  sql += ' ORDER BY title';
+  const manuals = db.prepare(sql).all(...params);
+  res.json(manuals);
+});
+
 // 統計情報
 router.get('/stats', requireAdmin, (req, res) => {
   const db = getDb();
