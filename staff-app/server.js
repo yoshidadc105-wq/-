@@ -1307,6 +1307,8 @@ app.get('/dashboard', async (req, res) => {
         </div>`;
     }).filter(Boolean).join('');
 
+    const bonusData = bonusTable.find(b => b.name === name) || { holidayDays: 0, hPts: 0, kMonths: 0, kPts: 0, total: 0 };
+
     return `
       <tr class="staff-row" onclick="openModal('${esc(name).replace(/'/g, "\\'")}')">
         <td><span class="avatar">${esc(initial)}</span><strong>${esc(name)}</strong></td>
@@ -1316,6 +1318,13 @@ app.get('/dashboard', async (req, res) => {
         ${otherCell}
         <td onclick="event.stopPropagation()" style="min-width:100px">
           ${goalParts || '<span style="color:#cbd5e1;font-size:11px">未設定</span>'}
+        </td>
+        <td class="num" onclick="event.stopPropagation()" style="min-width:90px;font-size:11px">
+          <div style="color:#6366f1">${bonusData.holidayDays}日×15pt</div>
+          <div style="color:#6366f1;font-weight:700">${bonusData.hPts}pt</div>
+          <div style="color:#059669;margin-top:2px">${bonusData.kMonths}ヶ月×10pt</div>
+          <div style="color:#059669;font-weight:700">${bonusData.kPts}pt</div>
+          <div style="color:#d97706;font-weight:800;margin-top:2px;font-size:12px">計${bonusData.total}pt</div>
         </td>
         <td onclick="event.stopPropagation()" style="white-space:nowrap">
           <a href="/admin/login-as/${encodeURIComponent(name)}" class="btn-eval" style="background:linear-gradient(135deg,#6366f1,#818cf8)">👤 本人画面</a>
@@ -1565,7 +1574,7 @@ td{padding:11px 14px;vertical-align:middle}
       <thead><tr>
         <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th>
         ${thCols}
-        <th>目標進捗</th><th>出力</th>
+        <th>目標進捗</th><th class="num">ボーナスpt</th><th>出力</th>
       </tr></thead>
       <tbody>${summaryRows || `<tr><td colspan="${5 + groupOrder.length}" class="empty">まだデータがありません</td></tr>`}</tbody>
     </table>
