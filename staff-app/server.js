@@ -1225,7 +1225,7 @@ app.get('/dashboard', async (req, res) => {
   if (bonusDaysCol && attendanceRecordsCol) {
     const bonusDays = await bonusDaysCol.find({ active: true, date: { $gte: bonusFrom, $lte: bonusTo } }).toArray();
     const allExceptions = await attendanceRecordsCol.find({}).toArray();
-    const todayStr = bonusTo;
+    const todayStr = new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10);
     const staffNamesList = await loadStaffNames();
     const BONUS_EXCLUDED = (sName) => sName.startsWith('吉田') || sName.startsWith('秋葉');
     for (const sName of staffNamesList) {
