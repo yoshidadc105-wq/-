@@ -1795,7 +1795,7 @@ td{padding:11px 14px;vertical-align:middle}
       <span id="initBonusMsg" style="font-size:12px;color:#0f766e"></span>
     </div>
     <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">土曜・祝日ボーナス日一覧（直近20件）</div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">土曜・祝日ボーナス日一覧（全件・過去含む）</div>
       <div id="bonusDaysList" style="font-size:12px;max-height:240px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px"></div>
     </div>
     <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-bottom:14px">
@@ -2533,10 +2533,9 @@ async function loadBonusDaysList() {
   if (!el) return;
   const res = await fetch('/api/bonus-days');
   const days = await res.json();
-  const today = new Date().toISOString().slice(0, 10);
-  const recent = days.filter(d => d.date >= today).slice(0, 20);
-  if (!recent.length) { el.innerHTML = '<span style="color:#94a3b8">データなし。初期データ生成ボタンで追加してください。</span>'; return; }
-  el.innerHTML = recent.map(d =>
+  const sorted = days.sort((a,b) => b.date.localeCompare(a.date));
+  if (!sorted.length) { el.innerHTML = '<span style="color:#94a3b8">データなし。初期データ生成ボタンで追加してください。</span>'; return; }
+  el.innerHTML = sorted.map(d =>
     '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9">'
     + '<span style="color:' + (d.active ? '#059669' : '#94a3b8') + '">' + (d.active ? '●' : '○') + '</span>'
     + '<span style="flex:1">' + d.date + ' ' + d.name + '</span>'
