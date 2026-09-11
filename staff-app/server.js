@@ -1230,7 +1230,7 @@ app.get('/dashboard', async (req, res) => {
     const BONUS_EXCLUDED = (sName) => sName.startsWith('吉田') || sName.startsWith('秋葉');
     for (const sName of staffNamesList) {
       if (BONUS_EXCLUDED(sName)) continue;
-      const exceptions = allExceptions.filter(r => r.staffName === sName && ['holiday_off','absence'].includes(r.type));
+      const exceptions = allExceptions.filter(r => r.staffName === sName && ['holiday_off','absence','yukyuu_paid'].includes(r.type));
       const exceptionDates = new Set(exceptions.map(r => r.date));
       const worked = bonusDays.filter(d => !exceptionDates.has(d.date));
       const hPts = worked.length * 15;
@@ -1817,6 +1817,7 @@ td{padding:11px 14px;vertical-align:middle}
             <option value="holiday_off">土曜日休み（ボーナス対象外）</option>
             <option value="absence">祝日休み（ボーナス対象外）</option>
             <option value="yukyuu">直前欠勤（皆勤対象外）</option>
+            <option value="yukyuu_paid">有休（ボーナス対象外）</option>
           </select>
         </div>
         <div>
@@ -2565,7 +2566,7 @@ async function loadAttendanceList() {
   const res = await adminFetch('/api/attendance-records');
   const records = await res.json();
   if (!records.length) { el.innerHTML = '<span style="color:#94a3b8">登録なし</span>'; return; }
-  const typeLabel = { holiday_off: '土曜日休み', absence: '祝日休み', yukyuu: '直前欠勤' };
+  const typeLabel = { holiday_off: '土曜日休み', absence: '祝日休み', yukyuu: '直前欠勤', yukyuu_paid: '有休' };
   el.innerHTML = records.slice(0, 50).map(r =>
     '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9">'
     + '<span style="flex:1">' + r.date + ' ' + r.staffName + ' <span style="color:#6366f1">[' + (typeLabel[r.type]||r.type) + ']</span>' + (r.note ? ' ' + r.note : '') + '</span>'
@@ -2867,7 +2868,7 @@ app.get('/my-stats', async (req, res) => {
   let kankinPoints = 0, kankinMonths = 0;
   if (bonusDaysCol && attendanceRecordsCol) {
     const bonusDays = await bonusDaysCol.find({ active: true, date: { $lte: today } }).toArray();
-    const staffExceptions = await attendanceRecordsCol.find({ staffName: name, type: { $in: ['holiday_off', 'absence'] } }).toArray();
+    const staffExceptions = await attendanceRecordsCol.find({ staffName: name, type: { $in: ['holiday_off', 'absence', 'yukyuu_paid'] } }).toArray();
     const exceptionDates = new Set(staffExceptions.map(r => r.date));
     workedHolidayDays = bonusDays.filter(d => !exceptionDates.has(d.date));
     holidayPoints = workedHolidayDays.length * 15;
