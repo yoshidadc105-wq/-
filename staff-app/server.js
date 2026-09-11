@@ -1336,11 +1336,13 @@ app.get('/dashboard', async (req, res) => {
           <div style="font-size:11px;color:#64748b">ボーナス ${bonusData.total}pt</div>
           <div style="font-size:16px;font-weight:900;color:#e11d48;margin-top:2px">${grandTotal}pt</div>
         </td>
-        <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <td onclick="event.stopPropagation()" style="white-space:nowrap;min-width:90px">
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
           <a href="/admin/login-as/${encodeURIComponent(name)}" class="btn-eval" style="background:linear-gradient(135deg,#6366f1,#818cf8)">👤 本人画面</a>
           <a href="/certificate?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-cert">賞状</a>
           <a href="/evaluation?name=${encodeURIComponent(name)}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}" target="_blank" class="btn-eval">評価表</a>
-          <button onclick="deleteStaffRecords('${esc(name)}')" style="background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🗑 記録削除</button>
+          <button onclick="deleteStaffRecords('${esc(name)}')" style="background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit">🗑 削除</button>
+          </div>
         </td>
       </tr>`;
   }).join('');
