@@ -1219,12 +1219,13 @@ app.get('/dashboard', async (req, res) => {
 
   // ===== 全スタッフのボーナスポイント計算 =====
   const bonusTable = [];
+  const BONUS_START = '2026-08-11';
+  const bonusFrom = req.query.bFrom || BONUS_START;
+  const bonusTo = req.query.bTo || new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10);
   if (bonusDaysCol && attendanceRecordsCol) {
-    const today = new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10);
-    const bonusDays = await bonusDaysCol.find({ active: true, date: { $lte: today } }).toArray();
+    const bonusDays = await bonusDaysCol.find({ active: true, date: { $gte: bonusFrom, $lte: bonusTo } }).toArray();
     const allExceptions = await attendanceRecordsCol.find({}).toArray();
-    const nowJst = new Date(Date.now() + 9*60*60*1000);
-    const todayStr = nowJst.toISOString().slice(0, 10);
+    const todayStr = bonusTo;
     const staffNamesList = await loadStaffNames();
     for (const sName of staffNamesList) {
       const exceptions = allExceptions.filter(r => r.staffName === sName && ['holiday_off','absence'].includes(r.type));
@@ -1239,6 +1240,7 @@ app.get('/dashboard', async (req, res) => {
         const nextY = mo === 12 ? y + 1 : y; const nextMo = mo === 12 ? 1 : mo + 1;
         const periodEnd = `${nextY}-${pad(nextMo)}-10`;
         if (periodEnd >= todayStr) break;
+        if (periodStart < bonusFrom) { mo = nextMo; y = nextY; continue; }
         if (!absences.some(r => r.date >= periodStart && r.date <= periodEnd)) { kPts += 10; kMonths++; }
         mo = nextMo; y = nextY;
       }
@@ -1769,6 +1771,17 @@ td{padding:11px 14px;vertical-align:middle}
   <!-- ボーナスポイント一覧 -->
   <div class="section-header"><h2>🎁 ボーナスポイント一覧</h2><div class="section-line"></div></div>
   <div class="mgmt-card" style="max-width:760px;margin-bottom:24px;overflow-x:auto">
+    <form method="get" action="/dashboard" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <input type="hidden" name="from" value="${esc(from||'')}">
+      <input type="hidden" name="to" value="${esc(to||'')}">
+      <input type="hidden" name="staff" value="${esc(staffFilter||'')}">
+      <label style="font-size:12px;color:#64748b;font-weight:600">期間</label>
+      <input type="date" name="bFrom" value="${esc(bonusFrom)}" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 9px;font-size:13px;font-family:inherit;background:#f8fafc">
+      <span style="color:#cbd5e1">—</span>
+      <input type="date" name="bTo" value="${esc(bonusTo)}" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 9px;font-size:13px;font-family:inherit;background:#f8fafc">
+      <button type="submit" class="btn-primary">絞り込む</button>
+      <a href="/dashboard${from||to||staffFilter?`?from=${from||''}&to=${to||''}&staff=${staffFilter||''}`:''}#bonus" style="font-size:12px;color:#64748b;text-decoration:none">リセット</a>
+    </form>
     ${bonusTableHtml}
   </div>
 
