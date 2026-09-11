@@ -1227,7 +1227,9 @@ app.get('/dashboard', async (req, res) => {
     const allExceptions = await attendanceRecordsCol.find({}).toArray();
     const todayStr = bonusTo;
     const staffNamesList = await loadStaffNames();
+    const BONUS_EXCLUDED = (sName) => sName.startsWith('吉田') || sName.startsWith('秋葉');
     for (const sName of staffNamesList) {
+      if (BONUS_EXCLUDED(sName)) continue;
       const exceptions = allExceptions.filter(r => r.staffName === sName && ['holiday_off','absence'].includes(r.type));
       const exceptionDates = new Set(exceptions.map(r => r.date));
       const worked = bonusDays.filter(d => !exceptionDates.has(d.date));
