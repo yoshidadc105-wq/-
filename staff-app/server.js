@@ -771,6 +771,11 @@ app.post('/peer-eval', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/staff-settings-all', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  res.json(await loadStaffSettings());
+});
+
 app.get('/api/staff-names', async (req, res) => {
   res.json(await loadStaffNames());
 });
@@ -865,6 +870,17 @@ app.post('/admin/staff-settings', async (req, res) => {
   const { staffName, showKuchikomi } = req.body;
   if (!staffName) return res.status(400).json({ error: 'staffName required' });
   await saveStaffSetting(staffName, { showKuchikomi: !!showKuchikomi });
+  res.json({ ok: true });
+});
+
+// 隔週休み設定API
+app.post('/admin/alternate-off', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, enabled, dayOfWeek, referenceDate } = req.body;
+  if (!staffName) return res.status(400).json({ error: 'staffName required' });
+  await saveStaffSetting(staffName, {
+    alternateOff: enabled ? { enabled: true, dayOfWeek: Number(dayOfWeek), referenceDate } : { enabled: false }
+  });
   res.json({ ok: true });
 });
 // 項目ON/OFF切り替えAPI
@@ -1227,12 +1243,25 @@ app.get('/dashboard', async (req, res) => {
     const allExceptions = await attendanceRecordsCol.find({}).toArray();
     const todayStr = new Date(Date.now() + 9*60*60*1000).toISOString().slice(0,10);
     const staffNamesList = await loadStaffNames();
+    const allSettings = await loadStaffSettings();
     const BONUS_EXCLUDED = (sName) => sName.startsWith('吉田') || sName.startsWith('秋葉');
+    // 隔週休みの日付かどうか判定
+    const isAlternateOffDay = (setting, dateStr) => {
+      if (!setting || !setting.enabled) return false;
+      const d = new Date(dateStr);
+      if (d.getDay() !== setting.dayOfWeek) return false;
+      const ref = new Date(setting.referenceDate);
+      const diffDays = Math.round((d - ref) / 86400000);
+      const diffWeeks = Math.round(diffDays / 7);
+      return diffWeeks % 2 === 0; // 基準日と同じ週サイクル＝休み
+    };
     for (const sName of staffNamesList) {
       if (BONUS_EXCLUDED(sName)) continue;
+      const staffSetting = allSettings.find(s => s.staffName === sName);
+      const altOff = staffSetting && staffSetting.alternateOff;
       const exceptions = allExceptions.filter(r => r.staffName === sName && ['holiday_off','absence','yukyuu_paid'].includes(r.type));
       const exceptionDates = new Set(exceptions.map(r => r.date));
-      const worked = bonusDays.filter(d => !exceptionDates.has(d.date));
+      const worked = bonusDays.filter(d => !exceptionDates.has(d.date) && !isAlternateOffDay(altOff, d.date));
       const hPts = worked.length * 15;
       const absences = allExceptions.filter(r => r.staffName === sName && r.type === 'yukyuu');
       let kPts = 0, kMonths = 0;
@@ -1797,6 +1826,33 @@ td{padding:11px 14px;vertical-align:middle}
     <div style="margin-bottom:16px">
       <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">土曜・祝日ボーナス日一覧（全件・過去含む）</div>
       <div id="bonusDaysList" style="font-size:12px;max-height:240px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px"></div>
+    </div>
+    <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">🔄 隔週休み設定（ボーナス自動除外）</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px">対象曜日の祝日・土曜が隔週休みの週に当たる場合、ボーナスポイントから自動除外されます（皆勤には影響なし）</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">スタッフ</label>
+          <select id="altOffStaff" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+            <option value="">選択</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">休む曜日</label>
+          <select id="altOffDay" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+            <option value="0">日</option><option value="1">月</option><option value="2">火</option>
+            <option value="3">水</option><option value="4">木</option><option value="5">金</option><option value="6">土</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">基準日（休みの週の日付）</label>
+          <input type="date" id="altOffRef" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+        </div>
+        <button onclick="saveAlternateOff(true)" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">設定</button>
+        <button onclick="saveAlternateOff(false)" style="background:#e2e8f0;color:#475569;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">解除</button>
+        <span id="altOffMsg" style="font-size:12px;color:#059669"></span>
+      </div>
+      <div id="altOffList" style="font-size:12px;border:1px solid #e2e8f0;border-radius:8px;padding:8px;min-height:40px"></div>
     </div>
     <div style="border-top:1px solid #e2e8f0;padding-top:14px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">休み登録（個別スタッフ）</div>
@@ -2580,12 +2636,44 @@ async function deleteAttendance(id) {
 (async function loadAttStaffOptions() {
   const res = await fetch('/api/staff-names');
   const names = await res.json();
-  const sel = document.getElementById('attStaffName');
-  if (!sel) return;
-  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+  ['attStaffName','altOffStaff'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+  });
 })();
+async function saveAlternateOff(enabled) {
+  const staffName = document.getElementById('altOffStaff').value;
+  const dayOfWeek = document.getElementById('altOffDay').value;
+  const referenceDate = document.getElementById('altOffRef').value;
+  const msg = document.getElementById('altOffMsg');
+  if (!staffName) { msg.style.color='#dc2626'; msg.textContent='スタッフを選択してください'; return; }
+  if (enabled && !referenceDate) { msg.style.color='#dc2626'; msg.textContent='基準日を入力してください'; return; }
+  const res = await adminFetch('/admin/alternate-off', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, enabled, dayOfWeek, referenceDate }) });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent=enabled?'設定しました':'解除しました'; loadAlternateOffList(); setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
+}
+const DOW = ['日','月','火','水','木','金','土'];
+async function loadAlternateOffList() {
+  const el = document.getElementById('altOffList');
+  if (!el) return;
+  const res = await fetch('/api/staff-names');
+  const names = await res.json();
+  const settingsRes = await adminFetch('/api/staff-settings-all');
+  if (!settingsRes.ok) { el.innerHTML='<span style="color:#94a3b8">設定なし</span>'; return; }
+  const settings = await settingsRes.json();
+  const active = settings.filter(s => s.alternateOff && s.alternateOff.enabled);
+  if (!active.length) { el.innerHTML='<span style="color:#94a3b8">設定なし</span>'; return; }
+  el.innerHTML = active.map(s => {
+    const ao = s.alternateOff;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9">'
+      + '<span style="flex:1"><b>' + s.staffName + '</b>：毎週' + DOW[ao.dayOfWeek] + '曜・隔週休み（基準日：' + ao.referenceDate + '）</span>'
+      + '</div>';
+  }).join('');
+}
 loadBonusDaysList();
 loadAttendanceList();
+loadAlternateOffList();
 <\/script>
 </body>
 </html>`);
@@ -2869,7 +2957,18 @@ app.get('/my-stats', async (req, res) => {
     const bonusDays = await bonusDaysCol.find({ active: true, date: { $gte: '2026-08-11', $lte: today } }).toArray();
     const staffExceptions = await attendanceRecordsCol.find({ staffName: name, type: { $in: ['holiday_off', 'absence', 'yukyuu_paid'] } }).toArray();
     const exceptionDates = new Set(staffExceptions.map(r => r.date));
-    workedHolidayDays = bonusDays.filter(d => !exceptionDates.has(d.date));
+    const mySettings = await loadStaffSettings();
+    const mySetting = mySettings.find(s => s.staffName === name);
+    const myAltOff = mySetting && mySetting.alternateOff;
+    const isMyAlternateOff = (dateStr) => {
+      if (!myAltOff || !myAltOff.enabled) return false;
+      const d = new Date(dateStr);
+      if (d.getDay() !== myAltOff.dayOfWeek) return false;
+      const ref = new Date(myAltOff.referenceDate);
+      const diffWeeks = Math.round((d - ref) / (7 * 86400000));
+      return diffWeeks % 2 === 0;
+    };
+    workedHolidayDays = bonusDays.filter(d => !exceptionDates.has(d.date) && !isMyAlternateOff(d.date));
     holidayPoints = workedHolidayDays.length * 15;
     const absences = await attendanceRecordsCol.find({ staffName: name, type: 'yukyuu' }).toArray();
     const nowJst = new Date(Date.now() + 9*60*60*1000);
