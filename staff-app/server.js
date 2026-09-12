@@ -2866,7 +2866,7 @@ app.get('/my-stats', async (req, res) => {
   let holidayPoints = 0, workedHolidayDays = [];
   let kankinPoints = 0, kankinMonths = 0;
   if (bonusDaysCol && attendanceRecordsCol) {
-    const bonusDays = await bonusDaysCol.find({ active: true, date: { $lte: today } }).toArray();
+    const bonusDays = await bonusDaysCol.find({ active: true, date: { $gte: '2026-08-11', $lte: today } }).toArray();
     const staffExceptions = await attendanceRecordsCol.find({ staffName: name, type: { $in: ['holiday_off', 'absence', 'yukyuu_paid'] } }).toArray();
     const exceptionDates = new Set(staffExceptions.map(r => r.date));
     workedHolidayDays = bonusDays.filter(d => !exceptionDates.has(d.date));
