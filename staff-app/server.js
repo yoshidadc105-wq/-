@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 
+// 土日祝・皆勤ポイント表示フラグ（falseで非表示）
+const BONUS_VISIBLE = false;
+
 const app = express();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -1356,6 +1359,7 @@ app.get('/dashboard', async (req, res) => {
         <td onclick="event.stopPropagation()" style="min-width:100px">
           ${goalParts || '<span style="color:#cbd5e1;font-size:11px">未設定</span>'}
         </td>
+        ${BONUS_VISIBLE ? `
         <td class="num" onclick="event.stopPropagation()" style="min-width:90px;font-size:11px">
           <div style="color:#6366f1">${bonusData.holidayDays}日×15pt</div>
           <div style="color:#6366f1;font-weight:700">${bonusData.hPts}pt</div>
@@ -1368,7 +1372,7 @@ app.get('/dashboard', async (req, res) => {
           <div style="font-size:11px;color:#64748b">評価 ${peerEvalPts}pt</div>
           <div style="font-size:11px;color:#64748b">ボーナス ${bonusData.total}pt</div>
           <div style="font-size:16px;font-weight:900;color:#e11d48;margin-top:2px">${grandTotal}pt</div>
-        </td>
+        </td>` : ''}
         <td onclick="event.stopPropagation()" style="white-space:nowrap;min-width:90px">
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
           <a href="/admin/login-as/${encodeURIComponent(name)}" class="btn-eval" style="background:linear-gradient(135deg,#6366f1,#818cf8)">👤 本人画面</a>
@@ -1619,7 +1623,7 @@ td{padding:11px 14px;vertical-align:middle}
       <thead><tr>
         <th>スタッフ</th><th class="num">書き込み</th><th class="num">患者数</th>
         ${thCols}
-        <th>目標進捗</th><th class="num">ボーナスpt</th><th class="num">合計pt</th><th>出力</th>
+        <th>目標進捗</th>${BONUS_VISIBLE ? '<th class="num">ボーナスpt</th><th class="num">合計pt</th>' : ''}<th>出力</th>
       </tr></thead>
       <tbody>${summaryRows || `<tr><td colspan="${5 + groupOrder.length}" class="empty">まだデータがありません</td></tr>`}</tbody>
     </table>
@@ -1800,8 +1804,8 @@ td{padding:11px 14px;vertical-align:middle}
   </div>
 
   <!-- ボーナスポイント一覧 -->
-  <div class="section-header"><h2>🎁 ボーナスポイント一覧</h2><div class="section-line"></div></div>
-  <div class="mgmt-card" style="max-width:760px;margin-bottom:24px;overflow-x:auto">
+  ${BONUS_VISIBLE ? '<div class="section-header"><h2>🎁 ボーナスポイント一覧</h2><div class="section-line"></div></div>' : ''}
+  ${BONUS_VISIBLE ? `<div class="mgmt-card" style="max-width:760px;margin-bottom:24px;overflow-x:auto">
     <form method="get" action="/dashboard" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <input type="hidden" name="from" value="${esc(from||'')}">
       <input type="hidden" name="to" value="${esc(to||'')}">
@@ -1814,7 +1818,7 @@ td{padding:11px 14px;vertical-align:middle}
       <a href="/dashboard${from||to||staffFilter?`?from=${from||''}&to=${to||''}&staff=${staffFilter||''}`:''}#bonus" style="font-size:12px;color:#64748b;text-decoration:none">リセット</a>
     </form>
     ${bonusTableHtml}
-  </div>
+  </div>` : ''}
 
   <!-- 出勤・欠勤管理 -->
   <div class="section-header"><h2>📅 出勤・欠勤管理</h2><div class="section-line"></div></div>
@@ -3377,7 +3381,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
   </div>
 
   <!-- ボーナスポイント -->
-  ${bonusHtml}
+  ${BONUS_VISIBLE ? bonusHtml : ''}
 
   <div class="card" id="calCard">
     <div class="card-header">📅 記録カレンダー</div>
