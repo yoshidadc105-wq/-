@@ -20,14 +20,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(session({
-  store: new FileStore({ path: SESSION_DIR, ttl: 60 * 60 * 24 * 30, retries: 0 }),
+  store: new FileStore({ path: SESSION_DIR, ttl: 86400, retries: 0 }),
   secret: process.env.SESSION_SECRET || 'manual-system-secret-2024',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
