@@ -226,8 +226,8 @@ async function loadManual(){
     bodyHtml=`<div class="card"><div class="card-body"><div class="manual-content">${manualData.content||''}</div></div></div>`;
   }
   const editBtns=manualData.type!=='pdf'&&isAdmin?`<div class="flex gap-2"><a href="/create.html?id=${manualId}" class="btn btn-secondary btn-sm">✏ 編集</a><button onclick="openMoveModal()" class="btn btn-secondary btn-sm">📁 移動</button><button onclick="openModal('deleteModal')" class="btn btn-danger btn-sm">🗑 削除</button></div>`:'';
-  const checkAreaHtml=manualData.type!=='pdf'?`<div class="card mt-2"><div class="card-body" style="text-align:center;padding:24px" id="checkArea"><div class="loading" style="padding:16px"></div></div></div>`:'';
-  document.getElementById('content').innerHTML=`
+  const copyBtn=`<button onclick="copyManualUrl()" class="btn btn-secondary btn-sm" style="white-space:nowrap">🔗 URLをコピー</button>`;
+  const checkAreaHtml=manualData.type!=='pdf'?`<div class="card mt-2"><div class="card-body" style="text-align:center;padding:24px" id="checkArea"><div class="loading" style="padding:16px"></div></div></div>`:'';  document.getElementById('content').innerHTML=`
     <div class="card mb-2"><div class="card-header">
       <div>
         <div class="flex items-center gap-2 mb-1">
@@ -238,13 +238,37 @@ async function loadManual(){
         ${manualData.description?`<p class="text-muted text-sm mt-1">${manualData.description}</p>`:''}
         <div class="text-sm text-muted mt-1">作成者: ${manualData.created_by_name} · 作成日: ${formatDate(manualData.created_at)} · 更新日: ${formatDate(manualData.updated_at)}</div>
       </div>
-      ${editBtns}
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0">
+        ${copyBtn}
+        ${editBtns}
+      </div>
     </div></div>
     ${bodyHtml}
     ${checkAreaHtml}`;
 }
 
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function copyManualUrl(){
+  const url=location.href;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>showCopyToast()).catch(()=>fallbackCopy(url));
+  }else{fallbackCopy(url);}
+}
+function fallbackCopy(url){
+  const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');showCopyToast();}catch(e){}
+  document.body.removeChild(ta);
+}
+function showCopyToast(){
+  let t=document.getElementById('copyToast');
+  if(!t){t=document.createElement('div');t.id='copyToast';
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:9999;pointer-events:none;transition:opacity .3s';
+    document.body.appendChild(t);}
+  t.textContent='URLをコピーしました';t.style.opacity='1';
+  clearTimeout(t._to);t._to=setTimeout(()=>{t.style.opacity='0';},2000);
+}
 
 async function loadCheckStatus(){
   const area=document.getElementById('checkArea');if(!area)return;
