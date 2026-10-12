@@ -1179,6 +1179,8 @@ app.get('/dashboard', async (req, res) => {
     }
   }
 
+  const staffSettings = await loadStaffSettings();
+
   const staffList = Object.entries(byStaff)
     .filter(([name]) => {
       const s = (staffSettings || []).find(s => s.staffName === name);
@@ -1315,8 +1317,6 @@ app.get('/dashboard', async (req, res) => {
       </tr>`).join('')}</tbody>
     </table>`;
   // ===== /全スタッフのボーナスポイント計算 =====
-
-  const staffSettings = await loadStaffSettings();
 
   // 全アイテムをグループ別にまとめてカラム定義を作る（defaultHiddenに関わらず全グループ表示）
   const dashItems = await loadActionItems();
