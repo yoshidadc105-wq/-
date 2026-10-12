@@ -1304,9 +1304,9 @@ app.get('/dashboard', async (req, res) => {
 
   const staffSettings = await loadStaffSettings();
 
-  // ONになっているアイテムをグループ別にまとめてカラム定義を作る
+  // 全アイテムをグループ別にまとめてカラム定義を作る（defaultHiddenに関わらず全グループ表示）
   const dashItems = await loadActionItems();
-  const enabledItems = dashItems.filter(i => !i.defaultHidden);
+  const enabledItems = dashItems;
   const groupOrder = [];
   const groupItemsMap = {};
   for (const item of enabledItems) {
