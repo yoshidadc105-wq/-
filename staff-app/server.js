@@ -876,6 +876,15 @@ app.post('/admin/staff-settings', async (req, res) => {
   res.json({ ok: true });
 });
 
+// 退職フラグAPI
+app.post('/admin/staff-retired', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { staffName, retired } = req.body;
+  if (!staffName) return res.status(400).json({ error: 'staffName required' });
+  await saveStaffSetting(staffName, { retired: !!retired });
+  res.json({ ok: true });
+});
+
 // 隔週休み設定API
 app.post('/admin/alternate-off', async (req, res) => {
   if (!checkAuth(req, res)) return;
@@ -1170,7 +1179,12 @@ app.get('/dashboard', async (req, res) => {
     }
   }
 
-  const staffList = Object.entries(byStaff).sort((a, b) => a[0].localeCompare(b[0], 'ja'));
+  const staffList = Object.entries(byStaff)
+    .filter(([name]) => {
+      const s = (staffSettings || []).find(s => s.staffName === name);
+      return !s || !s.retired;
+    })
+    .sort((a, b) => a[0].localeCompare(b[0], 'ja'));
 
   // 月別集計
   const byStaffMonth = {}; // { staffName: { 'YYYY-MM': { total, items, counseling, reviews } } }
@@ -1770,7 +1784,7 @@ td{padding:11px 14px;vertical-align:middle}
     <div class="table-scroll">
     <table id="staffTable">
       <thead><tr>
-        <th>スタッフ名</th><th>メールアドレス</th><th>最終ログイン</th><th style="text-align:center">評価者</th><th style="text-align:center">操作</th>
+        <th>スタッフ名</th><th>メールアドレス</th><th>最終ログイン</th><th style="text-align:center">評価者</th><th style="text-align:center">退職</th><th style="text-align:center">操作</th>
       </tr></thead>
       <tbody id="staffTableBody"></tbody>
     </table>
@@ -2318,14 +2332,15 @@ async function loadStaffTable() {
   const settingsMap = {};
   settings.forEach(s => { settingsMap[s.staffName] = s; });
   const tbody = document.getElementById('staffTableBody');
-  if (!names.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">スタッフが登録されていません</td></tr>'; return; }
+  if (!names.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">スタッフが登録されていません</td></tr>'; return; }
   tbody.innerHTML = '';
   names.forEach(n => {
     const a = accountMap[n] || {};
     const s = settingsMap[n] || {};
     const tr = document.createElement('tr');
+    if (s.retired) tr.style.opacity = '0.45';
     const loginTime = a.lastLogin ? new Date(a.lastLogin).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '未ログイン';
-    tr.innerHTML = '<td><strong>' + n + '</strong></td>' +
+    tr.innerHTML = '<td><strong>' + n + '</strong>' + (s.retired ? ' <span style="background:#fee2e2;color:#dc2626;font-size:10px;border-radius:4px;padding:1px 5px">退職</span>' : '') + '</td>' +
       '<td style="color:#475569">' + (a.email || '<span style="color:#cbd5e1">未設定</span>') + '</td>' +
       '<td style="color:#94a3b8;font-size:12px">' + loginTime + '</td>';
     // 評価者トグル
@@ -2341,6 +2356,19 @@ async function loadStaffTable() {
     };
     evalTd.appendChild(evalBtn);
     tr.appendChild(evalTd);
+    // 退職トグル
+    const retiredTd = document.createElement('td');
+    retiredTd.style.cssText = 'text-align:center';
+    const retiredBtn = document.createElement('button');
+    retiredBtn.textContent = s.retired ? '復帰' : '退職';
+    retiredBtn.style.cssText = 'border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;' + (s.retired ? 'background:#dcfce7;color:#16a34a' : 'background:#f1f5f9;color:#64748b');
+    retiredBtn.onclick = async function() {
+      if (!confirm(n + ' を' + (s.retired ? '現役に戻しますか？' : '退職済みにしますか？（サマリーから非表示になります）'))) return;
+      await adminFetch('/admin/staff-retired', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName: n, retired: !s.retired }) });
+      loadStaffTable();
+    };
+    retiredTd.appendChild(retiredBtn);
+    tr.appendChild(retiredTd);
     const opTd = document.createElement('td');
     opTd.style.cssText = 'text-align:center;white-space:nowrap';
     const editBtn = document.createElement('button');
