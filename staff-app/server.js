@@ -1180,9 +1180,11 @@ app.get('/dashboard', async (req, res) => {
   }
 
   const staffSettings = await loadStaffSettings();
+  const currentStaffNames = new Set(await loadStaffNames());
 
   const staffList = Object.entries(byStaff)
     .filter(([name]) => {
+      if (!currentStaffNames.has(name)) return false; // 削除済みスタッフを除外
       const s = (staffSettings || []).find(s => s.staffName === name);
       return !s || !s.retired;
     })
