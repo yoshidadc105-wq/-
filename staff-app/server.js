@@ -1881,7 +1881,7 @@ td{padding:11px 14px;vertical-align:middle}
         <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">スタッフ</label>
         <select id="mkStaffName" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
           <option value="">選択...</option>
-          ${(await loadStaffNames()).map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+          ${(await loadStaffNames()).map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('')}
         </select>
       </div>
       <div>
