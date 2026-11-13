@@ -2637,7 +2637,7 @@ async function loadMuketsukinList() {
   const totals = {};
   records.forEach(r => { totals[r.staffName] = (totals[r.staffName]||0) + r.points; });
   el.innerHTML = '<div style="margin-bottom:8px;font-size:11px;color:#475569;font-weight:700">合計: '
-    + Object.entries(totals).map(([n,p])=>`<b>${n}</b> ${p}pt`).join(' / ')
+    + Object.entries(totals).map(([n,p])=>'<b>'+n+'</b> '+p+'pt').join(' / ')
     + '</div>'
     + records.map(r =>
       '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">'
