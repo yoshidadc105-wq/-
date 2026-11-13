@@ -1990,9 +1990,12 @@ td{padding:11px 14px;vertical-align:middle}
   </div>
 </div>
 
+<script type="application/json" id="_sd">${JSON.stringify(staffDataObj).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')}<\/script>
+<script type="application/json" id="_md">${JSON.stringify(monthData).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')}<\/script>
+
 <script>
-const STAFF_DATA = ${JSON.stringify(staffDataObj)};
-const MONTH_DATA = ${JSON.stringify(monthData)};
+const STAFF_DATA = JSON.parse(document.getElementById('_sd').textContent);
+const MONTH_DATA = JSON.parse(document.getElementById('_md').textContent);
 const COUNT_UNIT_JS = ${JSON.stringify(COUNT_UNIT)};
 const ADMIN_AUTH = 'Basic ' + btoa(':' + ${JSON.stringify(ADMIN_PASSWORD)});
 function adminFetch(url, opts) {
