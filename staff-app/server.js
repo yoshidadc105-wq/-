@@ -1368,6 +1368,13 @@ app.get('/dashboard', async (req, res) => {
 
   const thCols = groupOrder.map(g => `<th class="num">${esc(g)}</th>`).join('') + `<th class="num">その他</th>`;
 
+  // 無欠勤ポイントをスタッフ別に集計
+  const muketsukinByStaff = {};
+  if (muketsukinCol) {
+    const mkAll = await muketsukinCol.find({}).toArray();
+    for (const r of mkAll) muketsukinByStaff[r.staffName] = (muketsukinByStaff[r.staffName] || 0) + (r.points || 0);
+  }
+
   const summaryRows = staffList.map(([name, s]) => {
     const initial = name.charAt(0);
     const groupCells = groupOrder.map(g => {
@@ -1399,7 +1406,8 @@ app.get('/dashboard', async (req, res) => {
     const peerEvalCount = (s.peerEvals || []).length;
     const peerEvalPts = s.actionMap['その他'] || 0;
     const actionPts = s.count - peerEvalCount; // 通常アクション件数（1件1pt）
-    const grandTotal = actionPts + peerEvalPts + bonusData.total;
+    const mkPts = muketsukinByStaff[name] || 0;
+    const grandTotal = actionPts + peerEvalPts + bonusData.total + mkPts;
 
     return `
       <tr class="staff-row" onclick="openModal('${esc(name).replace(/'/g, "\\'")}')">
@@ -1423,6 +1431,7 @@ app.get('/dashboard', async (req, res) => {
           <div style="font-size:11px;color:#64748b">通常 ${actionPts}pt</div>
           <div style="font-size:11px;color:#64748b">評価 ${peerEvalPts}pt</div>
           <div style="font-size:11px;color:#64748b">ボーナス ${bonusData.total}pt</div>
+          ${mkPts > 0 ? `<div style="font-size:11px;color:#0f766e">無欠勤 ${mkPts}pt</div>` : ''}
           <div style="font-size:16px;font-weight:900;color:#e11d48;margin-top:2px">${grandTotal}pt</div>
         </td>` : ''}
         <td onclick="event.stopPropagation()" style="white-space:nowrap;min-width:90px">
