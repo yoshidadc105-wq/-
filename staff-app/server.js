@@ -25,6 +25,7 @@ let staffAccountsCol = null;
 let actionItemsCol = null;
 let bonusDaysCol = null;
 let attendanceRecordsCol = null;
+let muketsukinCol = null;
 if (MONGODB_URI) {
   const client = new MongoClient(MONGODB_URI);
   client.connect()
@@ -36,6 +37,7 @@ if (MONGODB_URI) {
       actionItemsCol = client.db('nobinobi').collection('action_items');
       bonusDaysCol = client.db('nobinobi').collection('bonus_days');
       attendanceRecordsCol = client.db('nobinobi').collection('attendance_records');
+      muketsukinCol = client.db('nobinobi').collection('muketsukin_points');
       console.log('MongoDB接続成功');
     })
     .catch(err => console.error('MongoDB接続失敗（JSONファイルで継続）:', err.message));
@@ -1072,6 +1074,40 @@ app.post('/admin/init-bonus-days', async (req, res) => {
   res.json({ ok: true, count });
 });
 
+// ===== 無欠勤ポイント =====
+app.get('/api/muketsukin', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!muketsukinCol) return res.json([]);
+  const records = await muketsukinCol.find({}).sort({ date: -1, createdAt: -1 }).toArray();
+  res.json(records);
+});
+
+app.post('/admin/muketsukin', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!muketsukinCol) return res.status(503).json({ error: 'DB not connected' });
+  const { staffName, date, points, note } = req.body;
+  if (!staffName || !date || !points) return res.status(400).json({ error: 'staffName, date, points required' });
+  const doc = { id: crypto.randomUUID(), staffName, date, points: parseInt(points), note: note || '', createdAt: new Date().toISOString() };
+  await muketsukinCol.insertOne(doc);
+  res.json({ ok: true, id: doc.id });
+});
+
+app.delete('/admin/muketsukin/:id', async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!muketsukinCol) return res.status(503).json({ error: 'DB not connected' });
+  await muketsukinCol.deleteOne({ id: req.params.id });
+  res.json({ ok: true });
+});
+
+app.get('/api/muketsukin-staff', async (req, res) => {
+  const token = (req.headers.cookie || '').match(/staffSession=([^;]+)/)?.[1];
+  const name = token ? verifyStaffToken(decodeURIComponent(token)) : null;
+  if (!name) return res.status(401).json({ error: 'unauthorized' });
+  if (!muketsukinCol) return res.json([]);
+  const records = await muketsukinCol.find({ staffName: name }).sort({ date: -1 }).toArray();
+  res.json(records);
+});
+
 // ===== /dashboard-login =====
 app.get('/dashboard-login', (req, res) => {
   if (getAdminFromReq(req)) return res.redirect('/dashboard');
@@ -1910,6 +1946,36 @@ td{padding:11px 14px;vertical-align:middle}
     </div>
   </div>
 
+  <!-- 無欠勤ポイント管理 -->
+  <div class="section-header"><h2>🏆 無欠勤ポイント管理</h2><div class="section-line"></div></div>
+  <div class="mgmt-card" style="max-width:760px;margin-bottom:24px">
+    <div style="font-size:12px;color:#64748b;margin-bottom:14px">スタッフへ無欠勤ポイントを手動で付与・削除できます。スタッフのマイページに表示されます。</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">スタッフ</label>
+        <select id="mkStaffName" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+          <option value="">選択...</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">日付</label>
+        <input type="date" id="mkDate" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none" />
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">ポイント数</label>
+        <input type="number" id="mkPoints" value="3" min="1" max="99" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;width:80px" />
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">備考（任意）</label>
+        <input type="text" id="mkNote" placeholder="例: 11月分" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;width:140px" />
+      </div>
+      <button onclick="addMuketsukin()" style="background:linear-gradient(135deg,#0f766e,#2aab96);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">付与</button>
+    </div>
+    <div id="mkMsg" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>
+    <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">付与履歴</div>
+    <div id="mkList" style="font-size:12px;max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px"></div>
+  </div>
+
 </div><!-- /container -->
 
 <!-- アクション項目追加モーダル -->
@@ -2708,6 +2774,58 @@ async function loadAlternateOffList() {
 loadBonusDaysList();
 loadAttendanceList();
 loadAlternateOffList();
+
+// 無欠勤ポイント
+(async function initMkStaffOptions() {
+  const res = await fetch('/api/staff-names');
+  const names = await res.json();
+  const sel = document.getElementById('mkStaffName');
+  if (!sel) return;
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+  // 今日の日付をデフォルト設定
+  const jst = new Date(Date.now() + 9*60*60*1000);
+  document.getElementById('mkDate').value = jst.toISOString().slice(0,10);
+})();
+async function addMuketsukin() {
+  const staffName = document.getElementById('mkStaffName').value;
+  const date = document.getElementById('mkDate').value;
+  const points = document.getElementById('mkPoints').value;
+  const note = document.getElementById('mkNote').value;
+  const msg = document.getElementById('mkMsg');
+  if (!staffName) { msg.style.color='#dc2626'; msg.textContent='スタッフを選択してください'; return; }
+  if (!date) { msg.style.color='#dc2626'; msg.textContent='日付を入力してください'; return; }
+  if (!points || points < 1) { msg.style.color='#dc2626'; msg.textContent='ポイント数を入力してください'; return; }
+  const res = await adminFetch('/admin/muketsukin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ staffName, date, points, note }) });
+  if (res.ok) { msg.style.color='#059669'; msg.textContent='付与しました'; loadMuketsukinList(); setTimeout(()=>msg.textContent='',3000); }
+  else { msg.style.color='#dc2626'; msg.textContent='失敗しました'; }
+}
+async function loadMuketsukinList() {
+  const el = document.getElementById('mkList');
+  if (!el) return;
+  const res = await adminFetch('/api/muketsukin');
+  if (!res.ok) { el.innerHTML='<span style="color:#94a3b8">取得失敗</span>'; return; }
+  const records = await res.json();
+  if (!records.length) { el.innerHTML='<span style="color:#94a3b8">まだありません</span>'; return; }
+  // スタッフ別合計を表示
+  const totals = {};
+  records.forEach(r => { totals[r.staffName] = (totals[r.staffName]||0) + r.points; });
+  el.innerHTML = '<div style="margin-bottom:8px;font-size:11px;color:#475569;font-weight:700">合計: '
+    + Object.entries(totals).map(([n,p])=>`<b>${n}</b> ${p}pt`).join(' / ')
+    + '</div>'
+    + records.map(r =>
+      '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">'
+      + '<span style="color:#0f766e;font-weight:700;min-width:60px">' + r.date + '</span>'
+      + '<span style="flex:1"><b>' + r.staffName + '</b>　+' + r.points + 'pt' + (r.note?' <span style="color:#94a3b8">'+r.note+'</span>':'') + '</span>'
+      + '<button onclick="deleteMuketsukin(\'' + r.id + '\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">削除</button>'
+      + '</div>'
+    ).join('');
+}
+async function deleteMuketsukin(id) {
+  if (!confirm('このポイントを削除しますか？')) return;
+  await adminFetch('/admin/muketsukin/' + id, { method: 'DELETE' });
+  loadMuketsukinList();
+}
+loadMuketsukinList();
 <\/script>
 </body>
 </html>`);
@@ -3043,6 +3161,31 @@ app.get('/my-stats', async (req, res) => {
     </div>
   </div>`;
   // ===== /ボーナスポイント計算 =====
+
+  // ===== 無欠勤ポイント =====
+  let muketsukinRecords = [];
+  let muketsukinTotal = 0;
+  if (muketsukinCol) {
+    muketsukinRecords = await muketsukinCol.find({ staffName: name }).sort({ date: -1 }).toArray();
+    muketsukinTotal = muketsukinRecords.reduce((s, r) => s + (r.points || 0), 0);
+  }
+  const muketsukinHtml = `<div class="card" style="margin-bottom:16px">
+    <div class="card-header">🏆 無欠勤ポイント</div>
+    <div style="padding:14px 16px">
+      <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+        <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">累計</div>
+        <div style="font-size:28px;font-weight:900;color:#34d399">${muketsukinTotal}pt</div>
+      </div>
+      ${muketsukinRecords.length ? muketsukinRecords.map(r =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+          <span style="font-size:12px;color:rgba(255,255,255,.4);min-width:80px">${r.date}</span>
+          <span style="font-size:14px;font-weight:700;color:#6ee7b7">+${r.points}pt</span>
+          ${r.note ? `<span style="font-size:12px;color:rgba(255,255,255,.35)">${esc(r.note)}</span>` : ''}
+        </div>`
+      ).join('') : '<p style="color:rgba(255,255,255,.35);font-size:13px;text-align:center;padding:8px 0">まだありません</p>'}
+    </div>
+  </div>`;
+  // ===== /無欠勤ポイント =====
 
   const staffNames = await loadStaffNames();
   const settings = await loadStaffSettings();
@@ -3409,6 +3552,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:#071020;color:#e2e8f0;font
     </div>
     <div style="padding:4px 0">${evalHtml}</div>
   </div>
+
+  <!-- 無欠勤ポイント -->
+  ${muketsukinHtml}
 
   <!-- ボーナスポイント -->
   ${BONUS_VISIBLE ? bonusHtml : ''}
