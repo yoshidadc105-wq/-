@@ -1366,7 +1366,7 @@ app.get('/dashboard', async (req, res) => {
     groupItemsMap[item.group].push(item.name);
   }
 
-  const thCols = groupOrder.map(g => `<th class="num">${esc(g)}</th>`).join('') + `<th class="num">その他</th>`;
+  const thCols = groupOrder.map(g => `<th class="num">${esc(g)}</th>`).join('') + `<th class="num">その他</th><th class="num">無欠勤</th>`;
 
   // 無欠勤ポイントをスタッフ別に集計
   const muketsukinByStaff = {};
@@ -1386,6 +1386,8 @@ app.get('/dashboard', async (req, res) => {
     }).join('');
     const otherTotal = s.actionMap['その他'] || 0;
     const otherCell = `<td class="num">${otherTotal > 0 ? `<span class="badge badge-gray">${otherTotal}pt</span>` : `<span style="color:#cbd5e1">0</span>`}</td>`;
+    const mkPts = muketsukinByStaff[name] || 0;
+    const mkCell = `<td class="num">${mkPts > 0 ? `<span class="badge" style="background:#d1fae5;color:#065f46">${mkPts}pt</span>` : `<span style="color:#cbd5e1">0</span>`}</td>`;
 
     const stSetting = staffSettings.find(x => x.staffName === name) || {};
     const g = stSetting.goals || {};
@@ -1406,7 +1408,6 @@ app.get('/dashboard', async (req, res) => {
     const peerEvalCount = (s.peerEvals || []).length;
     const peerEvalPts = s.actionMap['その他'] || 0;
     const actionPts = s.count - peerEvalCount; // 通常アクション件数（1件1pt）
-    const mkPts = muketsukinByStaff[name] || 0;
     const grandTotal = actionPts + peerEvalPts + bonusData.total + mkPts;
 
     return `
@@ -1416,6 +1417,7 @@ app.get('/dashboard', async (req, res) => {
         <td class="num">${s.patients.size}</td>
         ${groupCells}
         ${otherCell}
+        ${mkCell}
         <td onclick="event.stopPropagation()" style="min-width:100px">
           ${goalParts || '<span style="color:#cbd5e1;font-size:11px">未設定</span>'}
         </td>
