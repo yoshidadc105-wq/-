@@ -2606,16 +2606,11 @@ async function deleteStaffRecords(name) {
 }
 
 
-// 無欠勤ポイント
-(async function initMkStaffOptions() {
-  const res = await fetch('/api/staff-names');
-  const names = await res.json();
-  const sel = document.getElementById('mkStaffName');
-  if (!sel) return;
-  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
-  // 今日の日付をデフォルト設定
+// 無欠勤ポイント - 今日の日付をデフォルト設定
+(function() {
   const jst = new Date(Date.now() + 9*60*60*1000);
-  document.getElementById('mkDate').value = jst.toISOString().slice(0,10);
+  const el = document.getElementById('mkDate');
+  if (el) el.value = jst.toISOString().slice(0,10);
 })();
 async function addMuketsukin() {
   const staffName = document.getElementById('mkStaffName').value;
