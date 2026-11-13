@@ -2646,8 +2646,8 @@ async function loadMuketsukinList() {
     + records.map(r =>
       '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">'
       + '<span style="color:#0f766e;font-weight:700;min-width:60px">' + r.date + '</span>'
-      + '<span style="flex:1"><b>' + r.staffName + '</b>　+' + r.points + 'pt' + (r.note?' <span style="color:#94a3b8">'+r.note+'</span>':'') + '</span>'
-      + '<button onclick="deleteMuketsukin(\'' + r.id + '\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">削除</button>'
+      + '<span style="flex:1"><b>' + r.staffName + '</b>　+' + r.points + 'pt' + (r.note?' <span style="color:#94a3b8">'+r.note.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</span>':'') + '</span>'
+      + '<button onclick="deleteMuketsukin(\'' + String(r._id) + '\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">削除</button>'
       + '</div>'
     ).join('');
 }
